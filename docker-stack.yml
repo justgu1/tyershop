@@ -1,0 +1,176 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${MEDUSA_DB_NAME}
+      POSTGRES_USER: ${MEDUSA_DB_USER}
+      POSTGRES_PASSWORD_FILE: /run/secrets/medusa_db_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - tyershop_internal
+    secrets:
+      - medusa_db_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MEDUSA_DB_USER} -d ${MEDUSA_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+        failure_action: rollback
+      rollback_config:
+        order: stop-first
+
+  redis:
+    image: redis:7-alpine
+    command: >
+      sh -c "redis-server --appendonly yes --requirepass \"$$(cat /run/secrets/redis_password)\""
+    volumes:
+      - redis_data:/data
+    networks:
+      - tyershop_internal
+    secrets:
+      - redis_password
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$(cat /run/secrets/redis_password)\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+        failure_action: rollback
+      rollback_config:
+        order: stop-first
+
+  backend:
+    image: ghcr.io/justgu1/tyershop-backend:${TYERSHOP_BACKEND_TAG:-latest}
+    environment:
+      FILESYSTEM_DISK: ${FILESYSTEM_DISK}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+      AWS_BUCKET: ${AWS_BUCKET}
+      AWS_ENDPOINT: ${AWS_ENDPOINT}
+      AWS_USE_PATH_STYLE_ENDPOINT: ${AWS_USE_PATH_STYLE_ENDPOINT}
+      AWS_URL: ${AWS_URL}
+    command: >
+      sh -c "export DATABASE_URL=postgres://${MEDUSA_DB_USER}:$$(cat /run/secrets/medusa_db_password)@postgres:5432/${MEDUSA_DB_NAME} &&
+             export REDIS_URL=redis://:$$(cat /run/secrets/redis_password)@redis:6379 &&
+             export JWT_SECRET=$$(cat /run/secrets/jwt_secret) &&
+             export COOKIE_SECRET=$$(cat /run/secrets/cookie_secret) &&
+             export AWS_SECRET_ACCESS_KEY=$$(cat /run/secrets/aws_secret_access_key) &&
+             npm run start"
+    networks:
+      - tyershop_internal
+      - tyershop_public
+    secrets:
+      - medusa_db_password
+      - redis_password
+      - jwt_secret
+      - cookie_secret
+      - aws_secret_access_key
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:9000/health', (r) => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+        failure_action: rollback
+      rollback_config:
+        order: stop-first
+
+  frontend:
+    image: ghcr.io/justgu1/tyershop-frontend:${TYERSHOP_FRONTEND_TAG:-latest}
+    environment:
+      PUBLIC_MEDUSA_URL: ${PUBLIC_MEDUSA_URL}
+      PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${PUBLIC_MEDUSA_PUBLISHABLE_KEY}
+      MEDUSA_INTERNAL_URL: http://backend:9000
+    networks:
+      - tyershop_public
+      - tyershop_internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+        failure_action: rollback
+      rollback_config:
+        order: stop-first
+
+  api:
+    image: ghcr.io/justgu1/tyershop-api:${TYERSHOP_API_TAG:-latest}
+    environment:
+      MEDUSA_URL: http://backend:9000
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      NEWSLETTER_FROM: ${NEWSLETTER_FROM}
+      NEWSLETTER_TO: ${NEWSLETTER_TO}
+    command: >
+      sh -c "export MERCADOPAGO_ACCESS_TOKEN=$$(cat /run/secrets/mercadopago_access_token) &&
+             node index.js"
+    networks:
+      - tyershop_internal
+      - tyershop_public
+    secrets:
+      - mercadopago_access_token
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+        failure_action: rollback
+      rollback_config:
+        order: stop-first
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  tyershop_internal:
+    driver: overlay
+    attachable: false
+    internal: true
+  tyershop_public:
+    driver: overlay
+    attachable: false
+
+secrets:
+  medusa_db_password:
+    external: true
+  redis_password:
+    external: true
+  jwt_secret:
+    external: true
+  cookie_secret:
+    external: true
+  mercadopago_access_token:
+    external: true
+  aws_secret_access_key:
+    external: true

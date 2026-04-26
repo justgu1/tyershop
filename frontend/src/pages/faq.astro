@@ -1,0 +1,36 @@
+---
+import LegalLayout from '../layouts/LegalLayout.astro';
+import { getLangFromUrl, t } from '../i18n/utils';
+const lang = getLangFromUrl(Astro.url);
+---
+<LegalLayout title="FAQ" lang={lang} description="Frequently asked questions about Tyer orders, shipping, and products.">
+  <div class="faq-list" role="list">
+    {[
+      { q: 'How long does shipping take?', a: 'Standard shipping takes 5–10 business days within Brazil. Express shipping (2–3 days) is available at checkout.' },
+      { q: 'Do you ship internationally?', a: 'Currently we ship to Brazil only. International shipping is coming soon.' },
+      { q: 'How do I track my order?', a: 'You will receive a tracking code via email once your order ships. You can also view it in your account under Order History.' },
+      { q: 'Are drops restocked?', a: 'Drops are limited edition by design — most pieces are produced once. Subscribe to our newsletter to be notified of new drops.' },
+      { q: 'What sizes do you offer?', a: 'Sizes range from XS to XL. Each product page includes a detailed size guide. When in doubt, size up.' },
+      { q: 'How do I care for my pieces?', a: 'Machine wash cold, inside out, with like colors. Do not tumble dry. Iron inside out on low heat.' },
+      { q: 'Can I change or cancel my order?', a: 'Orders can be modified or cancelled within 1 hour of placement. After that, contact us and we will do our best to help.' },
+    ].map(item => (
+      <details class="faq-item" role="listitem">
+        <summary class="faq-item__q">{item.q}</summary>
+        <p class="faq-item__a">{item.a}</p>
+      </details>
+    ))}
+  </div>
+</LegalLayout>
+
+<style>
+.faq-list { display: flex; flex-direction: column; gap: 2px; }
+.faq-item { border-bottom: 1px solid var(--c-border); }
+.faq-item__q {
+  padding: 16px 0; font-size: 15px; font-weight: 500; cursor: pointer;
+  list-style: none; display: flex; justify-content: space-between; align-items: center;
+  color: var(--c-text);
+}
+.faq-item__q::after { content: '+'; font-size: 20px; color: var(--c-muted); transition: transform 0.2s; }
+.faq-item[open] .faq-item__q::after { transform: rotate(45deg); }
+.faq-item__a { font-size: 14px; line-height: 1.8; color: var(--c-muted); padding-bottom: 16px; }
+</style>

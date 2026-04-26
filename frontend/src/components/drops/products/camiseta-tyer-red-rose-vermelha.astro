@@ -1,0 +1,291 @@
+---
+import ProductCard from '../../../components/ProductCard.astro';
+import { getVariantPriceInfo } from '../../../lib/medusa-pricing';
+
+const { product, lang = 'pt', related = [], newest = [] } = Astro.props;
+const variants = product?.variants ?? [];
+const defaultVariant = variants[0];
+const defaultPrice = getVariantPriceInfo(defaultVariant);
+const heroImage = product?.images?.[0]?.url || product?.thumbnail || '/logo.webp';
+const backImage = product?.images?.[1]?.url || heroImage;
+const fabricImage = product?.images?.[2]?.url || heroImage;
+const lifeImageA = product?.images?.[3]?.url || heroImage;
+const lifeImageB = product?.images?.[4]?.url || backImage;
+const lifeImageC = product?.images?.[5]?.url || fabricImage;
+const stars = Number(product?.metadata?.rating || 4.8);
+const reviews = Number(product?.metadata?.review_count || 132);
+const modelHeight = String(product?.metadata?.model_height || '1,77m');
+const modelWeight = String(product?.metadata?.model_weight || '73kg');
+const modelSize = String(product?.metadata?.model_size || 'M');
+---
+
+<section class="fashion-hero">
+  <div class="container fashion-hero__grid">
+    <div class="fashion-hero__media">
+      <button class="fashion-hero__main" id="main-image-btn" aria-label="Ampliar imagem do produto">
+        <img id="main-image" src={heroImage} alt={product?.title || 'Produto'} />
+      </button>
+      <div class="fashion-hero__switch">
+        <button class="is-active" data-main-image={heroImage}>Frente</button>
+        <button data-main-image={backImage}>Costas</button>
+        <button data-main-image={fabricImage}>Tecido</button>
+      </div>
+    </div>
+
+    <aside class="fashion-buy">
+      <p class="fashion-kicker">Drop limitado</p>
+      <h1>{product?.title}</h1>
+      <p class="fashion-price">{defaultPrice?.display || 'Consulte'}</p>
+      <p class="fashion-proof">⭐ {stars.toFixed(1)} ({reviews}+ avaliações)</p>
+
+      <div class="fashion-sizes">
+        <p>Tamanho</p>
+        <div id="size-options" class="fashion-size-grid">
+          {variants.map((v: any, i: number) => (
+            <button
+              class={`fashion-size ${i === 0 ? 'is-active' : ''} ${i === 1 ? 'is-popular' : ''}`}
+              data-variant-id={v.id}
+              data-price={getVariantPriceInfo(v)?.display || defaultPrice?.display || ''}
+              data-cents={getVariantPriceInfo(v)?.amountCents ?? 0}
+              aria-pressed={i === 0 ? 'true' : 'false'}
+            >
+              {v.title}
+              {i === 1 && <small>popular</small>}
+            </button>
+          ))}
+        </div>
+        <button class="fashion-link" id="open-size-guide">Ver guia de medidas</button>
+      </div>
+
+      <div class="fashion-colors">
+        <p>Cor</p>
+        <div class="fashion-swatches">
+          <button class="is-active" aria-label="Vermelho"></button>
+          <button aria-label="Preto"></button>
+          <button aria-label="Branco"></button>
+        </div>
+      </div>
+
+      <p class="fashion-model">Modelo: {modelHeight} · {modelWeight} · veste {modelSize}</p>
+
+      <div class="fashion-qty">
+        <button type="button" id="qty-dec">−</button>
+        <input id="qty-input" type="number" min="1" value="1" />
+        <button type="button" id="qty-inc">+</button>
+      </div>
+
+      <button class="btn btn-primary fashion-buy-btn" id="buy-now" data-variant-id={defaultVariant?.id} data-cents={defaultPrice?.amountCents ?? 0}>
+        Buy Now
+      </button>
+      <ul class="fashion-bullets">
+        <li>Caimento que valoriza o corpo</li>
+        <li>Conforto para uso diário</li>
+        <li>Troca fácil e suporte rápido</li>
+      </ul>
+    </aside>
+  </div>
+</section>
+
+<section class="fashion-gallery container">
+  <h2>Galeria do produto</h2>
+  <div class="fashion-gallery__grid">
+    <img src={heroImage} alt="" />
+    <img src={backImage} alt="" />
+    <img src={fabricImage} alt="" />
+    <img src={lifeImageA} alt="" />
+  </div>
+</section>
+
+<section class="fashion-confidence container">
+  <h2>Confiança no tamanho</h2>
+  <p>Sem adivinhação: referência real de modelo + guia rápido de medidas.</p>
+  <div class="fashion-confidence__box">
+    <div><strong>Altura</strong><span>{modelHeight}</span></div>
+    <div><strong>Peso</strong><span>{modelWeight}</span></div>
+    <div><strong>Tamanho usado</strong><span>{modelSize}</span></div>
+  </div>
+</section>
+
+<section class="fashion-real container">
+  <h2>Na vida real</h2>
+  <div class="fashion-real__grid">
+    <img src={lifeImageA} alt="" />
+    <img src={lifeImageB} alt="" />
+    <img src={lifeImageC} alt="" />
+  </div>
+</section>
+
+<section class="fashion-benefits container">
+  <h2>Benefícios principais</h2>
+  <ul>
+    <li><strong>Fit inteligente:</strong> modelagem que se ajusta melhor ao corpo.</li>
+    <li><strong>Conforto:</strong> tecido suave com boa respirabilidade.</li>
+    <li><strong>Durabilidade:</strong> mantém forma e cor após lavagens.</li>
+    <li><strong>Versatilidade:</strong> combina com vários estilos e ocasiões.</li>
+  </ul>
+</section>
+
+<section class="fashion-description container">
+  <h2>Descrição</h2>
+  <p>{product?.description || 'Peça pensada para unir estética premium, caimento e conforto em uma só compra.'}</p>
+</section>
+
+<section class="fashion-tech container">
+  <h2>Detalhes técnicos</h2>
+  <div class="fashion-tech__grid">
+    <div><strong>Material</strong><span>Algodão premium com toque macio</span></div>
+    <div><strong>Fit</strong><span>Regular com estrutura moderna</span></div>
+    <div><strong>Cuidados</strong><span>Lavar do avesso, água fria, secagem natural</span></div>
+  </div>
+</section>
+
+{related?.length > 0 && (
+  <section class="fashion-look container">
+    <h2>Complete o look</h2>
+    <div class="fashion-carousel">{related.map((p: any) => <ProductCard product={p} lang={lang} role="listitem" />)}</div>
+  </section>
+)}
+
+<section class="fashion-social container">
+  <h2>Avaliações</h2>
+  <p>⭐ {stars.toFixed(1)} média · “Veste muito bem” · “Tecido excelente” · “Chegou rápido”</p>
+</section>
+
+<section class="fashion-trust container">
+  <h2>Compre com tranquilidade</h2>
+  <div class="fashion-trust__grid">
+    <div><strong>Troca grátis</strong><span>Primeira troca facilitada</span></div>
+    <div><strong>Devolução fácil</strong><span>Sem burocracia dentro do prazo</span></div>
+    <div><strong>Suporte</strong><span>Atendimento humano e rápido</span></div>
+  </div>
+</section>
+
+<section class="fashion-faq container">
+  <h2>FAQ</h2>
+  <details><summary>Como saber meu tamanho ideal?</summary><p>Use o guia de medidas e a referência da modelo acima.</p></details>
+  <details><summary>O tecido esquenta muito?</summary><p>Não, tem respirabilidade pensada para uso diário.</p></details>
+  <details><summary>Se não servir, posso trocar?</summary><p>Sim, com processo simples e suporte no pós-venda.</p></details>
+</section>
+
+<section class="fashion-final container">
+  <h2>Pronta para vestir melhor hoje?</h2>
+  <button class="btn btn-primary" id="buy-now-bottom">Buy Now</button>
+</section>
+
+{newest?.length > 0 && (
+  <section class="fashion-look container">
+    <h2>Mais novos</h2>
+    <div class="fashion-carousel">{newest.map((p: any) => <ProductCard product={p} lang={lang} role="listitem" />)}</div>
+  </section>
+)}
+
+<style>
+  .fashion-hero { padding-top: calc(var(--header-h) + 16px); }
+  .fashion-hero__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 380px); gap: 24px; align-items: start; }
+  .fashion-hero__main { border: 0; background: #0f0f0f; border-radius: 14px; overflow: hidden; width: 100%; cursor: zoom-in; }
+  .fashion-hero__main img { width: 100%; height: min(78vh, 860px); object-fit: cover; transition: transform .25s ease; }
+  .fashion-hero__main:hover img { transform: scale(1.03); }
+  .fashion-hero__switch { display: flex; gap: 8px; margin-top: 10px; }
+  .fashion-hero__switch button { border: 1px solid #2a2a2a; border-radius: 999px; padding: 8px 12px; font-size: 12px; color: #cfcfcf; }
+  .fashion-hero__switch button.is-active { border-color: var(--c-accent); color: var(--c-accent); }
+  .fashion-buy { position: sticky; top: 92px; border: 1px solid #242424; border-radius: 12px; background: #101010; padding: 16px; display: grid; gap: 12px; }
+  .fashion-kicker { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #9a9a9a; }
+  .fashion-buy h1 { font-size: clamp(24px, 3vw, 36px); line-height: 1; text-transform: uppercase; }
+  .fashion-price { font-size: 30px; font-weight: 800; }
+  .fashion-proof { color: #ddd; font-size: 13px; }
+  .fashion-sizes p, .fashion-colors p { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #9d9d9d; margin-bottom: 6px; }
+  .fashion-size-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .fashion-size { border: 1px solid #2e2e2e; border-radius: 10px; padding: 10px 12px; min-width: 56px; position: relative; }
+  .fashion-size.is-active { border-color: var(--c-accent); }
+  .fashion-size small { display: block; font-size: 9px; color: var(--c-accent); text-transform: uppercase; letter-spacing: .08em; margin-top: 3px; }
+  .fashion-link { text-decoration: underline; text-underline-offset: 3px; font-size: 12px; color: #b9b9b9; margin-top: 6px; }
+  .fashion-swatches { display: flex; gap: 8px; }
+  .fashion-swatches button { width: 24px; height: 24px; border-radius: 50%; border: 1px solid #333; }
+  .fashion-swatches button:nth-child(1) { background: #8f1f1f; }
+  .fashion-swatches button:nth-child(2) { background: #111; }
+  .fashion-swatches button:nth-child(3) { background: #f7f7f7; }
+  .fashion-swatches .is-active { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+  .fashion-model { font-size: 12px; color: #c8c8c8; }
+  .fashion-qty { display: inline-flex; border: 1px solid #333; border-radius: 8px; overflow: hidden; }
+  .fashion-qty button { width: 36px; height: 36px; border: 0; background: #1a1a1a; color: #fff; }
+  .fashion-qty input { width: 56px; border: 0; text-align: center; background: #0f0f0f; color: #fff; }
+  .fashion-buy-btn { width: 100%; }
+  .fashion-bullets { padding-left: 16px; color: #d0d0d0; font-size: 13px; display: grid; gap: 4px; }
+  .fashion-gallery, .fashion-confidence, .fashion-real, .fashion-benefits, .fashion-description, .fashion-tech, .fashion-look, .fashion-social, .fashion-trust, .fashion-faq, .fashion-final { padding-block: 52px; }
+  .fashion-gallery__grid, .fashion-real__grid { margin-top: 16px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .fashion-gallery__grid img, .fashion-real__grid img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 10px; }
+  .fashion-confidence__box, .fashion-tech__grid, .fashion-trust__grid { margin-top: 14px; display: grid; gap: 10px; }
+  .fashion-confidence__box { grid-template-columns: repeat(3, 1fr); }
+  .fashion-confidence__box div, .fashion-tech__grid div, .fashion-trust__grid div { border: 1px solid #232323; border-radius: 10px; padding: 14px; background: #101010; display: grid; gap: 6px; }
+  .fashion-tech__grid, .fashion-trust__grid { grid-template-columns: repeat(3, 1fr); }
+  .fashion-benefits ul { display: grid; gap: 10px; padding-left: 16px; }
+  .fashion-faq details { border-top: 1px solid #252525; padding: 12px 0; }
+  .fashion-carousel { margin-top: 16px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 1fr); gap: 10px; overflow-x: auto; }
+  @media (max-width: 900px) {
+    .fashion-hero__grid { grid-template-columns: 1fr; }
+    .fashion-buy { position: static; }
+    .fashion-gallery__grid, .fashion-real__grid, .fashion-confidence__box, .fashion-tech__grid, .fashion-trust__grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 620px) {
+    .fashion-gallery__grid, .fashion-real__grid, .fashion-confidence__box, .fashion-tech__grid, .fashion-trust__grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<script>
+  const mainImage = document.getElementById('main-image') as HTMLImageElement | null;
+  const switchBtns = Array.from(document.querySelectorAll<HTMLButtonElement>('.fashion-hero__switch button'));
+  switchBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      switchBtns.forEach((b) => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      if (mainImage && btn.dataset.mainImage) mainImage.src = btn.dataset.mainImage;
+    });
+  });
+
+  const sizeBtns = Array.from(document.querySelectorAll<HTMLButtonElement>('.fashion-size'));
+  const buyBtn = document.getElementById('buy-now') as HTMLButtonElement | null;
+  const buyBtnBottom = document.getElementById('buy-now-bottom') as HTMLButtonElement | null;
+  const qtyInput = document.getElementById('qty-input') as HTMLInputElement | null;
+  const dec = document.getElementById('qty-dec') as HTMLButtonElement | null;
+  const inc = document.getElementById('qty-inc') as HTMLButtonElement | null;
+  const openSizeGuide = document.getElementById('open-size-guide');
+  function setVariant(btn: HTMLButtonElement) {
+    sizeBtns.forEach((b) => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+    if (buyBtn) {
+      buyBtn.dataset.variantId = btn.dataset.variantId || '';
+      buyBtn.dataset.cents = btn.dataset.cents || '0';
+    }
+    const price = document.querySelector('.fashion-price');
+    if (price && btn.dataset.price) price.textContent = btn.dataset.price;
+  }
+  sizeBtns.forEach((btn) => btn.addEventListener('click', () => setVariant(btn)));
+  openSizeGuide?.addEventListener('click', () => {
+    window.alert('Guia rápido: P (até 1,68m), M (1,69m a 1,78m), G (1,79m+).');
+  });
+  dec?.addEventListener('click', () => {
+    if (!qtyInput) return;
+    qtyInput.value = String(Math.max(1, Number(qtyInput.value || 1) - 1));
+  });
+  inc?.addEventListener('click', () => {
+    if (!qtyInput) return;
+    qtyInput.value = String(Math.max(1, Number(qtyInput.value || 1) + 1));
+  });
+  async function buyNow() {
+    const variantId = buyBtn?.dataset.variantId || '';
+    const price = Number(buyBtn?.dataset.cents || 0);
+    const qty = Math.max(1, Number(qtyInput?.value || 1));
+    if (!variantId) return;
+    const title = String(document.querySelector('.fashion-buy h1')?.textContent || 'Produto');
+    const payload = { items: [{ title, quantity: qty, unit_price: Math.max(1, price / 100) }] };
+    const res = await fetch('/api/create-checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data?.init_point) window.location.href = data.init_point;
+  }
+  buyBtn?.addEventListener('click', buyNow);
+  buyBtnBottom?.addEventListener('click', buyNow);
+</script>

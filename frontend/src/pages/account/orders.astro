@@ -1,0 +1,94 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getLangFromUrl, t, getPathForLang } from '../../i18n/utils';
+import type { Lang } from '../../i18n/utils';
+const lang: Lang = getLangFromUrl(Astro.url);
+---
+<Layout title={t(lang, 'account', 'order_history')} lang={lang} noindex>
+  <div class="orders-page container">
+    <div class="orders-page__head">
+      <h1 class="orders-page__title">{t(lang, 'account', 'order_history')}</h1>
+      <a href={getPathForLang('/account', lang)} class="btn btn-outline">Minha conta</a>
+    </div>
+    <div id="orders-list" class="orders-list" role="list" aria-label={t(lang, 'account', 'order_history')} aria-live="polite">
+      <p class="orders-loading" id="orders-loading">Loading...</p>
+    </div>
+  </div>
+</Layout>
+<style>
+.orders-page { padding-block: 64px; }
+.orders-page__head { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom: 24px; flex-wrap:wrap; }
+.orders-page__title { font-family: var(--font-title); font-size: 56px; text-transform: uppercase; margin-bottom: 0; }
+.orders-list { display: flex; flex-direction: column; gap: 16px; }
+.order-card { background: var(--c-surface); padding: 24px; border-radius: var(--r-md); display: grid; grid-template-columns: 1fr auto; gap: 16px; }
+.order-card__id { font-size: 12px; color: var(--c-muted); margin-bottom: 4px; }
+.order-card__date { font-size: 14px; font-weight: 500; }
+.order-card__status { display: inline-block; padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.order-card__status--completed { background: rgba(200,241,53,0.15); color: var(--c-accent); }
+.order-card__status--pending    { background: rgba(255,200,0,0.15); color: #ffc800; }
+.order-card__total { font-size: 18px; font-weight: 700; align-self: center; }
+.orders-empty { color: var(--c-muted); font-size: 14px; padding: 40px 0; }
+.orders-loading { color: var(--c-muted); font-size: 14px; }
+</style>
+<script>
+  async function loadOrders() {
+    const container = document.getElementById('orders-list');
+    const loading   = document.getElementById('orders-loading');
+    if (!(container instanceof HTMLElement)) return;
+    const token = localStorage.getItem('tyer_token') || '';
+    if (!token) {
+      window.location.href = '/account';
+      return;
+    }
+    try {
+      const pk = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
+      const res = await fetch('/store/orders', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-publishable-api-key': pk,
+        },
+      });
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem('tyer_token');
+          localStorage.removeItem('tyer_customer');
+          window.location.href = '/account';
+          return;
+        }
+        throw new Error(`Orders request failed: ${res.status}`);
+      }
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('Invalid orders response');
+        return;
+      }
+      const { orders } = await res.json();
+      if (loading) loading.remove();
+      if (!orders?.length) {
+        container.innerHTML = '<p class="orders-empty">No orders yet.</p>';
+        return;
+      }
+      for (const order of (orders ?? [])) {
+        const el = document.createElement('div');
+        el.className = 'order-card'; el.setAttribute('role', 'listitem');
+        const date = new Date(order.created_at).toLocaleDateString();
+        const total = (order.total / 100).toLocaleString('pt-BR', { style: 'currency', currency: order.currency_code?.toUpperCase() || 'BRL' });
+        el.innerHTML = `
+          <div>
+            <p class="order-card__id">#${order.display_id}</p>
+            <p class="order-card__date">${date}</p>
+          </div>
+          <div style="text-align:right">
+            <span class="order-card__status order-card__status--${order.status}">${order.status}</span>
+            <p class="order-card__total">${total}</p>
+          </div>
+        `;
+        container.appendChild(el);
+      }
+    } catch {
+      if (loading instanceof HTMLElement) loading.remove();
+      container.innerHTML = '<p class="orders-empty">Não foi possível carregar os pedidos agora.</p>';
+    }
+  }
+  loadOrders();
+</script>

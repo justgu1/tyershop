@@ -1,0 +1,31 @@
+---
+import LegalLayout from '../layouts/LegalLayout.astro';
+import { getLangFromUrl } from '../i18n/utils';
+const lang = getLangFromUrl(Astro.url);
+const toc = [
+  { id: 'policy', label: 'Return Policy' },
+  { id: 'process', label: 'Process' },
+  { id: 'refunds', label: 'Refunds' },
+  { id: 'exceptions', label: 'Exceptions' },
+];
+---
+<LegalLayout title="Returns & Exchanges" lang={lang} toc={toc} description="Tyer return and exchange policy.">
+  <p><strong>Last updated:</strong> January 2025</p>
+
+  <h2 id="policy">Return Policy</h2>
+  <p>You may return items within <strong>7 days</strong> of receiving your order, as per the Brazilian Consumer Defense Code (CDC). Items must be unused, unwashed, and in original packaging with all tags attached.</p>
+
+  <h2 id="process">How to Return</h2>
+  <ol>
+    <li>Email <a href="mailto:trocas@tyer.com.br">trocas@tyer.com.br</a> with your order number and reason for return</li>
+    <li>We will send you a return authorization within 2 business days</li>
+    <li>Ship the item back using the provided label</li>
+    <li>Once received and inspected, we will process your refund or exchange</li>
+  </ol>
+
+  <h2 id="refunds">Refunds</h2>
+  <p>Approved refunds are processed within 5–10 business days to your original payment method. Shipping costs are non-refundable unless the return is due to our error.</p>
+
+  <h2 id="exceptions">Exceptions</h2>
+  <p>Sale items, customized products, and limited drops marked "final sale" are not eligible for returns unless they arrive damaged or defective.</p>
+</LegalLayout>

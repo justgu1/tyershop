@@ -1,0 +1,13 @@
+diff --git a/node_modules/@medusajs/dashboard/dist/app.js b/node_modules/@medusajs/dashboard/dist/app.js
+index 630384f..ceab263 100644
+--- a/node_modules/@medusajs/dashboard/dist/app.js
++++ b/node_modules/@medusajs/dashboard/dist/app.js
+@@ -110619,7 +110619,7 @@ var init_file_upload = __esm({
+     import_ui55 = require("@medusajs/ui");
+     import_react71 = require("react");
+     import_jsx_runtime77 = require("react/jsx-runtime");
+-    DEFAULT_MAX_FILE_SIZE = 1024 * 1024;
++    DEFAULT_MAX_FILE_SIZE = 20 * 1024 * 1024;
+     FileUpload = ({
+       label,
+       hint,

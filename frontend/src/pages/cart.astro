@@ -1,0 +1,323 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getLangFromUrl, t, getPathForLang } from '../i18n/utils';
+import type { Lang } from '../i18n/utils';
+const lang: Lang = getLangFromUrl(Astro.url);
+---
+<Layout title={t(lang, 'cart', 'your_cart')} lang={lang} noindex>
+  <div class="cart-page container">
+    <h1 class="cart-page__title">{t(lang, 'cart', 'your_cart')}</h1>
+    <div class="cart-shell">
+      <section class="cart-shell__items">
+        <div class="sc__body" id="cart-items" role="list" aria-label={t(lang, 'cart', 'items')}>
+          <div class="sc__empty" id="cart-empty">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            <p>{t(lang, 'cart', 'empty')}</p>
+          </div>
+        </div>
+      </section>
+
+      <aside class="cart-shell__summary">
+        <div class="sc__footer cart-footer">
+          <div class="sc__coupon">
+            <input id="cart-coupon" class="sc__coupon-input" type="text" placeholder="Cupom de desconto" />
+            <button id="cart-apply-coupon" class="sc__coupon-btn" type="button">Aplicar cupom</button>
+          </div>
+          <p class="sc__coupon-feedback" id="cart-coupon-feedback" hidden></p>
+          <div class="sc__subtotal">
+            <span>{t(lang, 'cart', 'subtotal')}</span>
+            <strong id="cart-subtotal">R$ 0,00</strong>
+          </div>
+          <div class="sc__line-detail">
+            <span>Desconto</span>
+            <span id="cart-discount">R$ 0,00</span>
+          </div>
+          <div class="sc__line-detail">
+            <span>Taxas</span>
+            <span id="cart-taxes">R$ 0,00</span>
+          </div>
+          <div class="sc__line-detail">
+            <span>Entrega</span>
+            <span id="cart-shipping">R$ 0,00</span>
+          </div>
+          <div class="sc__subtotal sc__subtotal--total">
+            <span class="sc__total-label">{t(lang, 'cart', 'total')}</span>
+            <div class="sc__total-value-wrap">
+              <span class="sc__save-tag" id="cart-save-tag" hidden>0% OFF</span>
+              <strong id="cart-total">R$ 0,00</strong>
+            </div>
+          </div>
+          <button class="btn btn-primary sc__checkout" id="cart-checkout" type="button">{t(lang, 'cart', 'checkout')}</button>
+          <button class="sc__view-cart" id="cart-clear-all" type="button">Limpar carrinho</button>
+          <a href={getPathForLang('/shop', lang)} class="sc__view-cart">{t(lang, 'cart', 'continue_shopping')}</a>
+        </div>
+      </aside>
+    </div>
+  </div>
+</Layout>
+
+<style>
+.cart-page { padding-block: 40px 56px; }
+.cart-page__title { font-family: var(--font-title); font-size: clamp(42px, 5vw, 64px); text-transform: uppercase; margin-bottom: 24px; }
+.cart-shell { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; }
+.cart-shell__items, .cart-shell__summary { min-width: 0; }
+@media (max-width: 980px) { .cart-shell { grid-template-columns: 1fr; } }
+.sc__body { background: #111; border: 1px solid #1e1e1e; border-radius: 8px; min-height: 340px; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; }
+.sc__empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: var(--c-muted); font-size: 14px; text-align: center; padding: 56px 0; }
+.sc__empty[hidden] { display: none !important; }
+.cart-shell :global(.sc-item) { position: relative; width: 100%; min-width: 0; box-sizing: border-box; display: flex; flex-direction: column; padding: 0 0 12px 0; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.18); }
+.cart-shell :global(.sc-item:last-child) { margin-bottom: 0; }
+.cart-shell :global(.sc-item__head) { position: relative; padding: 0 40px 8px 0; min-height: 28px; display: flex; align-items: flex-start; }
+.cart-shell :global(.sc-item__name) { font-size: 13px; font-weight: 500; line-height: 1.35; color: var(--c-text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cart-shell :global(.sc-item__remove) { position: absolute; top: 0; right: 0; width: 28px; height: 28px; border: 1px solid #3f3f46; border-radius: 50%; background: #1a1a1a; color: #e5e7eb; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.cart-shell :global(.sc-item__remove:hover) { color: #fff; background: #b91c1c; border-color: #b91c1c; }
+.cart-shell :global(.sc-item__body) { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 10px 12px; }
+.cart-shell :global(.sc-item__img-wrap) { width: 88px; height: 88px; background: #1a1a1a; border-radius: var(--r); overflow: hidden; border: 1px solid #2a2a2a; }
+.cart-shell :global(.sc-item__img) { width: 100%; height: 100%; object-fit: contain; }
+.cart-shell :global(.sc-item__right) { min-width: 0; min-height: 88px; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+.cart-shell :global(.sc-item__variant) { font-size: 11px; color: var(--c-muted); }
+.cart-shell :global(.sc-item__footer) { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 10px; margin-top: auto; }
+.cart-shell :global(.sc-item__price) { font-size: 13px; font-weight: 700; color: var(--c-accent); white-space: nowrap; }
+.cart-shell :global(.sc-item__stepper) { display: inline-flex; align-items: stretch; height: 32px; border: 1px solid #3f3f46; border-radius: 8px; overflow: hidden; background: #0d0d0d; }
+.cart-shell :global(.sc-item__stepper-btn) { width: 32px; border: none; background: #1f1f1f; color: #f3f4f6; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.cart-shell :global(.sc-item__stepper-btn:hover) { background: var(--c-accent); color: #fff; }
+.cart-shell :global(.sc-item__stepper-input) { width: 44px; border: 0; text-align: center; color: var(--c-text); background: #141414; border-left: 1px solid #3f3f46; border-right: 1px solid #3f3f46; }
+.cart-footer { position: sticky; top: calc(var(--header-h) + 16px); background: #111; border: 1px solid #1e1e1e; border-radius: 8px; padding: 16px 20px 20px; }
+.sc__footer { display: flex; flex-direction: column; gap: 12px; }
+.sc__subtotal { display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: var(--c-muted); }
+.sc__subtotal strong { color: var(--c-text); font-size: 18px; font-weight: 700; }
+.sc__line-detail { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #9ca3af; }
+.sc__subtotal--total { border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px; }
+.sc__total-label { font-size: 14px; color: var(--c-text); }
+.sc__total-value-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.sc__save-tag { font-size: 10px; font-weight: 700; color: #fff; background: #16a34a; border-radius: 999px; padding: 2px 8px; letter-spacing: 0.04em; }
+.sc__coupon { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.sc__coupon-input { background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: var(--r); min-height: 36px; padding: 0 10px; color: var(--c-text); font-size: 12px; }
+.sc__coupon-btn { border: 1px solid #2a2a2a; border-radius: var(--r); background: #151515; color: #fff; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; padding: 0 12px; min-height: 36px; }
+.sc__coupon-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.sc__coupon-feedback { font-size: 11px; color: var(--c-muted); margin: 0; }
+.sc__coupon-feedback.is-error { color: #f87171; }
+.sc__coupon-feedback.is-success { color: #4ade80; }
+.sc__checkout { width: 100%; padding: 14px; font-size: 12px; letter-spacing: 0.1em; }
+.sc__view-cart { text-align: center; font-size: 12px; color: var(--c-muted); text-decoration: underline; text-underline-offset: 3px; transition: color var(--ease); background: transparent; border: 0; cursor: pointer; }
+.sc__view-cart:hover { color: var(--c-text); }
+</style>
+
+<script>
+  import { getCart, removeItem, updateQty, setQty, clearCart, getTotal, getAppliedPromoCode, setAppliedPromoCode } from '../lib/cart';
+  function fmt(cents: number) { return (Number(cents) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+  function escHtml(s: string) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function formatVariantLabel(raw: string) {
+    const text = String(raw || '').trim();
+    if (!text) return '';
+    if (text.includes(':')) return text;
+    const parts = text.split(/[\/|]/).map((s) => s.trim()).filter(Boolean);
+    if (!parts.length) return text;
+    return parts.map((value, idx) => `Opcao ${idx + 1}: ${value}`).join(' | ');
+  }
+  const couponState = { code: '', discountCents: 0, applied: false };
+  let couponResyncTimer: ReturnType<typeof setTimeout> | null = null;
+  function renderFeedback(message: string, tone: 'success' | 'error' | '') {
+    const el = document.getElementById('cart-coupon-feedback');
+    if (!(el instanceof HTMLElement)) return;
+    if (!message) { el.hidden = true; el.textContent = ''; el.classList.remove('is-success', 'is-error'); return; }
+    el.hidden = false; el.textContent = message;
+    el.classList.toggle('is-success', tone === 'success');
+    el.classList.toggle('is-error', tone === 'error');
+  }
+  async function fetchRegionId() {
+    const base = window.__MEDUSA_URL__ || 'http://localhost:9003';
+    const key = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
+    const res = await fetch(`${base}/store/regions?limit=1`, { headers: { 'x-publishable-api-key': key } });
+    const data = await res.json();
+    return data?.regions?.[0]?.id || null;
+  }
+  async function syncRemoteCart(items: Array<{ variantId: string; quantity: number }>) {
+    const base = window.__MEDUSA_URL__ || 'http://localhost:9003';
+    const key = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
+    const regionId = await fetchRegionId();
+    if (!regionId) throw new Error('Sem regiao');
+    const created = await fetch(`${base}/store/carts`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-publishable-api-key': key }, body: JSON.stringify({ region_id: regionId }) });
+    const createdJson = await created.json();
+    const cartId = createdJson?.cart?.id;
+    if (!cartId) throw new Error('Sem cart id');
+    for (const item of items) {
+      await fetch(`${base}/store/carts/${cartId}/line-items`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-publishable-api-key': key }, body: JSON.stringify({ variant_id: item.variantId, quantity: item.quantity }) });
+    }
+    return { base, key, cartId };
+  }
+  function parseDiscountFromCart(cart: any, subtotalCents: number) {
+    const total = Number(cart?.total ?? subtotalCents);
+    const discountTotal = Number(cart?.discount_total ?? Math.max(0, subtotalCents - total));
+    return Number.isFinite(discountTotal) && discountTotal > 0 ? Math.round(discountTotal) : 0;
+  }
+  async function applyPromoToMedusa(code: string, opts: { requirePositiveDiscount?: boolean } = {}) {
+    const requirePositiveDiscount = opts.requirePositiveDiscount !== false;
+    const items = getCart();
+    if (!items.length) throw new Error('empty');
+    const { base, key, cartId } = await syncRemoteCart(items);
+    const headers: Record<string, string> = { 'content-type': 'application/json', 'x-publishable-api-key': key };
+    let appliedResponse: any = null;
+    const tryPromotion = await fetch(`${base}/store/carts/${cartId}/promotions`, { method: 'POST', headers, body: JSON.stringify({ promo_codes: [code] }) });
+    if (tryPromotion.ok) appliedResponse = await tryPromotion.json();
+    else {
+      const fallback = await fetch(`${base}/store/carts/${cartId}`, { method: 'POST', headers, body: JSON.stringify({ promo_codes: [code] }) });
+      if (fallback.ok) appliedResponse = await fallback.json();
+    }
+    const cart = appliedResponse?.cart;
+    if (!cart) throw new Error('invalid');
+    const discountCents = parseDiscountFromCart(cart, getTotal());
+    if (requirePositiveDiscount && discountCents <= 0) throw new Error('no discount');
+    return { discountCents };
+  }
+  function render() {
+    const body = document.getElementById('cart-items');
+    const empty = document.getElementById('cart-empty');
+    if (!(body instanceof HTMLElement) || !(empty instanceof HTMLElement)) return;
+    body.querySelectorAll('.sc-item').forEach((el) => el.remove());
+    const items = getCart();
+    empty.hidden = items.length > 0;
+    items.forEach((item) => {
+      const el = document.createElement('div');
+      el.className = 'sc-item';
+      el.setAttribute('role', 'listitem');
+      const titleH = escHtml(item.title || '');
+      const variantH = item.variantTitle ? escHtml(formatVariantLabel(item.variantTitle)) : '';
+      const thumb = item.thumbnail || '/logo.webp';
+      const maxQtyRaw = Number(item.maxQuantity ?? 0);
+      const maxQty = Number.isFinite(maxQtyRaw) && maxQtyRaw > 0 ? Math.floor(maxQtyRaw) : 9999;
+      el.innerHTML = `<div class="sc-item__head"><span class="sc-item__name">${titleH}</span></div><button class="sc-item__remove" type="button" data-id="${item.variantId}" data-action="remove" aria-label="Remover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button><div class="sc-item__body"><div class="sc-item__img-wrap"><img class="sc-item__img" src="${thumb}" alt="" width="88" height="88" loading="lazy" decoding="async" /></div><div class="sc-item__right">${variantH ? `<div class="sc-item__variant">${variantH}</div>` : ''}<div class="sc-item__footer"><span class="sc-item__price">${fmt((item.price || 0) * (item.quantity || 1))}</span><div class="sc-item__stepper" role="group" aria-label="Quantidade"><button class="sc-item__stepper-btn" data-id="${item.variantId}" data-action="dec" type="button">−</button><input class="sc-item__stepper-input" data-id="${item.variantId}" data-action="set" type="number" min="1" max="${maxQty}" value="${item.quantity}" /><button class="sc-item__stepper-btn" data-id="${item.variantId}" data-action="inc" type="button">+</button></div></div></div></div>`;
+      body.appendChild(el);
+    });
+    const subtotal = getTotal();
+    const discount = Number(couponState.discountCents || 0);
+    const total = Math.max(0, subtotal - discount);
+    const savePct = subtotal > 0 && discount > 0 ? Math.round((discount / subtotal) * 100) : 0;
+    const setText = (id: string, text: string) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    setText('cart-subtotal', fmt(subtotal));
+    setText('cart-discount', `-${fmt(discount)}`);
+    setText('cart-taxes', fmt(0));
+    setText('cart-shipping', fmt(0));
+    setText('cart-total', fmt(total));
+    const saveTag = document.getElementById('cart-save-tag');
+    if (saveTag) { saveTag.hidden = savePct <= 0; saveTag.textContent = `${savePct}% OFF`; }
+  }
+  function scheduleCouponResync() {
+    if (!getAppliedPromoCode() || !getCart().length) return;
+    if (couponResyncTimer) clearTimeout(couponResyncTimer);
+    couponResyncTimer = setTimeout(() => { couponResyncTimer = null; void rehydrateAppliedCoupon(); }, 500);
+  }
+  async function rehydrateAppliedCoupon() {
+    const code = getAppliedPromoCode();
+    const input = document.getElementById('cart-coupon');
+    if (code && input instanceof HTMLInputElement) input.value = code;
+    if (!code) return;
+    if (!getCart().length) {
+      setAppliedPromoCode(null);
+      if (input instanceof HTMLInputElement) input.value = '';
+      couponState.code = '';
+      couponState.applied = false;
+      couponState.discountCents = 0;
+      render();
+      return;
+    }
+    try {
+      const { discountCents } = await applyPromoToMedusa(code, { requirePositiveDiscount: false });
+      couponState.discountCents = discountCents; couponState.code = code; couponState.applied = true;
+      setAppliedPromoCode(code); render();
+    } catch {
+      setAppliedPromoCode(null);
+      couponState.discountCents = 0; couponState.applied = false; couponState.code = '';
+      if (input instanceof HTMLInputElement) input.value = '';
+      renderFeedback('Nao foi possivel recalcular o cupom. Tente aplicar de novo.', 'error'); render();
+    }
+  }
+  document.getElementById('cart-items')?.addEventListener('click', (e) => {
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    const btn = target.closest('[data-id]');
+    if (!(btn instanceof HTMLElement)) return;
+    const id = btn.dataset.id;
+    const action = btn.dataset.action;
+    if (!id) return;
+    if (action === 'remove') removeItem(id);
+    if (action === 'inc') updateQty(id, 1);
+    if (action === 'dec') updateQty(id, -1);
+  });
+  function commitManualQty(input: HTMLInputElement) {
+    const id = input.dataset.id;
+    if (!id) return;
+    const raw = Number(input.value);
+    const min = 1;
+    const max = Number(input.max || '');
+    const boundedMax = Number.isFinite(max) && max > 0 ? Math.floor(max) : Infinity;
+    const nextQty = Math.max(min, Math.min(Number.isFinite(raw) ? Math.floor(raw) : min, boundedMax));
+    setQty(id, nextQty);
+  }
+  document.getElementById('cart-items')?.addEventListener('change', (e) => {
+    const target = e.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (target.dataset.action !== 'set') return;
+    commitManualQty(target);
+  });
+  document.getElementById('cart-items')?.addEventListener('keydown', (e) => {
+    const target = e.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (target.dataset.action !== 'set') return;
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    commitManualQty(target);
+  });
+  document.getElementById('cart-clear-all')?.addEventListener('click', () => {
+    clearCart();
+    couponState.discountCents = 0; couponState.applied = false; couponState.code = '';
+    setAppliedPromoCode(null);
+    const input = document.getElementById('cart-coupon');
+    if (input instanceof HTMLInputElement) input.value = '';
+    renderFeedback('', '');
+    render();
+  });
+  document.getElementById('cart-apply-coupon')?.addEventListener('click', async () => {
+    const input = document.getElementById('cart-coupon');
+    if (!(input instanceof HTMLInputElement)) return;
+    const code = input.value.trim();
+    if (!code) return renderFeedback('Digite um cupom para aplicar.', 'error');
+    if (!getCart().length) return renderFeedback('Adicione produtos para aplicar cupom.', 'error');
+    const btn = document.getElementById('cart-apply-coupon');
+    if (!(btn instanceof HTMLButtonElement)) return;
+    btn.disabled = true;
+    try {
+      const { discountCents } = await applyPromoToMedusa(code, { requirePositiveDiscount: true });
+      couponState.discountCents = discountCents; couponState.code = code; couponState.applied = true;
+      setAppliedPromoCode(code); renderFeedback(`Cupom ${code} aplicado.`, 'success'); render();
+    } catch {
+      setAppliedPromoCode(null);
+      couponState.discountCents = 0; couponState.applied = false; couponState.code = '';
+      renderFeedback('Nao foi possivel aplicar este cupom.', 'error'); render();
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  document.getElementById('cart-checkout')?.addEventListener('click', async () => {
+    const items = getCart();
+    if (!items.length) return;
+    const btn = document.getElementById('cart-checkout');
+    if (!(btn instanceof HTMLButtonElement)) return;
+    btn.disabled = true;
+    const orig = btn.textContent;
+    btn.textContent = '...';
+    try {
+      const res = await fetch('/api/create-checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) });
+      const data = await res.json();
+      if (data.init_point) window.location.href = data.init_point;
+      else throw new Error('No init_point');
+    } catch {
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
+  });
+  render();
+  void rehydrateAppliedCoupon();
+  window.addEventListener('cart:update', () => { render(); scheduleCouponResync(); });
+</script>
+-->

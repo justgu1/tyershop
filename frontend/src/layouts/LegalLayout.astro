@@ -1,0 +1,58 @@
+---
+import Layout from './Layout.astro';
+import { t, type Lang } from '../i18n/utils';
+
+interface Props {
+  title: string;
+  description?: string;
+  lang?: Lang;
+  toc?: { id: string; label: string }[];
+}
+const { title, description, lang = 'en', toc = [] } = Astro.props;
+---
+<Layout title={title} description={description} lang={lang} bodyClass="legal-body">
+  <div class="legal-wrap container">
+    {toc.length > 0 && (
+      <aside class="legal-toc" aria-label="Table of contents">
+        <p class="legal-toc__title">Contents</p>
+        <nav>
+          <ul role="list">
+            {toc.map(item => (
+              <li><a href={`#${item.id}`} class="legal-toc__link">{item.label}</a></li>
+            ))}
+          </ul>
+        </nav>
+      </aside>
+    )}
+    <article class="legal-content" aria-label={title}>
+      <h1 class="legal-title">{title}</h1>
+      <slot />
+    </article>
+  </div>
+</Layout>
+
+<style is:global>
+.legal-wrap {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 60px;
+  padding-block: 64px;
+  max-width: 960px;
+}
+@media (max-width: 768px) { .legal-wrap { grid-template-columns: 1fr; } .legal-toc { display: none; } }
+
+.legal-toc { position: sticky; top: calc(var(--header-h) + 24px); align-self: start; }
+.legal-toc__title { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c-muted); margin-bottom: 12px; }
+.legal-toc__link { display: block; font-size: 13px; color: var(--c-muted); padding: 6px 0; border-left: 2px solid var(--c-border); padding-left: 12px; transition: color var(--ease), border-color var(--ease); }
+.legal-toc__link:hover { color: var(--c-text); border-left-color: var(--c-accent); }
+
+.legal-title { font-family: var(--font-title); font-size: clamp(36px, 5vw, 64px); text-transform: uppercase; margin-bottom: 48px; }
+.legal-content h2 { font-family: var(--font-title); font-size: 28px; text-transform: uppercase; margin: 40px 0 12px; padding-top: 16px; }
+.legal-content p { font-size: 14px; line-height: 1.8; color: var(--c-muted); margin-bottom: 16px; }
+.legal-content ul, .legal-content ol { padding-left: 20px; margin-bottom: 16px; }
+.legal-content ul { list-style: disc; }
+.legal-content ol { list-style: decimal; }
+.legal-content li { font-size: 14px; line-height: 1.8; color: var(--c-muted); margin-bottom: 6px; }
+.legal-content a { color: var(--c-accent); text-decoration: underline; }
+.legal-content strong { color: var(--c-text); }
+</style>

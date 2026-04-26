@@ -1,0 +1,541 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ProductCard from '../../components/ProductCard.astro';
+import { getLangFromUrl, t, getPathForLang } from '../../i18n/utils';
+import type { Lang } from '../../i18n/utils';
+import { getProductListQueryString, getVariantPriceInfo, resolveDefaultRegionId } from '../../lib/medusa-pricing';
+
+const lang: Lang = getLangFromUrl(Astro.url);
+
+export async function getStaticPaths() {
+  try {
+    const url =
+      import.meta.env.MEDUSA_INTERNAL_URL ||
+      import.meta.env.MEDUSA_URL ||
+      import.meta.env.PUBLIC_MEDUSA_URL ||
+      'http://backend:9000';
+    const publishableKey =
+      import.meta.env.PUBLIC_MEDUSA_PUBLISHABLE_KEY ||
+      'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
+    const handles: string[] = [];
+    const limit = 100;
+    let offset = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const res = await fetch(
+        `${url}/store/products?limit=${limit}&offset=${offset}&fields=handle`,
+        {
+          headers: { 'x-publishable-api-key': publishableKey },
+          signal: AbortSignal.timeout(8000),
+        }
+      );
+      if (!res.ok) break;
+      const { products } = await res.json();
+      const batch = (products ?? [])
+        .map((p: any) => String(p?.handle || '').trim())
+        .filter((h: string) => h.length > 0);
+      handles.push(...batch);
+      hasMore = batch.length === limit;
+      offset += limit;
+    }
+
+    if (handles.length > 0) {
+      return Array.from(new Set(handles)).map((h) => ({ params: { handle: h } }));
+    }
+  } catch {}
+  return [{ params: { handle: 'placeholder' } }];
+}
+
+const { handle } = Astro.params;
+const pk = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
+const medusaHeaders = { 'x-publishable-api-key': pk };
+let product: any = null;
+let related: any[] = [];
+let newest: any[] = [];
+
+try {
+  const url = import.meta.env.MEDUSA_INTERNAL_URL || import.meta.env.MEDUSA_URL || 'http://localhost:9003';
+  const regionId = await resolveDefaultRegionId(url, medusaHeaders);
+  const q = getProductListQueryString(regionId);
+  const res = await fetch(
+    `${url}/store/products?${q}&handle=${encodeURIComponent(handle ?? '')}&limit=1`,
+    { headers: medusaHeaders, signal: AbortSignal.timeout(5000) }
+  );
+  if (res.ok) {
+    const { products } = await res.json();
+    product = products?.[0] ?? null;
+    if (product?.collection?.id) {
+      const rRes = await fetch(
+        `${url}/store/products?${q}&collection_id[]=${product.collection.id}&limit=12`,
+        { headers: medusaHeaders, signal: AbortSignal.timeout(5000) }
+      );
+      if (rRes.ok) {
+        const { products: rp } = await rRes.json();
+        related = (rp ?? []).filter((p: any) => p.handle !== handle).slice(0, 8);
+      }
+    }
+    const newestRes = await fetch(
+      `${url}/store/products?${q}&limit=16`,
+      { headers: medusaHeaders, signal: AbortSignal.timeout(5000) }
+    );
+    if (newestRes.ok) {
+      const { products: np } = await newestRes.json();
+      newest = [...(np ?? [])]
+        .filter((p: any) => p?.handle && p.handle !== handle)
+        .sort(
+          (a: any, b: any) =>
+            new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime()
+        )
+        .slice(0, 8);
+    }
+  }
+} catch {}
+
+if (!product) {
+  product = {
+    id: 'placeholder',
+    title: String(handle ?? '').replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || 'Product',
+    description: 'Limited edition streetwear.',
+    thumbnail: '/logo.webp',
+    images: [{ url: '/logo.webp' }],
+    variants: [],
+    metadata: {},
+  };
+}
+
+const images = product.images ?? (product.thumbnail ? [{ url: product.thumbnail }] : []);
+const variants = product.variants ?? [];
+const defaultVariant = variants[0];
+const defaultPriceInfo = getVariantPriceInfo(defaultVariant);
+const priceVal = defaultPriceInfo?.display ?? null;
+const dropHandleRaw =
+  String(product?.metadata?.drop ?? '').trim() ||
+  String(product?.collection?.handle ?? '').trim();
+const dropHandle = dropHandleRaw.toLowerCase().replace(/[^a-z0-9-_]/g, '');
+const customDropModules = import.meta.glob('../../components/drops/**/*.astro', { eager: true }) as Record<
+  string,
+  { default?: any }
+>;
+const productSpecificKey = `../../components/drops/products/${String(handle ?? '').toLowerCase()}.astro`;
+const dropProductKey = dropHandle
+  ? `../../components/drops/${dropHandle}/${String(handle ?? '').toLowerCase()}.astro`
+  : '';
+const dropPageKey = dropHandle ? `../../components/drops/${dropHandle}.astro` : '';
+const CustomDropComponent =
+  customDropModules[productSpecificKey]?.default ||
+  (dropProductKey ? customDropModules[dropProductKey]?.default : null) ||
+  (dropPageKey ? customDropModules[dropPageKey]?.default : null) ||
+  null;
+
+function getVariantMaxQty(v: any): number | null {
+  if (!v) return null;
+  if (v.allow_backorder === true) return null;
+  const nestedStockQty = (v.inventory_items ?? []).reduce((sum: number, item: any) => {
+    const levels = item?.inventory?.location_levels ?? [];
+    const levelSum = levels.reduce((inner: number, level: any) => {
+      const raw = Number(level?.stocked_quantity);
+      return Number.isFinite(raw) ? inner + raw : inner;
+    }, 0);
+    return sum + levelSum;
+  }, 0);
+  const qtyRaw =
+    nestedStockQty > 0 || nestedStockQty === 0
+      ? nestedStockQty
+      : v.inventory_quantity ?? v.calculated_inventory_quantity ?? v.stocked_quantity;
+  const qty = Number(qtyRaw);
+  if (!Number.isFinite(qty)) return null;
+  return Math.max(0, Math.floor(qty));
+}
+
+function getVariantLabel(v: any): string {
+  const options = (v?.options ?? [])
+    .map((opt: any) => {
+      const optionTitle = String(opt?.option?.title ?? opt?.option_title ?? opt?.title ?? '').trim();
+      const value = String(opt?.value ?? '').trim();
+      if (!optionTitle || !value) return '';
+      return `${optionTitle}: ${value}`;
+    })
+    .filter((s: string) => s.length > 0);
+  if (options.length) return options.join(' | ');
+  return String(v?.title ?? '').trim();
+}
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Product',
+  name: product.title,
+  description: product.description,
+  image: images.map((i: any) => `https://tyer.com.br${i.url}`),
+  brand: { '@type': 'Brand', name: 'Tyer' },
+  ...(defaultPriceInfo && {
+    offers: {
+      '@type': 'Offer',
+      price: defaultPriceInfo.amountCents / 100,
+      priceCurrency: defaultPriceInfo.currency,
+      availability: 'https://schema.org/InStock',
+    }
+  }),
+};
+---
+
+<Layout
+  title={product.title}
+  description={product.description ?? 'Limited edition streetwear piece by Tyer.'}
+  lang={lang}
+  ogImage={product.thumbnail ?? '/logo.webp'}
+  ogType="product"
+  jsonLd={jsonLd}
+>
+  <!-- Hero -->
+  <section class="pdp-hero" aria-labelledby="pdp-title">
+    <div class="pdp-hero__gallery" aria-label="Product images">
+      {images.slice(0, 4).map((img: any, i: number) => (
+        <div class="pdp-hero__img-wrap" data-index={i} aria-hidden={i > 0 ? 'true' : 'false'}>
+          <img
+            src={img.url}
+            alt={`${product.title} — view ${i + 1}`}
+            class="pdp-hero__img"
+            width="800" height="1000"
+            loading={i === 0 ? 'eager' : 'lazy'}
+            decoding={i === 0 ? 'sync' : 'async'}
+            fetchpriority={i === 0 ? 'high' : 'auto'}
+          />
+        </div>
+      ))}
+      {images.length > 1 && (
+        <div class="pdp-hero__thumbs" role="list" aria-label="Image thumbnails">
+          {images.slice(0, 4).map((img: any, i: number) => (
+            <button class={`pdp-hero__thumb ${i === 0 ? 'is-active' : ''}`} data-gallery-idx={i} role="listitem" aria-label={`View image ${i + 1}`} aria-pressed={i === 0 ? 'true' : 'false'}>
+              <img src={img.url} alt="" width="80" height="100" loading="lazy" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+
+    <div class="pdp-hero__info">
+      <nav class="pdp-breadcrumb" aria-label="Breadcrumb">
+        <ol class="pdp-breadcrumb__list">
+          <li><a href={getPathForLang('/', lang)}>Tyer</a></li>
+          <li aria-hidden="true">/</li>
+          <li><a href={getPathForLang('/shop', lang)}>{t(lang, 'nav', 'shop')}</a></li>
+          <li aria-hidden="true">/</li>
+          <li aria-current="page">{product.title}</li>
+        </ol>
+      </nav>
+
+      {product.metadata?.badge && <span class="pdp-badge">{product.metadata.badge}</span>}
+      <h1 class="pdp-title" id="pdp-title">{product.title}</h1>
+      {priceVal && <p class="pdp-price" aria-label={`Price: ${priceVal}`}>{priceVal}</p>}
+
+      {product.description && <p class="pdp-desc">{product.description}</p>}
+
+      <!-- Variants -->
+      {variants.length > 1 && (
+        <div class="pdp-variants" role="group" aria-label={t(lang, 'product', 'select_size')}>
+          <p class="pdp-label">{t(lang, 'product', 'select_size')}</p>
+          <div class="pdp-sizes" role="radiogroup">
+            {variants.map((v: any, i: number) => (
+              <button
+                class={`pdp-size-btn ${i === 0 ? 'is-active' : ''}`}
+                data-variant-id={v.id}
+                data-price={getVariantPriceInfo(v)?.amountCents ?? ''}
+                data-variant-title={getVariantLabel(v)}
+                data-max-qty={getVariantMaxQty(v) ?? ''}
+                role="radio"
+                aria-checked={i === 0 ? 'true' : 'false'}
+                aria-label={v.title}
+              >{v.title}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <button
+        class="btn btn-primary pdp-atc"
+        id="pdp-atc"
+        data-variant-id={defaultVariant?.id}
+        data-title={product.title}
+        data-price={defaultPriceInfo?.amountCents ?? ''}
+        data-thumbnail={product.thumbnail}
+        data-variant-title={getVariantLabel(defaultVariant)}
+        data-max-qty={getVariantMaxQty(defaultVariant) ?? ''}
+        data-qty="1"
+        aria-label={t(lang, 'product', 'add_to_cart')}
+      >
+        {t(lang, 'product', 'add_to_cart')} →
+      </button>
+      <div class="pdp-qty-wrap" role="group" aria-label="Quantidade">
+        <button type="button" class="pdp-qty-btn" id="pdp-qty-dec" aria-label="Diminuir quantidade">−</button>
+        <input
+          id="pdp-qty-input"
+          class="pdp-qty-input"
+          type="number"
+          min="1"
+          step="1"
+          value="1"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          aria-label="Quantidade selecionada"
+        />
+        <button type="button" class="pdp-qty-btn" id="pdp-qty-inc" aria-label="Aumentar quantidade">+</button>
+      </div>
+    </div>
+  </section>
+
+  {CustomDropComponent ? (
+    <CustomDropComponent product={product} lang={lang} related={related} newest={newest} />
+  ) : (
+    <>
+  <!-- Inspiration -->
+  <section class="pdp-section pdp-inspiration" aria-labelledby="inspo-title">
+    <div class="container pdp-inspiration__inner">
+      <div class="pdp-inspiration__text">
+        <p class="section-label">01 — {t(lang, 'product', 'inspiration')}</p>
+        <h2 class="pdp-section-title" id="inspo-title">{t(lang, 'product', 'inspiration')}</h2>
+        <p class="pdp-inspiration__body">
+          {product.metadata?.inspiration ?? product.description ?? t(lang, 'product', 'inspiration_text')}
+        </p>
+      </div>
+      {images[1] && (
+        <div class="pdp-inspiration__img">
+          <img src={images[1].url} alt={`${product.title} inspiration`} width="640" height="800" loading="lazy" decoding="async" />
+        </div>
+      )}
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="pdp-features section" aria-labelledby="features-title">
+    <div class="container">
+      <p class="section-label">02 — {t(lang, 'product', 'features')}</p>
+      <h2 class="pdp-section-title" id="features-title">{t(lang, 'product', 'features')}</h2>
+      <div class="pdp-features__grid">
+        {[
+          { num: '01', key: 'feature_1' },
+          { num: '02', key: 'feature_2' },
+          { num: '03', key: 'feature_3' },
+        ].map(f => (
+          <div class="pdp-feature">
+            <span class="pdp-feature__num">{f.num}</span>
+            <p class="pdp-feature__text">{t(lang, 'product', f.key)}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Street -->
+  {images[2] && (
+    <section class="pdp-street" aria-labelledby="street-title">
+      <img src={images[2].url} alt={`${product.title} street style`} class="pdp-street__img" width="1440" height="800" loading="lazy" decoding="async" />
+      <div class="pdp-street__content container">
+        <h2 class="pdp-street__title" id="street-title">03 — {t(lang, 'product', 'street')}</h2>
+      </div>
+    </section>
+  )}
+
+    </>
+  )}
+
+  <!-- Related -->
+  {related.length > 0 && (
+    <section class="pdp-related section" aria-labelledby="related-title">
+      <div class="container">
+        <h2 class="section__title" id="related-title">Quem compra também compra...</h2>
+        <div class="pdp-carousel" id="pdp-related-carousel" role="list">
+          {related.map(p => <ProductCard product={p} lang={lang} role="listitem" />)}
+        </div>
+      </div>
+    </section>
+  )}
+  {newest.length > 0 && (
+    <section class="pdp-related section" aria-labelledby="newest-title">
+      <div class="container">
+        <h2 class="section__title" id="newest-title">Mais novos</h2>
+        <div class="pdp-carousel" id="pdp-newest-carousel" role="list">
+          {newest.map(p => <ProductCard product={p} lang={lang} role="listitem" />)}
+        </div>
+      </div>
+    </section>
+  )}
+</Layout>
+
+<style>
+/* Hero */
+.pdp-hero { display: grid; grid-template-columns: 1fr 480px; min-height: calc(100svh - var(--header-h)); }
+@media (max-width: 1024px) { .pdp-hero { grid-template-columns: 1fr; } }
+
+.pdp-hero__gallery { position: relative; overflow: hidden; background: var(--c-surface); }
+.pdp-hero__img-wrap { position: absolute; inset: 0; opacity: 0; transition: opacity 0.5s ease; }
+.pdp-hero__img-wrap[data-index="0"] { opacity: 1; position: relative; height: 100%; }
+.pdp-hero__img-wrap.is-active { opacity: 1; position: relative; height: 100%; }
+.pdp-hero__img { width: 100%; height: 100%; object-fit: cover; }
+
+.pdp-hero__thumbs { position: absolute; bottom: 24px; left: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 10; }
+.pdp-hero__thumb { width: 56px; height: 72px; overflow: hidden; border-radius: var(--r); border: 2px solid transparent; opacity: 0.6; transition: all var(--ease); }
+.pdp-hero__thumb.is-active, .pdp-hero__thumb:hover { border-color: var(--c-accent); opacity: 1; }
+.pdp-hero__thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.pdp-hero__info {
+  display: flex; flex-direction: column; padding: 48px 40px;
+  background: var(--c-bg); overflow-y: auto; gap: 16px;
+}
+@media (max-width: 1024px) { .pdp-hero__info { padding: 32px 24px; } }
+
+.pdp-breadcrumb__list { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--c-muted); flex-wrap: wrap; }
+.pdp-breadcrumb__list a:hover { color: var(--c-text); }
+.pdp-badge { display: inline-block; background: var(--c-accent); color: var(--c-black); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 10px; border-radius: var(--r); }
+.pdp-title { font-family: var(--font-title); font-size: clamp(36px, 4vw, 56px); text-transform: uppercase; line-height: 0.95; }
+.pdp-price { font-size: 28px; font-weight: 700; color: var(--c-accent); }
+.pdp-desc { font-size: 14px; line-height: 1.7; color: var(--c-muted); }
+.pdp-label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--c-muted); margin-bottom: 8px; }
+.pdp-sizes { display: flex; flex-wrap: wrap; gap: 8px; }
+.pdp-size-btn { padding: 10px 16px; border: 1.5px solid var(--c-border); border-radius: var(--r); font-size: 13px; font-weight: 600; color: var(--c-muted); transition: all var(--ease); }
+.pdp-size-btn:hover, .pdp-size-btn.is-active { border-color: var(--c-accent); color: var(--c-accent); }
+.pdp-atc { padding: 16px; width: 100%; font-size: 14px; margin-top: auto; }
+.pdp-qty-wrap {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.pdp-qty-btn {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-size: 18px;
+  line-height: 1;
+}
+.pdp-qty-input {
+  width: 56px;
+  height: 40px;
+  text-align: center;
+  border: 0;
+  border-left: 1px solid var(--c-border);
+  border-right: 1px solid var(--c-border);
+  background: #0d0d0d;
+  color: var(--c-text);
+}
+.pdp-qty-input::-webkit-outer-spin-button,
+.pdp-qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.pdp-qty-input[type='number'] { -moz-appearance: textfield; }
+
+/* Sections */
+.pdp-section { padding-block: 96px; }
+.pdp-section-title { font-family: var(--font-title); font-size: clamp(36px, 4vw, 56px); text-transform: uppercase; margin: 12px 0 24px; }
+
+.pdp-inspiration__inner { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
+@media (max-width: 768px) { .pdp-inspiration__inner { grid-template-columns: 1fr; } }
+.pdp-inspiration__body { font-size: 16px; line-height: 1.8; color: var(--c-muted); }
+.pdp-inspiration__img { overflow: hidden; border-radius: var(--r-md); }
+.pdp-inspiration__img img { width: 100%; }
+
+.pdp-features__grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 2px; margin-top: 40px; }
+@media (max-width: 600px) { .pdp-features__grid { grid-template-columns: 1fr; } }
+.pdp-feature { background: var(--c-surface); padding: 32px; }
+.pdp-feature__num { font-family: var(--font-title); font-size: 48px; color: var(--c-border); display: block; }
+.pdp-feature__text { font-size: 15px; line-height: 1.7; color: var(--c-muted); margin-top: 8px; }
+
+.pdp-street { position: relative; height: 60vh; overflow: hidden; }
+.pdp-street__img { width: 100%; height: 100%; object-fit: cover; }
+.pdp-street__content { position: absolute; bottom: 40px; left: 0; right: 0; }
+.pdp-street__title { font-family: var(--font-title); font-size: clamp(32px, 5vw, 72px); text-transform: uppercase; color: var(--c-white); text-shadow: 0 2px 20px rgba(0,0,0,.5); }
+
+.pdp-carousel {
+  margin-top: 24px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(220px, 1fr);
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scroll-snap-type: x mandatory;
+}
+.pdp-carousel > * { scroll-snap-align: start; min-width: 220px; }
+</style>
+
+<script>
+  // Gallery
+  const wraps = document.querySelectorAll<HTMLElement>('.pdp-hero__img-wrap');
+  const thumbs = document.querySelectorAll<HTMLButtonElement>('.pdp-hero__thumb');
+
+  function showImg(idx: number) {
+    wraps.forEach((w, i) => {
+      w.classList.toggle('is-active', i === idx);
+      w.setAttribute('aria-hidden', i !== idx ? 'true' : 'false');
+    });
+    thumbs.forEach((t, i) => {
+      t.classList.toggle('is-active', i === idx);
+      t.setAttribute('aria-pressed', i === idx ? 'true' : 'false');
+    });
+  }
+  thumbs.forEach((t, i) => t.addEventListener('click', () => showImg(i)));
+
+  // Size selection
+  const sizeBtns = document.querySelectorAll<HTMLButtonElement>('.pdp-size-btn');
+  const atcBtn   = document.getElementById('pdp-atc') as HTMLButtonElement | null;
+  const qtyInput = document.getElementById('pdp-qty-input') as HTMLInputElement | null;
+  const qtyDec = document.getElementById('pdp-qty-dec') as HTMLButtonElement | null;
+  const qtyInc = document.getElementById('pdp-qty-inc') as HTMLButtonElement | null;
+  function resolveMaxQty() {
+    if (!atcBtn) return null;
+    const raw = Number(atcBtn.dataset.maxQty || '');
+    return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : null;
+  }
+  function clampQty(v: number) {
+    const max = resolveMaxQty();
+    if (!Number.isFinite(v) || v < 1) return 1;
+    if (max && v > max) return max;
+    return Math.floor(v);
+  }
+  function syncQty(next: number) {
+    const safe = clampQty(next);
+    if (qtyInput) qtyInput.value = String(safe);
+    if (atcBtn) atcBtn.dataset.qty = String(safe);
+  }
+  syncQty(Number(qtyInput?.value || 1));
+  qtyDec?.addEventListener('click', () => syncQty(Number(qtyInput?.value || 1) - 1));
+  qtyInc?.addEventListener('click', () => syncQty(Number(qtyInput?.value || 1) + 1));
+  qtyInput?.addEventListener('input', () => syncQty(Number(qtyInput.value || 1)));
+  sizeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      sizeBtns.forEach(b => { b.classList.remove('is-active'); b.setAttribute('aria-checked', 'false'); });
+      btn.classList.add('is-active'); btn.setAttribute('aria-checked', 'true');
+      if (atcBtn) {
+        atcBtn.dataset.variantId = btn.dataset.variantId ?? '';
+        atcBtn.dataset.price = btn.dataset.price ?? '';
+        atcBtn.dataset.variantTitle = btn.dataset.variantTitle ?? '';
+        atcBtn.dataset.maxQty = btn.dataset.maxQty ?? '';
+        syncQty(Number(qtyInput?.value || 1));
+      }
+    });
+  });
+
+  // ATC
+  atcBtn?.addEventListener('click', () => {
+    const { variantId, title, price, thumbnail, variantTitle, maxQty, qty } = atcBtn.dataset;
+    if (!variantId) return;
+    const parsedMax = Number(maxQty || '');
+    const maxQuantity = Number.isFinite(parsedMax) && parsedMax > 0 ? Math.floor(parsedMax) : undefined;
+    const selectedQty = Math.max(1, Number(qty || qtyInput?.value || 1));
+    import('../../lib/cart').then(({ addItem }) => {
+      addItem({
+        variantId,
+        title: title ?? '',
+        variantTitle: variantTitle ?? '',
+        price: Number(price ?? 0),
+        thumbnail: thumbnail ?? '',
+        quantity: selectedQty,
+        maxQuantity,
+      });
+      document.getElementById('side-cart')?.classList.add('is-open');
+      document.getElementById('side-cart-backdrop')?.classList.add('is-active');
+      document.body.style.overflow = 'hidden';
+    });
+  });
+</script>

@@ -1,0 +1,77 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getLangFromUrl } from '../../i18n/utils';
+import type { Lang } from '../../i18n/utils';
+import { getProductListQueryString, resolveDefaultRegionId } from '../../lib/medusa-pricing';
+import ProductTemplate from '../../components/drops/products/camiseta-tyer-red-rose-vermelha.astro';
+
+const lang: Lang = getLangFromUrl(Astro.url);
+const handle = 'camiseta-tyer-red-rose-vermelha';
+const pk = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
+const medusaHeaders = { 'x-publishable-api-key': pk };
+let product: any = null;
+let related: any[] = [];
+let newest: any[] = [];
+
+try {
+  const url =
+    import.meta.env.MEDUSA_INTERNAL_URL ||
+    import.meta.env.MEDUSA_URL ||
+    import.meta.env.PUBLIC_MEDUSA_URL ||
+    'http://backend:9000';
+  const regionId = await resolveDefaultRegionId(url, medusaHeaders);
+  const q = getProductListQueryString(regionId);
+  const res = await fetch(
+    `${url}/store/products?${q}&handle=${encodeURIComponent(handle)}&limit=1`,
+    { headers: medusaHeaders, signal: AbortSignal.timeout(7000) }
+  );
+  if (res.ok) {
+    const { products } = await res.json();
+    product = products?.[0] ?? null;
+  }
+  if (product?.collection?.id) {
+    const relRes = await fetch(
+      `${url}/store/products?${q}&collection_id[]=${product.collection.id}&limit=16`,
+      { headers: medusaHeaders, signal: AbortSignal.timeout(7000) }
+    );
+    if (relRes.ok) {
+      const { products: rp } = await relRes.json();
+      related = (rp ?? []).filter((p: any) => p?.handle !== handle).slice(0, 8);
+    }
+  }
+  const newestRes = await fetch(`${url}/store/products?${q}&limit=16`, {
+    headers: medusaHeaders,
+    signal: AbortSignal.timeout(7000),
+  });
+  if (newestRes.ok) {
+    const { products: np } = await newestRes.json();
+    newest = [...(np ?? [])]
+      .filter((p: any) => p?.handle && p.handle !== handle)
+      .sort((a: any, b: any) => new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime())
+      .slice(0, 8);
+  }
+} catch {
+  // fallback handled below
+}
+
+if (!product) {
+  product = {
+    title: 'Camiseta Red Rose Vermelha',
+    description: 'Peça premium com identidade forte do drop.',
+    thumbnail: '/logo.webp',
+    images: [{ url: '/logo.webp' }],
+    variants: [],
+    metadata: {},
+  };
+}
+---
+
+<Layout
+  title={`${product.title} | Tyer`}
+  description={product.description ?? 'Camiseta Red Rose Vermelha da Tyer.'}
+  lang={lang}
+  ogImage={product.thumbnail ?? '/logo.webp'}
+  ogType="product"
+>
+  <ProductTemplate product={product} lang={lang} related={related} newest={newest} />
+</Layout>

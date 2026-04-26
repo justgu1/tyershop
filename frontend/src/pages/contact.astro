@@ -1,0 +1,60 @@
+---
+import LegalLayout from '../layouts/LegalLayout.astro';
+import { getLangFromUrl, t } from '../i18n/utils';
+const lang = getLangFromUrl(Astro.url);
+---
+<LegalLayout title={t(lang, 'footer', 'contact')} lang={lang} description="Get in touch with Tyer.">
+  <p>Have a question, collaboration idea, or just want to say what's up? We'd love to hear from you.</p>
+
+  <form class="contact-form" id="contact-form" novalidate>
+    <div class="contact-form__row">
+      <div class="contact-form__field">
+        <label for="c-name">Name</label>
+        <input type="text" id="c-name" name="name" required />
+      </div>
+      <div class="contact-form__field">
+        <label for="c-email">Email</label>
+        <input type="email" id="c-email" name="email" required />
+      </div>
+    </div>
+    <div class="contact-form__field">
+      <label for="c-subject">Subject</label>
+      <input type="text" id="c-subject" name="subject" />
+    </div>
+    <div class="contact-form__field">
+      <label for="c-message">Message</label>
+      <textarea id="c-message" name="message" rows="6" required></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Send Message</button>
+    <p id="contact-status" aria-live="polite" style="font-size:13px;color:var(--c-accent);margin-top:8px" hidden></p>
+  </form>
+
+  <h2 id="info" style="margin-top:48px">Contact Info</h2>
+  <p>Email: <a href="mailto:oi@tyer.com.br">oi@tyer.com.br</a></p>
+  <p>Instagram: <a href="https://instagram.com/tyer" target="_blank" rel="noopener noreferrer">@tyer</a></p>
+  <p>Business hours: Mon–Fri, 9am–6pm (BRT)</p>
+</LegalLayout>
+
+<style>
+.contact-form { display: flex; flex-direction: column; gap: 20px; max-width: 600px; margin-top: 32px; }
+.contact-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 560px) { .contact-form__row { grid-template-columns: 1fr; } }
+.contact-form__field { display: flex; flex-direction: column; gap: 6px; }
+.contact-form__field label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-muted); }
+.contact-form__field input, .contact-form__field textarea {
+  padding: 12px 14px; background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--r); color: var(--c-text); font-size: 14px;
+  transition: border-color var(--ease); resize: vertical;
+}
+.contact-form__field input:focus, .contact-form__field textarea:focus { outline: none; border-color: var(--c-accent); }
+</style>
+<script>
+  document.getElementById('contact-form')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const status = document.getElementById('contact-status')!;
+    status.hidden = false; status.textContent = 'Sending...';
+    await new Promise(r => setTimeout(r, 800));
+    status.textContent = '✓ Message sent! We\'ll get back to you soon.';
+    (e.currentTarget as HTMLFormElement).reset();
+  });
+</script>

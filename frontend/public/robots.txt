@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+Disallow: /conta/
+Disallow: /api/
+
+Sitemap: https://tyer.com.br/sitemap-index.xml

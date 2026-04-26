@@ -1,0 +1,736 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ProductCard from '../components/ProductCard.astro';
+import { t, getPathForLang, type Lang } from '../i18n/utils';
+import { getProductListQueryString, resolveDefaultRegionId } from '../lib/medusa-pricing';
+
+const lang: Lang = 'pt';
+const pk = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
+
+let products: any[] = [];
+let collections: any[] = [];
+
+try {
+  const url = import.meta.env.MEDUSA_INTERNAL_URL || import.meta.env.MEDUSA_URL || 'http://localhost:9003';
+  const headers = { 'x-publishable-api-key': pk };
+  const regionId = await resolveDefaultRegionId(url, headers);
+  const pq = getProductListQueryString(regionId);
+  const [pRes, cRes] = await Promise.all([
+    fetch(`${url}/store/products?${pq}&limit=8`, { headers, signal: AbortSignal.timeout(5000) }),
+    fetch(`${url}/store/collections?limit=50`, { headers, signal: AbortSignal.timeout(5000) }),
+  ]);
+  if (pRes.ok) products = ((await pRes.json()).products ?? []).slice(0, 4);
+  if (cRes.ok) {
+    collections = (await cRes.json()).collections ?? [];
+    const countPromises = collections.map(c =>
+      fetch(`${url}/store/products?collection_id[]=${c.id}&limit=1`, { headers, signal: AbortSignal.timeout(3000) })
+        .then(r => r.json())
+        .then(d => d.count || 0)
+        .catch(() => 0)
+    );
+    const counts = await Promise.all(countPromises);
+    collections.forEach((c, i) => c.products_count = counts[i]);
+  }
+} catch {}
+
+if (collections.length === 0) {
+  collections = [
+    { id: '1', title: 'Tyer In Paris', handle: 'tyer-in-paris', products_count: 12 },
+    { id: '2', title: 'Five Stars',    handle: 'five-stars',    products_count: 8  },
+    { id: '3', title: 'Drop MVP',      handle: 'mvp',           products_count: 15 },
+    { id: '4', title: 'Tyer Pro',      handle: 'tyer-pro',      products_count: 10 },
+    { id: '5', title: 'Red Rose',      handle: 'red-rose',      products_count: 6  },
+  ];
+}
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'Tyer',
+  url: 'https://tyer.com.br',
+  potentialAction: { '@type': 'SearchAction', target: 'https://tyer.com.br/shop?q={search_term_string}', 'query-input': 'required name=search_term_string' },
+};
+
+function getCollectionImage(col: any): string {
+  return `/collections/${col.handle || 'no-data'}.webp`;
+}
+function getCount(col: any): number {
+  return col.products_count ?? 0;
+}
+
+const YOUTUBE_URL = 'https://www.youtube.com/@tyer_br';
+const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
+---
+
+<Layout
+  title="Tyer"
+  description="TYER — Streetwear e Basketball. Peças únicas feitas para durar."
+  lang={lang}
+  ogImage="/logo.webp"
+  bodyClass="home"
+  jsonLd={jsonLd}
+>
+  <!-- Config for client-side JS -->
+  <div id="app-config" data-pk={pk} hidden aria-hidden="true"></div>
+
+  <!-- HERO -->
+  <section class="hero" aria-label="Hero">
+    <video class="hero__video" autoplay loop muted playsinline preload="none" aria-hidden="true">
+      <source src="/video/hero.mp4" type="video/mp4" />
+    </video>
+    <div class="hero__overlay" aria-hidden="true"></div>
+    <a href="#produtos-vendidos" class="hero__scroll" aria-label="Scroll para produtos">
+      <span class="hero__scroll-label">Desça para ver mais</span>
+      <svg width="20" height="28" viewBox="0 0 20 28" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="18" height="26" rx="9" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+        <circle cx="10" cy="8" r="2.5" fill="rgba(255,255,255,0.7)" class="scroll-dot"/>
+      </svg>
+    </a>
+  </section>
+
+  <!-- MAIS VENDIDOS -->
+  <section id="produtos-vendidos" class="section products-section" aria-labelledby="products-title">
+    <div class="section-bg" style="background-image:url('/products-section-background.webp')"></div>
+    <div class="section-overlay"></div>
+    <div class="container section-content">
+      <header class="section__header section__header--centered">
+        <h2 class="section__title" id="products-title">Mais Vendidos</h2>
+      </header>
+      <div class="products-showcase" role="list" id="products-grid">
+        {products.length > 0 ? products.map(p => (
+          <ProductCard product={p} lang={lang} role="listitem" />
+        )) : ([1,2,3,4].map(() => (
+          <div class="product-showcase-card psc--skeleton" role="listitem" aria-hidden="true">
+            <div class="psc__img-wrap">
+              <div class="psc__img psc__img--skel" />
+            </div>
+            <div class="psc__info">
+              <div class="skel-line skel-line--name" />
+              <div class="skel-line skel-line--price" />
+            </div>
+          </div>
+        )))}
+      </div>
+      <p class="products-section__actions">
+        <a
+          class="btn btn-outline products-section__cta"
+          href={getPathForLang('/shop', lang)}
+        >
+          <span class="products-section__cta-txt">{t(lang, 'sections', 'view_all')}</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-arrow-right products-section__cta-ico"
+            aria-hidden="true"
+            ><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg
+          >
+        </a>
+      </p>
+    </div>
+  </section>
+
+  <!-- COLLECTIONS CAROUSEL -->
+  <section id="collection" class="section collections-section" aria-labelledby="collections-title">
+    <div class="section-bg" style="background-image:url('/collections-section-background.webp')"></div>
+    <div class="section-overlay"></div>
+    <div class="section-content collections-wrap">
+      <h2 class="collections-title section__title" id="collections-title">Drops</h2>
+      <div class="carousel-stage" id="carousel-stage" role="region" aria-label="Collections">
+        <div class="carousel-track" id="carousel-track">
+          {collections.map((col, i) => (
+            <article
+              class={`col-card${i === 0 ? ' is-active' : ''}`}
+              data-index={i}
+              role="listitem"
+            >
+              <a href={`/collections/${col.handle}`} class="col-card__link">
+                <img
+                  src={getCollectionImage(col)}
+                  alt={col.title}
+                  onerror="this.src='/no-data.webp'"
+                  class="col-card__img"
+                  width="260" height="400"
+                  loading={i === 0 ? 'eager' : 'lazy'}
+                  decoding="async"
+                />
+                {col.products_count === 0 && (
+                  <div class="col-card__ribbon"><span>SOLD OUT</span></div>
+                )}
+                <div class="col-card__content">
+                  <h3 class="col-card__name">{col.title}</h3>
+                  <p class="col-card__count">{getCount(col)} itens disponíveis</p>
+                  <span class="col-card__cta">Ver coleção →</span>
+                </div>
+              </a>
+            </article>
+          ))}
+        </div>
+        <button class="carousel-nav carousel-nav--prev" id="col-prev" aria-label="Anterior" type="button">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <button class="carousel-nav carousel-nav--next" id="col-next" aria-label="Próximo" type="button">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <div class="carousel-dots" id="carousel-dots" role="tablist">
+          {collections.map((_, i) => (
+            <button
+              class={`carousel-dot${i === 0 ? ' is-active' : ''}`}
+              aria-label={`Coleção ${i + 1}`}
+              data-idx={i}
+              role="tab"
+              aria-selected={i === 0 ? 'true' : 'false'}
+            ></button>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EDITORIAL -->
+  <section id="editorial" class="section editorial-section" aria-labelledby="editorial-title">
+    <div class="section-bg" style="background-image:url('/editorial-section-background.webp')"></div>
+    <div class="section-overlay"></div>
+    <div class="container section-content">
+      <header class="section__header section__header--centered">
+        <h2 class="section__title" id="editorial-title">{t(lang, 'sections', 'social_title')}</h2>
+      </header>
+      <div class="editorial__content">
+        <div class="editorial__left">
+          <img src="/logo.webp" alt="Tyer" width="240" height="104" loading="lazy" decoding="async" />
+        </div>
+        <div class="editorial__right">
+          <a
+            class="editorial__right-link"
+            href={YOUTUBE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Conteúdos Tyer no YouTube"
+          >
+            <img
+              src="/editorial-right-image.webp"
+              alt="Conteúdos e basketball"
+              width="560"
+              height="400"
+              class="editorial__right-img"
+              loading="lazy"
+              decoding="async"
+              onerror="this.src='/no-data.webp'"
+            />
+          </a>
+          <ul class="editorial__social" role="list" aria-label="Redes e comunidade">
+            <li>
+              <a
+                class="editorial__social-link"
+                href="https://www.instagram.com/tyer_br"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram @tyer_br"
+              >
+                <img
+                  class="editorial__social-ico"
+                  src="/icons/instagram.svg"
+                  width="32"
+                  height="32"
+                  alt=""
+                  decoding="async"
+                />
+              </a>
+            </li>
+            <li>
+              <a
+                class="editorial__social-link"
+                href="https://www.tiktok.com/@tyer_br"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="TikTok @tyer_br"
+              >
+                <img
+                  class="editorial__social-ico"
+                  src="/icons/tiktok.svg"
+                  width="32"
+                  height="32"
+                  alt=""
+                  decoding="async"
+                />
+              </a>
+            </li>
+            <li>
+              <a
+                class="editorial__social-link"
+                href={YOUTUBE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="YouTube @tyer_br"
+              >
+                <img
+                  class="editorial__social-ico"
+                  src="/icons/youtube.svg"
+                  width="32"
+                  height="32"
+                  alt=""
+                  decoding="async"
+                />
+              </a>
+            </li>
+            <li>
+              <a
+                class="editorial__fam-link"
+                href={WHATSAPP_GROUP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Grupo Família tyer no WhatsApp"
+              >
+                <img
+                  class="editorial__fam-img"
+                  src="/tyer-fam.webp"
+                  alt=""
+                  width="36"
+                  height="36"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HISTORY — no background image, uses site default bg -->
+  <section class="section history-section" aria-labelledby="history-title">
+    <div class="section-content history-content">
+      <div class="history__text">
+        <h2 class="history__title" id="history-title">Nossa História</h2>
+        <p class="history__text-body">TYER foi nascida do basquete — e existe porque dele. Somos muito mais que uma marca de roupas. Somos uma comunidade unida pelo jogo, feita por pessoas que vivem basquete todos os dias. Isso é ser TYER. Isso é TYER GANG.</p>
+        <p class="history__text-body">Acreditamos em verdadeiros MVPs: aqueles que se esforçam para melhorar diariamente dentro e fora da quadra. Nossa missão é fortalecer a cultura, contar histórias reais e apoiar quem faz o basquete crescer no Brasil.</p>
+        <p class="history__text-body">Do jogo de rua para os grandes palcos, estamos juntos nessa, elevando o nível e levando o basquete cada vez mais longe.</p>
+        <p class="history__text-body">Não vestimos basquete. Somos basquete. 🏀🇧🇷</p>
+      </div>
+      <div class="history__image" aria-hidden="true">
+        <img src="/our-history.webp" alt="" width="560" height="700" loading="lazy" decoding="async" onerror="this.src='/no-data.webp'" />
+      </div>
+    </div>
+  </section>
+
+</Layout>
+
+<style>
+/* ── Hero ── */
+.hero {
+  position: relative; min-height: 100svh;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  margin-top: calc(-1 * var(--header-h));
+}
+.hdr:has(.hdr__nav-item--mega:hover) {
+  background: var(--c-bg); /* Match megamenu background */
+  backdrop-filter: none;
+}
+.hdr__inner { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+.hero__video { width: 100%; height: 100svh; object-fit: cover; }
+.hero__overlay { position: absolute; inset: 0; z-index: 1; background: linear-gradient(to bottom, rgba(0,0,0,.75) 0%, transparent); }
+.hero__scroll {
+  position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+  z-index: 2; color: rgba(255,255,255,0.6); transition: color var(--ease);
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.hero__scroll:hover { color: rgba(255,255,255,0.9); }
+.hero__scroll-label { font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; }
+.scroll-dot { animation: scrollpulse 2s ease-in-out infinite; }
+@keyframes scrollpulse { 0%,100% { cy: 8; opacity: 1; } 50% { cy: 16; opacity: 0.4; } }
+
+/* ── Section base ── */
+.section { position: relative; min-height: 75svh; display: flex; align-items: center; overflow: hidden; }
+
+/* Bg layer — position:absolute is NOT affected by any parent rules */
+.section-bg {
+  position: absolute !important;
+  inset: 0;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  filter: blur(3px);
+  transform: scale(1.06);
+  z-index: 0;
+}
+.section-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  z-index: 1;
+  pointer-events: none;
+}
+.section-content { position: relative; z-index: 2; width: 100%; padding-block: 64px; }
+
+/* ── Section header ── */
+.section__header { margin-bottom: 48px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 24px; }
+.section__header--centered { justify-content: center; text-align: center; }
+.section__title { font-family: var(--font-title); font-size: clamp(36px, 5vw, 64px); text-transform: uppercase; flex: 1 0 100%; }
+.products-section__actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+  margin-bottom: 0;
+}
+.products-section__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 9999px;
+  padding: 12px 28px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+}
+.products-section__cta-txt { line-height: 1.2; }
+.products-section__cta-ico { flex-shrink: 0; opacity: 0.9; }
+.products-section__cta:hover .products-section__cta-ico, .products-section__cta:focus-visible .products-section__cta-ico {
+  transform: translateX(2px);
+  transition: transform 0.2s ease;
+}
+
+/* ── Products (usa ProductCard; moldura suavizada via bloco :global abaixo) ── */
+.products-showcase { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; align-items: start; }
+.products-showcase > :global(*) { min-width: 0; }
+@media (max-width: 900px) { .products-showcase { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .products-showcase { grid-template-columns: 1fr; } }
+
+.product-showcase-card {
+  transition: transform 0.3s ease;
+}
+.product-showcase-card:hover { transform: translateY(-4px); }
+.psc__link { display: block; height: 100%; text-decoration: none; }
+.psc__img-wrap {
+  aspect-ratio: 1;
+  position: relative;
+  background: var(--c-bg-mute, #1a1a1a);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px; /* Soft moldura */
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.psc__img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
+.psc__link:hover .psc__img { transform: scale(1.06); }
+.psc__img--skel { background: linear-gradient(110deg, #1a1a1a 30%, #2a2a2a 50%, #1a1a1a 70%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.psc__info { text-align: center; padding: 0 4px; }
+.psc__name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--c-text);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.psc__price { font-size: 16px; font-weight: 700; color: var(--c-accent); margin-top: 8px; }
+.skel-line { height: 12px; border-radius: 4px; background: #2a2a2a; margin-top: 8px; }
+.skel-line--name { width: 70%; }
+.skel-line--price { width: 40%; margin-top: 6px; }
+
+/* ── Collections flat carousel ── */
+.collections-section { padding-block: 0; }
+.collections-wrap { padding-inline: 0; }
+.collections-title { text-align: center; margin-bottom: 56px; padding-inline: 40px; }
+
+/* Stage: clips the sides, shows 5 cards */
+.carousel-stage {
+  position: relative;
+  height: 480px;
+  overflow: hidden;
+}
+
+/* Track: all cards are absolute, stacked at center */
+.carousel-track {
+  position: absolute;
+  inset: 0;
+  /* No preserve-3d! Cards use 2D transforms only */
+}
+
+/* Individual card */
+.col-card {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 260px; height: 400px;
+  margin-top: -200px;
+  margin-left: -130px;
+  border-radius: 12px;
+  overflow: visible;   /* allow ribbon */
+  cursor: pointer;
+  /* Default: behind and grayscale */
+  filter: grayscale(100%);
+  opacity: 0.45;
+  /* All transitions explicitly on transform, filter, opacity, z-index */
+  transition:
+    transform 0.55s cubic-bezier(0.4,0,0.2,1),
+    filter 0.4s ease,
+    opacity 0.4s ease;
+  /* Will be set by JS */
+  z-index: 1;
+}
+
+.col-card.is-active {
+  filter: grayscale(0%) !important;
+  opacity: 1 !important;
+}
+
+/* Overflow hidden only on the inner link */
+.col-card__link {
+  display: block; width: 100%; height: 100%;
+  position: relative; overflow: hidden;
+  border-radius: 12px;
+}
+
+.col-card__img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease; display: block; }
+.is-active .col-card__link:hover .col-card__img { transform: scale(1.05); }
+
+/* Content — only visible on active card */
+.col-card__content {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 20px 16px;
+  background: linear-gradient(to top, rgba(0,0,0,.95) 0%, rgba(0,0,0,.45) 55%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 3;
+}
+.col-card.is-active .col-card__content { opacity: 1; }
+
+.col-card__name { font-family: var(--font-title); font-size: 20px; text-transform: uppercase; color: var(--c-white); line-height: 1; margin: 0 0 4px 0; }
+.col-card__count { font-size: 11px; color: rgba(255,255,255,0.6); margin: 0 0 10px 0; }
+.col-card__cta { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--c-accent); }
+
+/* Ribbon */
+.col-card__ribbon {
+  position: absolute; top: 0; right: 0; z-index: 10;
+  width: 90px; height: 90px; overflow: hidden; pointer-events: none;
+}
+.col-card__ribbon span {
+  position: absolute; display: block; width: 128px; padding: 5px 0;
+  background: var(--c-accent); color: var(--c-white);
+  font-size: 9px; font-weight: 800; letter-spacing: 0.1em;
+  text-align: center; text-transform: uppercase;
+  top: 19px; right: -33px; transform: rotate(45deg);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+}
+
+/* Navigation buttons */
+.carousel-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(0,0,0,0.6); color: var(--c-white);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 30; border: 1px solid rgba(255,255,255,0.15);
+  transition: background var(--ease); backdrop-filter: blur(6px);
+}
+.carousel-nav:hover { background: rgba(0,0,0,0.9); }
+.carousel-nav--prev { left: 16px; }
+.carousel-nav--next { right: 16px; }
+
+/* Dots */
+.carousel-dots {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; z-index: 30;
+}
+.carousel-dot { width: 24px; height: 3px; border-radius: 99px; background: rgba(255,255,255,0.2); transition: background 0.3s, width 0.3s; padding: 0; }
+.carousel-dot.is-active { background: var(--c-accent); width: 40px; }
+
+@media (max-width: 700px) {
+  .carousel-stage { height: 380px; }
+  .col-card { width: 200px; height: 310px; margin-top: -155px; margin-left: -100px; }
+  .carousel-nav { display: none; }
+}
+
+/* ── Editorial ── */
+.editorial__content { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; max-width: var(--max-w); margin: 0 auto; padding: 0 40px; }
+@media (max-width: 768px) { .editorial__content { grid-template-columns: 1fr; gap: 32px; } }
+.editorial__left { display: flex; align-items: center; justify-content: center; padding: 40px; }
+.editorial__left img { max-width: 240px; height: auto; opacity: 0.9; }
+.editorial__right-link { display: block; border-radius: 8px; overflow: hidden; transition: transform 0.25s ease, box-shadow 0.25s ease; }
+.editorial__right-link:hover, .editorial__right-link:focus-visible {
+  transform: scale(1.02);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+  outline: none;
+}
+.editorial__right { display: flex; flex-direction: column; align-items: flex-start; gap: 24px; }
+.editorial__right-img { width: 100%; height: auto; display: block; vertical-align: top; }
+.editorial__social { width:100%; list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 20px; }
+.editorial__social li { display: flex; align-items: center; }
+.editorial__social-link {
+  display: flex; align-items: center; justify-content: center;
+  padding: 4px; border-radius: 50%;
+  text-decoration: none; transition: transform 0.2s ease, filter 0.2s ease; outline: none;
+}
+.editorial__social-ico {
+  width: 32px; height: 32px; object-fit: contain; display: block;
+  filter: brightness(0) invert(1);
+  transition: filter 0.2s ease, transform 0.2s ease;
+}
+.editorial__social-link:hover .editorial__social-ico, .editorial__social-link:focus-visible .editorial__social-ico {
+  transform: scale(1.08);
+  filter: brightness(0) invert(1) drop-shadow(0 0 10px color-mix(in srgb, var(--c-accent) 75%, transparent));
+}
+.editorial__fam-link {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 6px; overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease; outline: none; text-decoration: none;
+  flex-shrink: 0;
+}
+.editorial__fam-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.editorial__fam-link:hover, .editorial__fam-link:focus-visible {
+  transform: scale(1.08);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--c-accent) 50%, transparent);
+}
+
+/* ── History — no bg image, natural site bg ── */
+.history-section {
+  background: var(--c-bg);
+  min-height: 85svh;
+}
+.history-content {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 64px;
+  max-width: var(--max-w); margin: 0 auto; padding: 0 40px; align-items: center;
+}
+@media (max-width: 768px) {
+  .history-content { grid-template-columns: 1fr; gap: 48px; }
+  .history__image { order: -1; }
+}
+@media (max-width: 480px) { .history-content { padding: 0 20px; } }
+.history__text { display: flex; flex-direction: column; gap: 16px; }
+.history__title { font-family: var(--font-title); font-size: clamp(36px, 5vw, 64px); text-transform: uppercase; line-height: 0.95; margin: 0; }
+.history__text-body { font-size: 15px; line-height: 1.8; color: var(--c-muted); }
+.history__image img { width: 100%; height: auto; border-radius: 8px; }
+</style>
+<style is:global>
+#products-grid .pc__img-wrap {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+}
+</style>
+
+<script>
+(function () {
+  /* ─────────────────────────────────────────────
+     FLAT 2D carousel — no preserve-3d, no z-index BS.
+     Cards sit at center; JS moves them with translateX + scale.
+     Active card always gets highest z-index via JS.
+  ───────────────────────────────────────────── */
+  const stage   = document.getElementById('carousel-stage');
+  const track   = document.getElementById('carousel-track');
+  const prevBtn = document.getElementById('col-prev');
+  const nextBtn = document.getElementById('col-next');
+  const dotsEl  = document.getElementById('carousel-dots');
+  if (!stage || !track) return;
+
+  const cards = Array.from(track.querySelectorAll('.col-card'));
+  const dots  = dotsEl ? Array.from(dotsEl.querySelectorAll('.carousel-dot')) : [];
+  const n = cards.length;
+  let current = 0;
+  let autoTimer;
+
+  // Slot positions [leftmost … rightmost]
+  // Adjust x / scale / opacity to taste
+  const SLOTS = [
+    { x: -430, scale: 0.62, opacity: 0.35, zi: 1 },
+    { x: -238, scale: 0.80, opacity: 0.60, zi: 2 },
+    { x:    0, scale: 1.00, opacity: 1.00, zi: 5 },
+    { x:  238, scale: 0.80, opacity: 0.60, zi: 2 },
+    { x:  430, scale: 0.62, opacity: 0.35, zi: 1 },
+  ];
+  const HALF = Math.floor(SLOTS.length / 2); // 2
+
+  function positionCards(activeIdx) {
+    cards.forEach((card, i) => {
+      // Signed relative position (-2 to +2)
+      let rel = ((i - activeIdx) % n + n) % n;
+      if (rel > n - 1 - HALF) rel -= n;
+
+      const slotIdx = rel + HALF; // maps to 0..4
+
+      if (slotIdx < 0 || slotIdx >= SLOTS.length) {
+        // Card is "behind" and not shown in any slot (n > 5 case)
+        card.style.transform = 'translateX(0) scale(0.3)';
+        card.style.opacity = '0';
+        card.style.zIndex = '0';
+        card.style.pointerEvents = 'none';
+        card.classList.remove('is-active');
+        return;
+      }
+
+      const slot = SLOTS[slotIdx];
+      const isActive = slotIdx === HALF;
+
+      card.style.transform = `translateX(${slot.x}px) scale(${slot.scale})`;
+      card.style.opacity = String(slot.opacity);
+      card.style.zIndex  = String(slot.zi);
+      card.style.filter  = isActive ? 'grayscale(0%)' : 'grayscale(100%)';
+      card.style.pointerEvents = 'all';
+      card.classList.toggle('is-active', isActive);
+      card.setAttribute('aria-current', isActive ? 'true' : 'false');
+    });
+
+    dots.forEach((dot, i) => {
+      dot.classList.toggle('is-active', i === activeIdx);
+      dot.setAttribute('aria-selected', i === activeIdx ? 'true' : 'false');
+    });
+  }
+
+  function goTo(idx) {
+    current = ((idx % n) + n) % n;
+    positionCards(current);
+  }
+
+  function startAuto() {
+    clearInterval(autoTimer);
+    autoTimer = setInterval(() => goTo(current + 1), 4500);
+  }
+  function stopAuto() { clearInterval(autoTimer); }
+
+  // Init
+  positionCards(0);
+
+  // Nav buttons
+  prevBtn?.addEventListener('click', () => { goTo(current - 1); stopAuto(); startAuto(); });
+  nextBtn?.addEventListener('click', () => { goTo(current + 1); stopAuto(); startAuto(); });
+
+  // Dots
+  dots.forEach((dot, i) => dot.addEventListener('click', () => { goTo(i); stopAuto(); startAuto(); }));
+
+  // Click a non-active card → bring to front
+  cards.forEach((card, i) => {
+    card.addEventListener('click', (e) => {
+      if (i !== current) {
+        e.preventDefault();
+        goTo(i);
+        stopAuto();
+        startAuto();
+      }
+    });
+  });
+
+  // Keyboard navigation
+  stage.setAttribute('tabindex', '0');
+  stage.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft')  { goTo(current - 1); stopAuto(); startAuto(); }
+    if (e.key === 'ArrowRight') { goTo(current + 1); stopAuto(); startAuto(); }
+  });
+
+  // Pause auto on hover
+  stage.addEventListener('mouseenter', stopAuto);
+  stage.addEventListener('mouseleave', startAuto);
+  startAuto();
+})();
+</script>

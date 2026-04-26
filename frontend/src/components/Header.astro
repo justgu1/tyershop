@@ -1,0 +1,1778 @@
+---
+import { t, getPathForLang, type Lang } from "../i18n/utils";
+
+interface Props {
+  lang?: Lang;
+}
+const lang: Lang = Astro.props.lang ?? "pt";
+
+const url =
+  import.meta.env.MEDUSA_INTERNAL_URL ||
+  import.meta.env.MEDUSA_URL ||
+  "http://localhost:9003";
+const medusaBase = (
+  import.meta.env.PUBLIC_MEDUSA_URL || url
+).replace(/\/$/, "");
+const pk =
+  "pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975";
+const headers = { "x-publishable-api-key": pk };
+
+let drops: any[] = [];
+try {
+  const res = await fetch(`${url}/store/collections?limit=50`, {
+    headers,
+    signal: AbortSignal.timeout(3000),
+  });
+  if (res.ok) {
+    const data = await res.json();
+    drops = (data.collections || []).map((c: any, i: number) => ({
+      handle: c.handle,
+      name: c.title,
+      num: String(i + 1).padStart(2, "0"),
+      img: `/collections/${c.handle}.webp`,
+    }));
+  }
+} catch {}
+const resetSentHint = t(lang, "account", "reset_sent_hint");
+---
+
+<header class="hdr" id="site-header">
+  <div class="hdr__inner container">
+    <!-- Logo -->
+    <a
+      href={getPathForLang("/", lang)}
+      class="hdr__logo"
+      aria-label="Tyer — Home"
+    >
+      <img src="/logo.webp" alt="Tyer" width="100" height="44" />
+    </a>
+
+    <!-- Nav -->
+    <nav class="hdr__nav" aria-label="Main navigation">
+      <!-- Collections with megamenu -->
+      <div class="hdr__nav-item hdr__nav-item--mega" id="nav-collections-wrap">
+        <a
+          href={getPathForLang("/#collection", lang)}
+          class="hdr__nav-link"
+          aria-haspopup="true"
+          aria-expanded="false"
+          id="nav-collections-btn"
+        >
+          {t(lang, "nav", "collections")}
+          <svg
+            class="hdr__nav-chevron"
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg
+          >
+        </a>
+        <!-- Megamenu -->
+        <div
+          class="mega"
+          id="mega-collections"
+          role="region"
+          aria-label="Collections"
+          aria-hidden="true"
+        >
+          <div class="mega__inner container">
+            <ul class="mega__list" role="list">
+              {
+                drops.map((drop, i) => (
+                  <li>
+                    <a
+                      href={getPathForLang(`/collections/${drop.handle}`, lang)}
+                      class={`mega__item${i === 0 ? " is-preloaded" : ""}`}
+                      data-img={drop.img}
+                      data-num={drop.num}
+                    >
+                      <span class="mega__item-num">{drop.num}</span>
+                      <span class="mega__item-name">{drop.name}</span>
+                      <svg
+                        class="mega__item-arrow"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path d="m9 18 6-6-6-6" />
+                      </svg>
+                    </a>
+                  </li>
+                ))
+              }
+            </ul>
+            <div class="mega__preview">
+              <img
+                src={drops[0]?.img || "/logo.webp"}
+                alt={drops[0]?.name || "Preview"}
+                id="mega-preview-img"
+                class="mega__preview-img"
+                width="320"
+                height="420"
+                loading="eager"
+                decoding="async"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <a href={getPathForLang("/shop", lang)} class="hdr__nav-link"
+        >{t(lang, "nav", "shop")}</a
+      >
+      <a
+        href={`${getPathForLang("/", lang)}#editorial`}
+        class="hdr__nav-link"
+        data-scroll-anchor="true">{t(lang, "nav", "editorial")}</a
+      >
+    </nav>
+
+    <!-- Actions -->
+    <div class="hdr__actions">
+      <!-- Search -->
+      <button
+        class="hdr__icon-btn"
+        id="search-toggle"
+        aria-label={t(lang, "nav", "search")}
+        aria-expanded="false"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+          ><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"
+          ></path></svg
+        >
+      </button>
+      <!-- Cart -->
+      <button
+        class="hdr__icon-btn"
+        id="cart-toggle"
+        aria-label={t(lang, "nav", "cart")}
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+          ><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"
+          ></path><line x1="3" y1="6" x2="21" y2="6"></line><path
+            d="M16 10a4 4 0 0 1-8 0"></path></svg
+        >
+        <span
+          class="hdr__cart-badge"
+          id="cart-badge"
+          data-count="0"
+          aria-hidden="true">0</span
+        >
+      </button>
+      <!-- Account (hover no desktop, clique no mobile) -->
+      <div class="hdr__account-wrap" id="hdr-account-wrap" data-orders-href={getPathForLang("/account/orders", lang)}>
+        <button
+          type="button"
+          class="hdr__icon-btn"
+          id="hdr-account-btn"
+          aria-label={t(lang, "nav", "account")}
+          aria-expanded="false"
+          aria-controls="hdr-account-panel"
+          aria-haspopup="dialog"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+            ><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle
+              cx="12"
+              cy="7"
+              r="4"></circle></svg
+          >
+        </button>
+        <span class="hdr__account-name" id="hdr-account-name" hidden></span>
+        <div
+          class="hdr__account-panel"
+          id="hdr-account-panel"
+          role="dialog"
+          aria-label={t(lang, "account", "my_account")}
+          aria-hidden="true"
+        >
+          <div id="hdr-auth-logged" class="hdr-auth-logged" hidden>
+            <p class="hdr-auth-logged__name" id="hdr-profile-name"></p>
+            <a
+              class="btn btn-outline hdr-auth-logged__btn"
+              href={getPathForLang("/account", lang)}>{t(lang, "account", "my_account")}</a
+            >
+            <a
+              class="btn btn-outline hdr-auth-logged__btn"
+              id="hdr-orders-link"
+              href={getPathForLang("/account/orders", lang)}>{t(lang, "account", "order_history")}</a
+            >
+            <button type="button" class="btn btn-primary hdr-auth-logged__btn" id="hdr-logout-btn"
+              >{t(lang, "account", "logout")}</button
+            >
+          </div>
+          <div id="hdr-auth-forms">
+            <div class="hdr-auth-tabs" role="tablist" aria-label={t(lang, "account", "my_account")}>
+              <button
+                type="button"
+                class="hdr-auth-tab is-active"
+                id="hdr-tab-login"
+                role="tab"
+                data-tab="login"
+                aria-selected="true"
+                >{t(lang, "account", "login")}</button
+              >
+              <button
+                type="button"
+                class="hdr-auth-tab"
+                id="hdr-tab-register"
+                role="tab"
+                data-tab="register"
+                aria-selected="false"
+                >{t(lang, "account", "register")}</button
+              >
+            </div>
+            <div id="hdr-auth-main">
+              <form class="hdr-auth-form" id="hdr-login-form" novalidate>
+                <div class="hdr-auth-field">
+                  <label for="hdr-login-email">{t(lang, "account", "email")}</label>
+                  <input
+                    type="email"
+                    id="hdr-login-email"
+                    name="email"
+                    autocomplete="email"
+                    required
+                  />
+                </div>
+                <div class="hdr-auth-field">
+                  <label for="hdr-login-password">{t(lang, "account", "password")}</label>
+                  <input
+                    type="password"
+                    id="hdr-login-password"
+                    name="password"
+                    autocomplete="current-password"
+                    required
+                  />
+                </div>
+                <p class="hdr-auth-status" id="hdr-login-status" aria-live="polite" hidden></p>
+                <button type="submit" class="btn btn-primary hdr-auth-submit"
+                  >{t(lang, "account", "login")}</button
+                >
+                <button type="button" class="hdr-auth-link" id="hdr-forgot-open"
+                  >{t(lang, "account", "forgot_password")}</button
+                >
+              </form>
+              <form class="hdr-auth-form" id="hdr-register-form" hidden novalidate>
+                <div class="hdr-auth-field">
+                  <label for="hdr-reg-first">{t(lang, "account", "first_name")}</label>
+                  <input type="text" id="hdr-reg-first" name="first_name" autocomplete="given-name" required />
+                </div>
+                <div class="hdr-auth-field">
+                  <label for="hdr-reg-last">{t(lang, "account", "last_name")}</label>
+                  <input type="text" id="hdr-reg-last" name="last_name" autocomplete="family-name" required />
+                </div>
+                <div class="hdr-auth-field">
+                  <label for="hdr-reg-email">{t(lang, "account", "email")}</label>
+                  <input type="email" id="hdr-reg-email" name="email" autocomplete="email" required />
+                </div>
+                <div class="hdr-auth-field">
+                  <label for="hdr-reg-password">{t(lang, "account", "password")}</label>
+                  <input
+                    type="password"
+                    id="hdr-reg-password"
+                    name="password"
+                    autocomplete="new-password"
+                    required
+                    minlength="8"
+                  />
+                </div>
+                <p class="hdr-auth-status" id="hdr-reg-status" aria-live="polite" hidden></p>
+                <button type="submit" class="btn btn-primary hdr-auth-submit"
+                  >{t(lang, "account", "register")}</button
+                >
+              </form>
+            </div>
+            <form class="hdr-auth-form hdr-auth-form--forgot" id="hdr-forgot-form" hidden novalidate>
+              <p class="hdr-auth-forgot-hint">{t(lang, "account", "forgot_password")}</p>
+              <div class="hdr-auth-field">
+                <label for="hdr-forgot-email">{t(lang, "account", "email")}</label>
+                <input type="email" id="hdr-forgot-email" name="email" autocomplete="email" required />
+              </div>
+              <p class="hdr-auth-status" id="hdr-forgot-status" aria-live="polite" hidden></p>
+              <button type="submit" class="btn btn-primary hdr-auth-submit"
+                >{t(lang, "account", "send_reset")}</button
+              >
+              <button type="button" class="hdr-auth-link" id="hdr-forgot-back"
+                >{t(lang, "account", "back_to_login")}</button
+              >
+            </form>
+          </div>
+        </div>
+      </div>
+      <!-- Burger -->
+      <button
+        class="hdr__burger"
+        id="menu-toggle"
+        aria-label={t(lang, "nav", "open_menu")}
+        aria-expanded="false"
+      >
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Search overlay -->
+<div
+  class="search-overlay"
+  id="search-overlay"
+  aria-hidden="true"
+  role="dialog"
+  aria-label={t(lang, "nav", "search")}
+>
+  <div class="search-overlay__inner container">
+    <div class="search-overlay__bar">
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+        ><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"
+        ></path></svg
+      >
+      <input
+        type="search"
+        class="search-overlay__input"
+        id="search-input"
+        placeholder={`${t(lang, "nav", "search")}…`}
+        aria-label={t(lang, "nav", "search")}
+        autocomplete="off"
+      />
+      <button
+        class="search-overlay__close"
+        id="search-close"
+        aria-label="Close search"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg
+        >
+      </button>
+    </div>
+    <div class="search-overlay__body" id="search-body">
+      <div class="search-recents" id="search-recents">
+        <p class="search-section-title">Recent Searches</p>
+        <ul class="search-recents__list" id="search-recents-list" role="list">
+        </ul>
+      </div>
+      <div class="search-results" id="search-results" hidden>
+        <ul
+          class="search-results__list"
+          id="search-results-list"
+          role="listbox"
+          aria-label="Search results"
+        >
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="backdrop" id="search-backdrop" aria-hidden="true"></div>
+
+<!-- Mobile menu -->
+<nav
+  class="mob-menu"
+  id="mobile-menu"
+  aria-label="Mobile menu"
+  aria-hidden="true"
+>
+  <div class="mob-menu__header">
+    <a href={getPathForLang("/", lang)} class="mob-menu__logo">
+      <img src="/logo-white.png" alt="Tyer" width="80" height="36" />
+    </a>
+    <button
+      class="mob-menu__close"
+      id="menu-close"
+      aria-label={t(lang, "nav", "close_menu")}
+    >
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"><path d="M18 6 6 18M6 6l12 12"></path></svg
+      >
+    </button>
+  </div>
+  <ul class="mob-menu__list">
+    <li>
+      <a
+        href={getPathForLang("/collections/tyer-in-paris", lang)}
+        class="mob-menu__link">{t(lang, "nav", "collections")}</a>
+    </li>
+    {
+      drops.map((d) => (
+        <li>
+          <a
+            href={getPathForLang(`/collections/${d.handle}`, lang)}
+            class="mob-menu__sub"
+          >
+            {d.name}
+          </a>
+        </li>
+      ))
+    }
+    <li class="mob-menu__divider" role="separator"></li>
+    <li>
+      <a href={getPathForLang("/shop", lang)} class="mob-menu__link"
+        >{t(lang, "nav", "shop")}</a>
+    </li>
+    <li>
+      <button type="button" class="mob-menu__link mob-menu__link--btn" id="mob-menu-account"
+        >{t(lang, "nav", "account")}</button>
+    </li>
+  </ul>
+</nav>
+<div class="backdrop" id="menu-backdrop" aria-hidden="true"></div>
+
+<style>
+  /* ── Header ── */
+  .hdr {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 500;
+    height: var(--header-h);
+    background: transparent;
+    transition:
+      background 0.35s ease,
+      border-color 0.35s ease;
+    border-bottom: 1px solid transparent;
+  }
+  .hdr.is-scrolled {
+    background: rgba(8, 8, 8, 0.94);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom-color: #1e1e1e;
+  }
+  .hdr.is-mega-open {
+    background: var(--c-bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom-color: #1e1e1e;
+  }
+  .hdr__inner {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
+  .hdr__logo {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .hdr__logo img {
+    height: 36px;
+    width: auto;
+    object-fit: contain;
+  }
+
+  /* Nav */
+  .hdr__nav {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex: 1;
+  }
+  .hdr__nav-item {
+    position: relative;
+  }
+  .hdr__nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.7);
+    border-radius: var(--r);
+    transition: color var(--ease);
+    cursor: pointer;
+  }
+  .hdr__nav-link:hover,
+  .hdr__nav-link.is-active {
+    color: var(--c-white);
+  }
+  .hdr__nav-link.is-active {
+    position: relative;
+  }
+  .hdr__nav-link.is-active::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 14px;
+    right: 14px;
+    height: 1.5px;
+    background: var(--c-accent);
+    border-radius: 99px;
+  }
+  .hdr__nav-chevron {
+    transition: transform 0.2s;
+    opacity: 0.6;
+  }
+  .hdr__nav-item--mega:hover .hdr__nav-chevron {
+    transform: rotate(180deg);
+  }
+
+  /* Megamenu */
+  .mega {
+    position: fixed;
+    top: var(--header-h);
+    left: 0;
+    right: 0;
+    background: rgba(8, 8, 8, 0.97);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-bottom: 1px solid #1e1e1e;
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+    transition:
+      opacity 0.2s ease,
+      transform 0.2s ease;
+    z-index: 490;
+    padding: 32px 0;
+  }
+  .hdr__nav-item--mega:hover .mega,
+  .hdr__nav-item--mega.is-hovered .mega,
+  .mega:hover {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: all;
+  }
+  .mega__inner {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 48px;
+    align-items: center;
+    padding-block: 8px;
+  }
+
+  /* List of collection titles — 2 columns */
+  .mega__list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 16px;
+  }
+  .mega__item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: var(--r-md);
+    transition:
+      background var(--ease),
+      color var(--ease);
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 13px;
+  }
+  .mega__item:hover,
+  .mega__item.is-active {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--c-white);
+  }
+  .mega__item-num {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--c-accent);
+    min-width: 24px;
+  }
+  .mega__item-name {
+    font-size: 14px;
+    font-weight: 600;
+    flex: 1;
+  }
+  .mega__item-arrow {
+    opacity: 0;
+    transform: translateX(-4px);
+    transition:
+      opacity var(--ease),
+      transform var(--ease);
+  }
+  .mega__item:hover .mega__item-arrow,
+  .mega__item.is-active .mega__item-arrow {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  /* Preview image (right side) */
+  .mega__preview {
+    width: 100%;
+    aspect-ratio: 3/4;
+    border-radius: var(--r-md);
+    overflow: hidden;
+    background: #111;
+    position: relative;
+  }
+  .mega__preview-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: grayscale(20%);
+    transition:
+      opacity 0.3s ease,
+      transform 0.4s ease;
+  }
+  .mega__preview-img.is-transitioning {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+
+  /* Actions */
+  .hdr__actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+  }
+  .hdr__icon-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--r);
+    color: rgba(255, 255, 255, 0.65);
+    transition:
+      color var(--ease),
+      background var(--ease);
+  }
+  .hdr__icon-btn:hover {
+    color: var(--c-white);
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .hdr__cart-badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: var(--c-accent);
+    color: var(--c-white);
+    font-size: 8px;
+    font-weight: 800;
+    min-width: 14px;
+    height: 14px;
+    border-radius: 99px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+    line-height: 1;
+  }
+  .hdr__cart-badge[data-count="0"] {
+    display: none;
+  }
+
+  .hdr__account-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .hdr__account-name {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: rgba(255,255,255,0.82);
+    max-width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hdr__account-panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: min(320px, 92vw);
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-md);
+    padding: 20px 18px;
+    z-index: 520;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-6px);
+    transition:
+      opacity 0.2s ease,
+      transform 0.2s ease,
+      visibility 0.2s;
+  }
+  .hdr__account-wrap.is-open .hdr__account-panel {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: all;
+    transform: translateY(0);
+  }
+  .hdr__account-panel[aria-hidden="true"] { pointer-events: none; }
+  .hdr__account-panel [hidden],
+  .hdr__account-panel[hidden] { display: none !important; }
+  .hdr-auth-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--c-border);
+    margin-bottom: 16px;
+  }
+  .hdr-auth-tab {
+    padding: 8px 12px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--c-muted);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .hdr-auth-tab.is-active {
+    color: var(--c-text);
+    border-bottom-color: var(--c-accent);
+  }
+  .hdr-auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .hdr-auth-form--forgot { gap: 14px; }
+  .hdr-auth-forgot-hint {
+    font-size: 13px;
+    color: var(--c-muted);
+    line-height: 1.4;
+  }
+  .hdr-auth-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .hdr-auth-field label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--c-muted);
+  }
+  .hdr-auth-field input {
+    padding: 10px 12px;
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r);
+    color: var(--c-text);
+    font-size: 14px;
+  }
+  .hdr-auth-field input:focus {
+    outline: none;
+    border-color: var(--c-accent);
+  }
+  .hdr-auth-submit {
+    width: 100%;
+    margin-top: 4px;
+    padding: 12px;
+  }
+  .hdr-auth-link {
+    font-size: 12px;
+    color: var(--c-muted);
+    text-align: center;
+    padding: 4px 0 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .hdr-auth-link:hover {
+    color: var(--c-accent);
+  }
+  .hdr-auth-status {
+    font-size: 12px;
+    color: var(--c-accent);
+  }
+  .hdr-auth-logged {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .hdr-auth-logged__name {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .hdr-auth-logged__btn {
+    width: 100%;
+  }
+
+  /* Lang switcher */
+  .hdr__lang {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-left: 8px;
+    padding-left: 12px;
+    border-left: 1px solid #222;
+  }
+  .hdr__lang-btn {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+    padding: 6px 6px;
+    border-radius: var(--r);
+    transition: color var(--ease);
+  }
+  .hdr__lang-btn:hover,
+  .hdr__lang-btn.is-active {
+    color: var(--c-accent);
+  }
+
+  /* Burger */
+  .hdr__burger {
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+    width: 40px;
+    height: 40px;
+    padding: 12px 10px;
+    border-radius: var(--r);
+    transition: background var(--ease);
+  }
+  .hdr__burger:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .hdr__burger span {
+    display: block;
+    height: 1.5px;
+    background: rgba(255, 255, 255, 0.65);
+    transition:
+      transform 0.3s,
+      opacity 0.3s;
+  }
+  .hdr__burger.is-open span:nth-child(1) {
+    transform: translateY(6.5px) rotate(45deg);
+  }
+  .hdr__burger.is-open span:nth-child(2) {
+    opacity: 0;
+  }
+  .hdr__burger.is-open span:nth-child(3) {
+    transform: translateY(-6.5px) rotate(-45deg);
+  }
+
+  /* Search Overlay */
+  .search-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: rgba(8, 8, 8, 0.98);
+    backdrop-filter: blur(24px);
+    z-index: 600;
+    transform: translateY(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    padding-top: 16px;
+    padding-bottom: 32px;
+  }
+  .search-overlay.is-open {
+    transform: translateY(0);
+  }
+  .search-overlay__bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 0;
+    border-bottom: 1px solid #222;
+    color: var(--c-muted);
+  }
+  .search-overlay__input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--c-text);
+    font-size: 20px;
+    padding: 4px 0;
+  }
+  .search-overlay__input::placeholder {
+    color: #444;
+  }
+  .search-overlay__close {
+    color: var(--c-muted);
+    padding: 6px;
+    border-radius: var(--r);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+      color var(--ease),
+      background var(--ease);
+  }
+  .search-overlay__close:hover {
+    color: var(--c-white);
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .search-overlay__body {
+    padding-top: 24px;
+  }
+  .search-section-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--c-muted);
+    margin-bottom: 12px;
+  }
+  .search-recents__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .search-recent-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid #222;
+    border-radius: 99px;
+    font-size: 12px;
+    color: var(--c-text);
+    transition:
+      border-color var(--ease),
+      color var(--ease);
+    cursor: pointer;
+  }
+  .search-recent-tag:hover {
+    border-color: var(--c-accent);
+    color: var(--c-accent);
+  }
+  .search-results__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+    padding-top: 8px;
+  }
+  .search-result-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    border-radius: var(--r-md);
+    background: var(--c-surface);
+    cursor: pointer;
+    transition: background var(--ease);
+  }
+  .search-result-item:hover {
+    background: var(--c-surface2);
+  }
+  .search-result-img {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: var(--r);
+    flex-shrink: 0;
+  }
+  .search-result-name {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+
+  /* Mobile menu */
+  .mob-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(320px, 90vw);
+    background: var(--c-surface);
+    z-index: 600;
+    transform: translateX(-100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .mob-menu.is-open {
+    transform: translateX(0);
+  }
+  .mob-menu__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--c-border);
+  }
+  .mob-menu__logo img {
+    height: 30px;
+    width: auto;
+  }
+  .mob-menu__close {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--c-muted);
+    border-radius: var(--r);
+    transition: all var(--ease);
+  }
+  .mob-menu__close:hover {
+    color: var(--c-white);
+    background: var(--c-surface2);
+  }
+  .mob-menu__list {
+    padding: 12px 0;
+    flex: 1;
+  }
+  .mob-menu__link {
+    display: block;
+    padding: 13px 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--c-muted);
+    transition:
+      color var(--ease),
+      background var(--ease);
+  }
+  .mob-menu__link:hover {
+    color: var(--c-white);
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .mob-menu__link--btn {
+    width: 100%;
+    text-align: left;
+    display: block;
+  }
+  .mob-menu__sub {
+    display: block;
+    padding: 8px 28px;
+    font-size: 13px;
+    color: #555;
+    transition: color var(--ease);
+  }
+  .mob-menu__sub:hover {
+    color: var(--c-text);
+  }
+  .mob-menu__divider {
+    height: 1px;
+    background: var(--c-border);
+    margin: 8px 20px;
+  }
+  .mob-menu__langs {
+    display: flex;
+    gap: 6px;
+    padding: 14px 20px;
+  }
+  .mob-menu__lang-btn {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--c-muted);
+    padding: 6px 10px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r);
+    transition: all var(--ease);
+  }
+  .mob-menu__lang-btn.is-active {
+    color: var(--c-accent);
+    border-color: var(--c-accent);
+  }
+  .mob-menu__lang-btn:hover {
+    color: var(--c-white);
+    border-color: #444;
+  }
+
+  @media (max-width: 900px) {
+    .hdr__nav {
+      display: none;
+    }
+    .hdr__lang {
+      display: none;
+    }
+    .hdr__burger {
+      display: flex;
+    }
+  }
+</style>
+
+<script
+  define:vars={{
+    publicKey:
+      "pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975",
+    medusaBase,
+    resetSentHint,
+  }}
+>
+  // ── Header scroll ──
+  const header = document.getElementById("site-header");
+  function updateHeader() {
+    if (header) header.classList.toggle("is-scrolled", window.scrollY > 10);
+  }
+  updateHeader();
+  window.addEventListener("scroll", updateHeader, { passive: true });
+
+  // ── Cart badge ──
+  function updateBadge() {
+    try {
+      const items = JSON.parse(localStorage.getItem("tyer_cart") || "[]");
+      const count = items.reduce((s, i) => s + (i.quantity || 0), 0);
+      const badge = document.getElementById("cart-badge");
+      if (badge) {
+        badge.textContent = String(count);
+        badge.dataset.count = String(count);
+      }
+    } catch {}
+  }
+  updateBadge();
+  window.addEventListener("cart:update", updateBadge);
+
+  // ── Account dropdown (login / registo / recuperar senha) ──
+  const hdrWrap = document.getElementById("hdr-account-wrap");
+  const hdrBtn = document.getElementById("hdr-account-btn");
+  const hdrPanel = document.getElementById("hdr-account-panel");
+  const hdrAuthLogged = document.getElementById("hdr-auth-logged");
+  const hdrAuthForms = document.getElementById("hdr-auth-forms");
+  const hdrProfileName = document.getElementById("hdr-profile-name");
+  const hdrAccountName = document.getElementById("hdr-account-name");
+  const hdrLoginForm = document.getElementById("hdr-login-form");
+  const hdrRegForm = document.getElementById("hdr-register-form");
+  const hdrForgotForm = document.getElementById("hdr-forgot-form");
+  const hdrAuthMain = document.getElementById("hdr-auth-main");
+  const hdrLoginStatus = document.getElementById("hdr-login-status");
+  const hdrRegStatus = document.getElementById("hdr-reg-status");
+  const hdrForgotStatus = document.getElementById("hdr-forgot-status");
+
+  const storeJsonHeaders = {
+    "Content-Type": "application/json",
+    "x-publishable-api-key": publicKey,
+  };
+  const tResetSent = resetSentHint;
+  const storeApiBase = (
+    (window.__MEDUSA_URL__ && String(window.__MEDUSA_URL__)) ||
+    String(medusaBase || "http://localhost:9003")
+  ).replace(/\/$/, "");
+  async function readJsonSafe(res) {
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) {
+      try { return await res.json(); } catch { return null; }
+    }
+    try {
+      const text = await res.text();
+      return { message: text && text.length < 220 ? text : "" };
+    } catch {
+      return null;
+    }
+  }
+
+  function showAccountGuest() {
+    if (hdrAuthLogged) hdrAuthLogged.hidden = true;
+    if (hdrAuthForms) hdrAuthForms.hidden = false;
+    if (hdrAccountName) {
+      hdrAccountName.hidden = true;
+      hdrAccountName.textContent = "";
+    }
+  }
+
+  function showAccountLogged(name) {
+    if (hdrProfileName) hdrProfileName.textContent = name;
+    if (hdrAuthLogged) hdrAuthLogged.hidden = false;
+    if (hdrAuthForms) hdrAuthForms.hidden = true;
+    if (hdrAccountName) {
+      hdrAccountName.hidden = false;
+      hdrAccountName.textContent = name;
+    }
+  }
+
+  async function syncAccountFromToken() {
+    const token = localStorage.getItem("tyer_token");
+    if (!token) {
+      showAccountGuest();
+      return;
+    }
+    try {
+      const res = await fetch(`${storeApiBase}/store/customers/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "x-publishable-api-key": publicKey,
+        },
+      });
+      if (!res.ok) throw new Error("unauth");
+      const data = await res.json();
+      const c = data.customer;
+      if (c) {
+        localStorage.setItem("tyer_customer", JSON.stringify(c));
+        const name = [c.first_name, c.last_name].filter(Boolean).join(" ").trim() || c.email;
+        showAccountLogged(name);
+        return;
+      }
+    } catch {
+      /* token inválido */
+    }
+    localStorage.removeItem("tyer_token");
+    localStorage.removeItem("tyer_customer");
+    showAccountGuest();
+  }
+  syncAccountFromToken();
+
+  if (hdrPanel) {
+    hdrPanel.setAttribute("aria-hidden", "true");
+  }
+  let accountCloseTimer = null;
+  function openAccountPanel() {
+    if (!hdrWrap) return;
+    if (accountCloseTimer) clearTimeout(accountCloseTimer);
+    hdrWrap.classList.add("is-open");
+    setAccountPanelOpen(true);
+  }
+  function scheduleCloseAccountPanel() {
+    if (window.matchMedia("(max-width: 900px)").matches) return;
+    accountCloseTimer = setTimeout(() => {
+      if (hdrWrap && hdrWrap.contains(document.activeElement)) return;
+      hdrWrap?.classList.remove("is-open");
+      setAccountPanelOpen(false);
+    }, 900);
+  }
+  function setAccountPanelOpen(isOpen) {
+    if (!hdrPanel || !hdrBtn) return;
+    hdrPanel.setAttribute("aria-hidden", isOpen ? "false" : "true");
+    hdrBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  }
+  if (hdrWrap) {
+    hdrWrap.addEventListener("mouseenter", () => {
+      if (!window.matchMedia("(min-width: 901px)").matches) return;
+      openAccountPanel();
+    });
+    hdrWrap.addEventListener("mouseleave", () => {
+      if (!window.matchMedia("(min-width: 901px)").matches) return;
+      scheduleCloseAccountPanel();
+    });
+  }
+  if (hdrPanel) {
+    hdrPanel.addEventListener("mouseenter", () => {
+      if (!window.matchMedia("(min-width: 901px)").matches) return;
+      openAccountPanel();
+    });
+    hdrPanel.addEventListener("mouseleave", () => {
+      if (!window.matchMedia("(min-width: 901px)").matches) return;
+      scheduleCloseAccountPanel();
+    });
+  }
+  if (hdrBtn) {
+    hdrBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (window.matchMedia("(min-width: 901px)").matches) {
+        openAccountPanel();
+        return;
+      }
+      const open = !hdrWrap?.classList.contains("is-open");
+      hdrWrap?.classList.toggle("is-open", open);
+      setAccountPanelOpen(open);
+    });
+  }
+  document.getElementById("mob-menu-account")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeMob();
+    openAccountPanel();
+  });
+  document.addEventListener("click", (e) => {
+    if (!hdrWrap || !e.target) return;
+    if (window.matchMedia("(min-width: 901px)").matches) return;
+    if (hdrWrap.contains(e.target)) return;
+    hdrWrap.classList.remove("is-open");
+    setAccountPanelOpen(false);
+  });
+
+  document.querySelectorAll(".hdr-auth-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".hdr-auth-tab").forEach((t) => {
+        t.classList.remove("is-active");
+        t.setAttribute("aria-selected", "false");
+      });
+      tab.classList.add("is-active");
+      tab.setAttribute("aria-selected", "true");
+      const which = tab.getAttribute("data-tab");
+      if (hdrLoginForm) hdrLoginForm.hidden = which !== "login";
+      if (hdrRegForm) hdrRegForm.hidden = which !== "register";
+    });
+  });
+
+  document.getElementById("hdr-forgot-open")?.addEventListener("click", () => {
+    if (hdrAuthMain) hdrAuthMain.hidden = true;
+    if (hdrForgotForm) {
+      hdrForgotForm.hidden = false;
+    }
+    document.querySelector(".hdr-auth-tabs")?.setAttribute("hidden", "");
+  });
+  document.getElementById("hdr-forgot-back")?.addEventListener("click", () => {
+    if (hdrForgotForm) hdrForgotForm.hidden = true;
+    if (hdrAuthMain) hdrAuthMain.hidden = false;
+    document.querySelector(".hdr-auth-tabs")?.removeAttribute("hidden");
+  });
+
+  if (hdrLoginForm) {
+    hdrLoginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(hdrLoginForm);
+      const email = String(fd.get("email") || "");
+      const password = String(fd.get("password") || "");
+      if (hdrLoginStatus) {
+        hdrLoginStatus.hidden = false;
+        hdrLoginStatus.textContent = "…";
+      }
+      try {
+        const res = await fetch(`${storeApiBase}/auth/customer/emailpass`, {
+          method: "POST",
+          headers: storeJsonHeaders,
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await readJsonSafe(res);
+        if (!res.ok) throw new Error(data?.message || "Falha no login");
+        const token = data.token;
+        if (!token) throw new Error("Resposta inválida");
+        localStorage.setItem("tyer_token", token);
+        await syncAccountFromToken();
+        if (hdrLoginStatus) hdrLoginStatus.textContent = "";
+        if (hdrLoginStatus) hdrLoginStatus.hidden = true;
+      } catch (err) {
+        if (hdrLoginStatus)
+          hdrLoginStatus.textContent =
+            err instanceof Error ? err.message : "Email ou senha inválidos.";
+      }
+    });
+  }
+
+  if (hdrRegForm) {
+    hdrRegForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(hdrRegForm);
+      const first_name = String(fd.get("first_name") || "");
+      const last_name = String(fd.get("last_name") || "");
+      const email = String(fd.get("email") || "");
+      const password = String(fd.get("password") || "");
+      if (hdrRegStatus) {
+        hdrRegStatus.hidden = false;
+        hdrRegStatus.textContent = "…";
+      }
+      try {
+        const reg = await fetch(`${storeApiBase}/auth/customer/emailpass/register`, {
+          method: "POST",
+          headers: storeJsonHeaders,
+          body: JSON.stringify({ email, password }),
+        });
+        const regData = await readJsonSafe(reg);
+        if (!reg.ok) throw new Error(regData?.message || "Registo falhou");
+        const regToken = regData.token;
+        if (!regToken) throw new Error("Sem token de registo");
+        const create = await fetch(`${storeApiBase}/store/customers`, {
+          method: "POST",
+          headers: {
+            ...storeJsonHeaders,
+            Authorization: `Bearer ${regToken}`,
+          },
+          body: JSON.stringify({ email, first_name, last_name }),
+        });
+        const createData = await readJsonSafe(create);
+        if (!create.ok) throw new Error(createData?.message || "Não foi possível criar a conta");
+        const loginRes = await fetch(`${storeApiBase}/auth/customer/emailpass`, {
+          method: "POST",
+          headers: storeJsonHeaders,
+          body: JSON.stringify({ email, password }),
+        });
+        const loginData = await readJsonSafe(loginRes);
+        if (!loginRes.ok || !loginData.token) throw new Error("Conta criada; faça login");
+        localStorage.setItem("tyer_token", loginData.token);
+        await syncAccountFromToken();
+        if (hdrRegStatus) hdrRegStatus.textContent = "";
+        if (hdrRegStatus) hdrRegStatus.hidden = true;
+      } catch (err) {
+        if (hdrRegStatus)
+          hdrRegStatus.textContent = err instanceof Error ? err.message : "Erro";
+      }
+    });
+  }
+
+  if (hdrForgotForm) {
+    hdrForgotForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = String(
+        (document.getElementById("hdr-forgot-email") instanceof HTMLInputElement &&
+          document.getElementById("hdr-forgot-email").value) ||
+          ""
+      );
+      if (hdrForgotStatus) {
+        hdrForgotStatus.hidden = false;
+        hdrForgotStatus.textContent = "…";
+      }
+      try {
+        const res = await fetch(
+          `${storeApiBase}/auth/customer/emailpass/reset-password`,
+          {
+            method: "POST",
+            headers: { ...storeJsonHeaders, accept: "text/plain" },
+            body: JSON.stringify({ identifier: email }),
+          }
+        );
+        if (hdrForgotStatus)
+          hdrForgotStatus.textContent =
+            res.status < 500
+              ? tResetSent
+              : "Não foi possível enviar. Tente novamente.";
+      } catch {
+        if (hdrForgotStatus) hdrForgotStatus.textContent = tResetSent;
+      }
+    });
+  }
+
+  document.getElementById("hdr-logout-btn")?.addEventListener("click", () => {
+    localStorage.removeItem("tyer_token");
+    localStorage.removeItem("tyer_customer");
+    showAccountGuest();
+    window.location.reload();
+  });
+
+  // ── Cart open ──
+  document.getElementById("cart-toggle")?.addEventListener("click", () => {
+    const sc = document.getElementById("side-cart");
+    const bd = document.getElementById("side-cart-backdrop");
+    if (sc) {
+      sc.classList.add("is-open");
+      sc.setAttribute("aria-hidden", "false");
+    }
+    if (bd) {
+      bd.classList.add("is-active");
+    }
+    document.body.style.overflow = "hidden";
+  });
+
+  // ── Search overlay ──
+  const searchOverlay = document.getElementById("search-overlay");
+  const searchInput = document.getElementById("search-input");
+  const searchBackdrop = document.getElementById("search-backdrop");
+  const searchResultsEl = document.getElementById("search-results");
+  const searchResultsList = document.getElementById("search-results-list");
+  const searchRecentsEl = document.getElementById("search-recents");
+  const searchRecentsList = document.getElementById("search-recents-list");
+
+  const RECENT_KEY = "tyer_searches";
+  const VISITED_KEY = "tyer_visited";
+  const medusaUrl = window.__MEDUSA_URL__ || "http://localhost:9003";
+  let discoverCache = null;
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function getRecents() {
+    try {
+      return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  }
+  function saveRecent(q) {
+    const list = [q, ...getRecents().filter((r) => r !== q)].slice(0, 6);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+  }
+
+  function renderRecents() {
+    const list = getRecents();
+    if (searchRecentsList) searchRecentsList.innerHTML = "";
+    if (!list.length) {
+      if (searchRecentsEl) searchRecentsEl.hidden = true;
+      return;
+    }
+    if (searchRecentsEl) searchRecentsEl.hidden = false;
+    list.forEach((term) => {
+      const btn = document.createElement("button");
+      btn.className = "search-recent-tag";
+      btn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.41-5.62"/></svg>${term}`;
+      btn.addEventListener("click", () => {
+        if (searchInput) {
+          searchInput.value = term;
+          doSearch(term);
+        }
+      });
+      if (searchRecentsList) searchRecentsList.appendChild(btn);
+    });
+  }
+
+  let searchTimer = null;
+  async function fetchDiscoverProducts() {
+    if (discoverCache) return discoverCache;
+    const headers = { "x-publishable-api-key": publicKey };
+    const res = await fetch(`/store/products?limit=24`, { headers });
+    if (!res.ok) return { newest: [], popular: [] };
+    const data = await res.json();
+    const products = Array.isArray(data.products) ? data.products : [];
+    const newest = [...products]
+      .sort((a, b) => new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime())
+      .slice(0, 4);
+    const popular = [...products]
+      .sort((a, b) => {
+        const aScore = Number(a?.metadata?.sales_count || a?.metadata?.total_sales || a?.sold_count || 0);
+        const bScore = Number(b?.metadata?.sales_count || b?.metadata?.total_sales || b?.sold_count || 0);
+        return bScore - aScore;
+      })
+      .slice(0, 4);
+    discoverCache = { newest, popular };
+    return discoverCache;
+  }
+
+  function renderSearchProductsGroup(title, products) {
+    if (!products?.length) return "";
+    const items = products
+      .map((p) => {
+        const thumb = escapeHtml(p?.thumbnail || "/logo.webp");
+        const label = escapeHtml(p?.title || "");
+        const handle = escapeHtml(p?.handle || "");
+        return `<li role="option"><a class="search-result-item" href="/product/${handle}">
+          <img class="search-result-img" src="${thumb}" alt="" width="48" height="48" />
+          <span class="search-result-name">${label}</span>
+        </a></li>`;
+      })
+      .join("");
+    return `<li style="grid-column:1/-1;color:#888;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 2px;">${title}</li>${items}`;
+  }
+
+  async function renderDiscoverFallback() {
+    try {
+      const data = await fetchDiscoverProducts();
+      if (searchResultsEl) searchResultsEl.hidden = false;
+      if (searchRecentsEl) searchRecentsEl.hidden = false;
+      if (searchResultsList) {
+        searchResultsList.innerHTML =
+          renderSearchProductsGroup("Mais novos", data.newest) +
+          renderSearchProductsGroup("Mais vendidos", data.popular);
+      }
+    } catch {
+      if (searchResultsEl) searchResultsEl.hidden = true;
+    }
+  }
+
+  async function doSearch(q) {
+    if (!q.trim()) {
+      renderRecents();
+      await renderDiscoverFallback();
+      return;
+    }
+    if (searchRecentsEl) searchRecentsEl.hidden = true;
+    try {
+      const headers = {
+        "x-publishable-api-key": publicKey,
+      };
+      const res = await fetch(
+        `/store/products?q=${encodeURIComponent(q)}&limit=8`,
+        { headers },
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const products = data.products;
+      if (searchResultsEl) searchResultsEl.hidden = false;
+      if (searchResultsList) searchResultsList.innerHTML = "";
+      if (!products || !products.length) {
+        if (searchResultsList)
+          searchResultsList.innerHTML =
+            '<li style="color:#666;font-size:13px;padding:16px 0">No results found.</li>';
+        return;
+      }
+      products.forEach((p) => {
+        const li = document.createElement("li");
+        li.setAttribute("role", "option");
+        const thumb = p.thumbnail || "/logo.webp";
+        const title = p.title || "";
+        const handle = p.handle || "";
+        li.innerHTML = `<a class="search-result-item" href="/product/${handle}">
+          <img class="search-result-img" src="${thumb}" alt="" width="48" height="48" />
+          <span class="search-result-name">${title}</span>
+        </a>`;
+        if (searchResultsList) searchResultsList.appendChild(li);
+      });
+    } catch {}
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener("input", () => {
+      if (searchTimer) clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => doSearch(searchInput.value), 280);
+    });
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && searchInput.value.trim()) {
+        saveRecent(searchInput.value.trim());
+        doSearch(searchInput.value);
+      }
+    });
+  }
+
+  function openSearch() {
+    searchOverlay.classList.add("is-open");
+    searchOverlay.setAttribute("aria-hidden", "false");
+    searchBackdrop.classList.add("is-active");
+    document.body.style.overflow = "hidden";
+    renderRecents();
+    renderDiscoverFallback();
+    setTimeout(() => searchInput?.focus(), 50);
+    document
+      .getElementById("search-toggle")
+      ?.setAttribute("aria-expanded", "true");
+  }
+  function closeSearch() {
+    searchOverlay.classList.remove("is-open");
+    searchOverlay.setAttribute("aria-hidden", "true");
+    searchBackdrop.classList.remove("is-active");
+    document.body.style.overflow = "";
+    document
+      .getElementById("search-toggle")
+      ?.setAttribute("aria-expanded", "false");
+  }
+  document
+    .getElementById("search-toggle")
+    ?.addEventListener("click", openSearch);
+  document
+    .getElementById("search-close")
+    ?.addEventListener("click", closeSearch);
+  searchBackdrop?.addEventListener("click", closeSearch);
+
+  // ── Mobile menu ──
+  const mobMenu = document.getElementById("mobile-menu");
+  const mobBackdrop = document.getElementById("menu-backdrop");
+  const burger = document.getElementById("menu-toggle");
+  function openMob() {
+    mobMenu?.classList.add("is-open");
+    mobBackdrop?.classList.add("is-active");
+    burger?.classList.add("is-open");
+    burger?.setAttribute("aria-expanded", "true");
+    mobMenu?.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  }
+  function closeMob() {
+    mobMenu?.classList.remove("is-open");
+    mobBackdrop?.classList.remove("is-active");
+    burger?.classList.remove("is-open");
+    burger?.setAttribute("aria-expanded", "false");
+    mobMenu?.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+  }
+  burger?.addEventListener("click", openMob);
+  document.getElementById("menu-close")?.addEventListener("click", closeMob);
+  mobBackdrop?.addEventListener("click", closeMob);
+
+  // ── Escape key ──
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeSearch();
+      closeMob();
+      if (hdrWrap?.classList.contains("is-open")) {
+        hdrWrap.classList.remove("is-open");
+        setAccountPanelOpen(false);
+      }
+    }
+  });
+
+  // ── Megamenu hover delay (2s after mouseleave) ──
+  const megaWrap = document.getElementById("nav-collections-wrap");
+  const mega = document.getElementById("mega-collections");
+  let megaCloseTimer = null;
+  if (megaWrap && mega) {
+    megaWrap.addEventListener("mouseenter", () => {
+      if (document.body.classList.contains("shop-sidebar-open")) return;
+      if (megaCloseTimer) clearTimeout(megaCloseTimer);
+      megaWrap.classList.add("is-hovered");
+      header?.classList.add("is-mega-open");
+    });
+    megaWrap.addEventListener("mouseleave", () => {
+      megaCloseTimer = setTimeout(() => {
+        megaWrap.classList.remove("is-hovered");
+        header?.classList.remove("is-mega-open");
+      }, 500);
+    });
+    mega.addEventListener("mouseenter", () => {
+      if (document.body.classList.contains("shop-sidebar-open")) return;
+      if (megaCloseTimer) clearTimeout(megaCloseTimer);
+      megaWrap.classList.add("is-hovered");
+      header?.classList.add("is-mega-open");
+    });
+    mega.addEventListener("mouseleave", () => {
+      megaCloseTimer = setTimeout(() => {
+        megaWrap.classList.remove("is-hovered");
+        header?.classList.remove("is-mega-open");
+      }, 500);
+    });
+  }
+
+  // ── Active nav ──
+  const path = window.location.pathname;
+  document.querySelectorAll(".hdr__nav-link").forEach((a) => {
+    const href = a.getAttribute("href");
+    if (href && path.startsWith(href) && href !== "/") {
+      a.classList.add("is-active");
+    }
+  });
+
+  // ── Megamenu preview image swap on hover ──
+  const previewImg = document.getElementById("mega-preview-img");
+  const megaItems = document.querySelectorAll(".mega__item");
+
+  if (previewImg && megaItems.length) {
+    // Mark first item as active on initial render
+    megaItems[0]?.classList.add("is-active");
+
+    megaItems.forEach((item) => {
+      item.addEventListener("mouseenter", () => {
+        const img = item.dataset.img;
+        if (!img || previewImg.src.endsWith(img)) return;
+
+        // Cross-fade the image
+        previewImg.classList.add("is-transitioning");
+        setTimeout(() => {
+          previewImg.src = img;
+          previewImg.alt =
+            item.querySelector(".mega__item-name")?.textContent || "";
+          previewImg.classList.remove("is-transitioning");
+        }, 60);
+
+        // Mark active
+        megaItems.forEach((i) => i.classList.remove("is-active"));
+        item.classList.add("is-active");
+      });
+    });
+  }
+</script>

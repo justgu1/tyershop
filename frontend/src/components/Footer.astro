@@ -1,0 +1,723 @@
+---
+import { t, getPathForLang, type Lang } from '../i18n/utils';
+
+interface Props {
+  lang?: Lang;
+}
+const lang: Lang = Astro.props.lang ?? 'pt';
+const year = new Date().getFullYear();
+const copyrightFull = t(lang, 'footer', 'copyright_full').replace('{year}', String(year));
+const publicApiUrl = (import.meta.env.PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '');
+
+const YOUTUBE_URL = 'https://www.youtube.com/@tyer_br';
+const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
+---
+
+<footer class="footer">
+  <div class="footer__main">
+    <div class="container footer__grid">
+      <div class="footer__col footer__col--brand">
+        <a href={getPathForLang('/', lang)} class="footer__logo-link" aria-label="Tyer — Início">
+          <img src="/logo.webp" alt="Tyer" width="120" height="52" loading="lazy" />
+        </a>
+        <p class="footer__tagline">{t(lang, 'footer', 'tagline')}</p>
+      </div>
+
+      <nav class="footer__col" aria-label="Menu do rodapé">
+        <ul class="footer__col-list" role="list">
+          <li>
+            <a href={getPathForLang('/', lang)} class="footer__col-link">{t(lang, 'footer', 'inicio')}</a>
+          </li>
+          <li>
+            <a href={`${getPathForLang('/', lang)}#collection`} class="footer__col-link">{t(lang, 'nav', 'collections')}</a>
+          </li>
+          <li>
+            <a href={getPathForLang('/shop', lang)} class="footer__col-link">{t(lang, 'nav', 'shop')}</a>
+          </li>
+          <li>
+            <a href={WHATSAPP_GROUP_URL} class="footer__col-link" target="_blank" rel="noopener noreferrer"
+              >{t(lang, 'footer', 'comunidade')}</a
+            >
+          </li>
+          <li>
+            <a href={getPathForLang('/contact', lang)} class="footer__col-link">{t(lang, 'footer', 'contact')}</a>
+          </li>
+        </ul>
+      </nav>
+
+      <nav class="footer__col" aria-label="Informações legais">
+        <ul class="footer__col-list" role="list">
+          <li>
+            <a href={getPathForLang('/privacy', lang)} class="footer__col-link">{t(lang, 'footer', 'privacy')}</a>
+          </li>
+          <li>
+            <a href={getPathForLang('/terms', lang)} class="footer__col-link">{t(lang, 'footer', 'terms')}</a>
+          </li>
+          <li>
+            <a href={getPathForLang('/returns', lang)} class="footer__col-link">{t(lang, 'footer', 'returns')}</a>
+          </li>
+          <li>
+            <a href={getPathForLang('/faq', lang)} class="footer__col-link">{t(lang, 'footer', 'faq')}</a>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="footer__col footer__col--news">
+        <p class="footer__nl-kicker">{t(lang, 'footer', 'newsletter_title')}</p>
+        <p class="footer__nl-text">{t(lang, 'footer', 'newsletter_sub')}</p>
+        <form
+          class="footer__nl-form"
+          id="footer-nl-form"
+          novalidate
+          data-success={t(lang, 'footer', 'newsletter_ok')}
+        >
+          <div class="footer__nl-field">
+            <input
+              type="email"
+              name="email"
+              required
+              class="footer__nl-input"
+              placeholder={t(lang, 'footer', 'newsletter_placeholder')}
+              aria-label={t(lang, 'footer', 'newsletter_placeholder')}
+              autocomplete="email"
+            />
+            <button type="submit" class="footer__nl-btn" aria-label={t(lang, 'footer', 'newsletter_submit')}>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="lucide lucide-chevron-right"
+                aria-hidden="true"
+                ><path d="m9 18 6-6-6-6"></path></svg
+              >
+            </button>
+          </div>
+        </form>
+        <p class="footer__nl-status" id="footer-nl-status" aria-live="polite" hidden></p>
+      </div>
+    </div>
+
+    <div class="container footer__social-wrap">
+      <ul class="footer__social footer__social--center" role="list" aria-label={t(lang, 'footer', 'social_aria')}>
+        <li>
+          <a
+            href="https://www.instagram.com/tyer_br"
+            class="footer__social-a"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Instagram"
+            ><img src="/icons/instagram.svg" width="22" height="22" alt="" class="footer__social-img" /></a
+          >
+        </li>
+        <li>
+          <a
+            href="https://www.tiktok.com/@tyer_br"
+            class="footer__social-a"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="TikTok"
+            ><img src="/icons/tiktok.svg" width="22" height="22" alt="" class="footer__social-img" /></a
+          >
+        </li>
+        <li>
+          <a
+            href={YOUTUBE_URL}
+            class="footer__social-a"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="YouTube"
+            ><img src="/icons/youtube.svg" width="22" height="22" alt="" class="footer__social-img" /></a
+          >
+        </li>
+        <li>
+          <a
+            href={WHATSAPP_GROUP_URL}
+            class="footer__social-a"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="WhatsApp"
+            ><img src="/tyer-fam.webp" width="32" height="32" alt="" class="footer__social-img footer__social-img--fam" /></a
+          >
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer__strip">
+    <div class="container footer__strip-inner">
+      <p class="footer__copy-line">{copyrightFull}</p>
+      <nav class="footer__strip-nav" aria-label="Links secundários">
+        <a href={getPathForLang('/privacy', lang)} class="footer__strip-a">{t(lang, 'footer', 'strip_privacy')}</a>
+        <span class="footer__strip-sep" aria-hidden="true">|</span>
+        <a
+          href="https://justgui.dev"
+          class="footer__strip-a"
+          target="_blank"
+          rel="noopener noreferrer"
+        >Justgui</a>
+        <span class="footer__strip-sep" aria-hidden="true">|</span>
+        <button
+          type="button"
+          class="footer__strip-a11y"
+          id="tyer-a11y-open"
+          aria-haspopup="dialog"
+          aria-expanded="false"
+          aria-controls="tyer-a11y-dialog"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-accessibility footer__a11y-ico"
+            aria-hidden="true"
+            ><circle cx="16" cy="4" r="1" /><path d="m18 19 1-7-6 1" /><path d="m5 8 3-3 5.5 3-2.36 3.5" /><path
+              d="M4.24 14.5a5 5 0 0 0 6.88 6"
+            /><path d="M13.76 17.5a5 5 0 0 0-6.88-6" /></svg
+          >
+          <span>{t(lang, 'footer', 'strip_access')}</span>
+        </button>
+      </nav>
+    </div>
+  </div>
+</footer>
+
+<div
+  class="tyer-a11y"
+  id="tyer-a11y-dialog"
+  hidden
+  role="presentation"
+>
+  <div class="tyer-a11y__backdrop" data-a11y-close tabindex="-1" aria-hidden="true"></div>
+  <div
+    class="tyer-a11y__panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="tyer-a11y-title"
+    tabindex="-1"
+  >
+    <div class="tyer-a11y__head">
+      <h2 class="tyer-a11y__title" id="tyer-a11y-title">{t(lang, 'footer', 'a11y_title')}</h2>
+      <button type="button" class="tyer-a11y__close" data-a11y-close aria-label={t(lang, 'footer', 'a11y_close')}>
+        <span aria-hidden="true">×</span>
+      </button>
+    </div>
+
+    <p class="tyer-a11y__label">{t(lang, 'footer', 'a11y_font')}</p>
+    <div class="tyer-a11y__chips" role="group" aria-label={t(lang, 'footer', 'a11y_font')}>
+      <button type="button" class="tyer-a11y__chip" data-tyer-font="sm">{t(lang, 'footer', 'a11y_font_sm')}</button>
+      <button type="button" class="tyer-a11y__chip" data-tyer-font="md">{t(lang, 'footer', 'a11y_font_md')}</button>
+      <button type="button" class="tyer-a11y__chip" data-tyer-font="lg">{t(lang, 'footer', 'a11y_font_lg')}</button>
+      <button type="button" class="tyer-a11y__chip" data-tyer-font="2xl">{t(lang, 'footer', 'a11y_font_xl')}</button>
+    </div>
+
+    <label class="tyer-a11y__row">
+      <input type="checkbox" id="tyer-a11y-hc" />
+      <span>{t(lang, 'footer', 'a11y_contrast')}</span>
+    </label>
+    <label class="tyer-a11y__row">
+      <input type="checkbox" id="tyer-a11y-mo" />
+      <span>{t(lang, 'footer', 'a11y_motion')}</span>
+    </label>
+
+    <p class="tyer-a11y__sub">{t(lang, 'footer', 'a11y_audio')}</p>
+    <p class="tyer-a11y__hint">{t(lang, 'footer', 'a11y_audio_hint')}</p>
+  </div>
+</div>
+
+<style>
+  .footer {
+    background: var(--c-bg);
+    border-top: 1px solid #1a1a1a;
+  }
+
+  .footer__main {
+    padding-block: 48px 0;
+  }
+
+  .footer__grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr 1.3fr;
+    gap: 40px 32px;
+    padding-bottom: 40px;
+    border-bottom: 1px solid #1a1a1a;
+  }
+  @media (max-width: 900px) {
+    .footer__grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .footer__col--news {
+      grid-column: 1 / -1;
+    }
+  }
+  @media (max-width: 520px) {
+    .footer__grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .footer__col--brand {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .footer__logo-link img {
+    height: 40px;
+    width: auto;
+    opacity: 0.9;
+    transition: opacity var(--ease);
+  }
+  .footer__logo-link:hover img {
+    opacity: 1;
+  }
+  .footer__tagline {
+    font-size: 12px;
+    color: #666;
+    margin: 0;
+    max-width: 14rem;
+  }
+
+  .footer__col-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .footer__col-link {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #999;
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+  .footer__col-link:hover {
+    color: var(--c-text);
+  }
+
+  .footer__col--news {
+    min-width: 0;
+  }
+  .footer__nl-kicker {
+    font-family: var(--font-title);
+    font-size: clamp(16px, 1.5vw, 20px);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--c-white);
+    margin: 0 0 6px 0;
+  }
+  .footer__nl-text {
+    font-size: 12px;
+    color: #888;
+    margin: 0 0 16px 0;
+    line-height: 1.4;
+  }
+  .footer__nl-field {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    border-bottom: 2px solid var(--c-accent);
+    max-width: 100%;
+  }
+  .footer__nl-input {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 8px 10px 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--c-text);
+    font-size: 14px;
+  }
+  .footer__nl-input::placeholder {
+    color: #555;
+  }
+  .footer__nl-btn {
+    flex-shrink: 0;
+    width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--c-accent);
+    color: #111;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+  .footer__nl-btn:hover {
+    background: var(--c-accent-d, #d4a012);
+  }
+  .footer__nl-status {
+    font-size: 12px;
+    color: var(--c-accent);
+    margin-top: 8px;
+  }
+
+  .footer__social-wrap {
+    padding-block: 28px 40px;
+  }
+  .footer__social--center {
+    justify-content: center;
+    width: 100%;
+  }
+  .footer__social {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 20px;
+  }
+  .footer__social-a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 6px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .footer__social-a:hover,
+  .footer__social-a:focus-visible {
+    transform: scale(1.06);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--c-accent) 40%, transparent);
+    outline: none;
+  }
+  .footer__social-img {
+    display: block;
+    filter: brightness(0) invert(1);
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+  }
+  .footer__social-img--fam {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    object-fit: cover;
+    filter: none;
+  }
+  .footer__social-a:hover .footer__social-img--fam {
+    filter: none;
+  }
+
+  .footer__strip {
+    border-top: 1px solid #1a1a1a;
+    padding-block: 16px 20px;
+  }
+  .footer__strip-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+  }
+  .footer__copy-line {
+    font-size: 11px;
+    color: #555;
+    margin: 0;
+  }
+  .footer__strip-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+  }
+  .footer__strip-a {
+    font-size: 11px;
+    color: #666;
+    text-decoration: none;
+  }
+  .footer__strip-a[href]:hover {
+    color: var(--c-muted);
+  }
+  .footer__strip-muted {
+    font-size: 11px;
+    color: #666;
+  }
+  .footer__strip-sep {
+    color: #3a3a3a;
+    user-select: none;
+  }
+  .footer__strip-a11y {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: #666;
+    text-decoration: none;
+    background: none;
+    border: none;
+    padding: 2px 0;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .footer__strip-a11y:hover,
+  .footer__strip-a11y:focus-visible {
+    color: var(--c-muted);
+  }
+  .footer__a11y-ico { flex-shrink: 0; }
+
+  /* Painel acessibilidade (fora do <footer> no DOM) */
+  .tyer-a11y[hidden] {
+    display: none;
+  }
+  .tyer-a11y {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .tyer-a11y__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+  }
+  .tyer-a11y__panel {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 400px;
+    max-height: min(90vh, 520px);
+    overflow: auto;
+    background: var(--c-surface2);
+    border: 1px solid var(--c-border);
+    border-radius: 10px;
+    padding: 20px 22px 22px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  }
+  .tyer-a11y__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .tyer-a11y__title {
+    font-family: var(--font-title);
+    font-size: 22px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 0;
+  }
+  .tyer-a11y__close {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    line-height: 1;
+    color: var(--c-muted);
+    border-radius: 6px;
+  }
+  .tyer-a11y__close:hover,
+  .tyer-a11y__close:focus-visible {
+    color: var(--c-text);
+    background: var(--c-surface);
+  }
+  .tyer-a11y__label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--c-muted);
+    margin: 0 0 10px 0;
+  }
+  .tyer-a11y__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .tyer-a11y__chip {
+    padding: 8px 12px;
+    font-size: 12px;
+    border: 1px solid var(--c-border);
+    border-radius: 9999px;
+    color: var(--c-text);
+    background: var(--c-surface);
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+  }
+  .tyer-a11y__chip:hover {
+    border-color: var(--c-accent);
+  }
+  .tyer-a11y__chip.is-active {
+    background: var(--c-accent);
+    border-color: var(--c-accent);
+    color: #111;
+  }
+  .tyer-a11y__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    margin-bottom: 12px;
+    cursor: pointer;
+  }
+  .tyer-a11y__row input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--c-accent);
+  }
+  .tyer-a11y__sub {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--c-muted);
+    margin: 18px 0 6px 0;
+  }
+  .tyer-a11y__hint {
+    font-size: 12px;
+    line-height: 1.5;
+    color: #888;
+    margin: 0;
+  }
+</style>
+
+<script is:inline define:vars={{ publicApiUrl }}>
+  (function () {
+    var A11Y_LS = 'tyer_a11y_prefs';
+    var defaultA11y = { font: 'sm', contrast: false, motion: false };
+
+    var FONTS = { sm: 1, md: 1, lg: 1, '2xl': 1 };
+    function readA11y() {
+      try {
+        var raw = localStorage.getItem(A11Y_LS);
+        if (raw) {
+          var o = JSON.parse(raw);
+          var f = o.font;
+          if (!FONTS[f]) f = defaultA11y.font;
+          return { font: f, contrast: !!o.contrast, motion: !!o.motion };
+        }
+      } catch (e) { /* */ }
+      return { font: defaultA11y.font, contrast: defaultA11y.contrast, motion: defaultA11y.motion };
+    }
+    function writeA11y(p) {
+      try {
+        localStorage.setItem(A11Y_LS, JSON.stringify(p));
+      } catch (e) { /* */ }
+    }
+    function applyA11y(p) {
+      var root = document.documentElement;
+      if (p.font === 'sm') root.removeAttribute('data-tyer-a11y-font');
+      else root.setAttribute('data-tyer-a11y-font', p.font);
+      if (p.contrast) root.setAttribute('data-tyer-a11y-contrast', 'on');
+      else root.removeAttribute('data-tyer-a11y-contrast');
+      if (p.motion) root.setAttribute('data-tyer-a11y-motion', 'reduce');
+      else root.removeAttribute('data-tyer-a11y-motion');
+      var chips = document.querySelectorAll('.tyer-a11y__chip[data-tyer-font]');
+      chips.forEach(function (btn) {
+        var v = btn.getAttribute('data-tyer-font');
+        btn.classList.toggle('is-active', p.font === v);
+      });
+      var hc = document.getElementById('tyer-a11y-hc');
+      var mo = document.getElementById('tyer-a11y-mo');
+      if (hc) hc.checked = p.contrast;
+      if (mo) mo.checked = p.motion;
+    }
+
+    document.getElementById('footer-nl-form')?.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var form = e.currentTarget;
+      var status = document.getElementById('footer-nl-status');
+      var el = form.elements.namedItem('email');
+      var email = el && el.value ? el.value.trim() : '';
+      if (!email) return;
+      var ok = form.getAttribute('data-success') || '';
+      status.hidden = false;
+      status.textContent = '…';
+      fetch(publicApiUrl + '/api/newsletter', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: email }),
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('newsletter failed');
+          status.textContent = ok;
+          form.reset();
+        })
+        .catch(function () {
+          status.textContent = 'Não foi possível enviar agora.';
+        });
+    });
+
+    var a11yRoot = document.getElementById('tyer-a11y-dialog');
+    var a11yOpen = document.getElementById('tyer-a11y-open');
+    var a11yPanel = a11yRoot ? a11yRoot.querySelector('.tyer-a11y__panel') : null;
+
+    applyA11y(readA11y());
+
+    function setA11yOpen(open) {
+      if (!a11yRoot) return;
+      if (open) a11yRoot.removeAttribute('hidden');
+      else a11yRoot.setAttribute('hidden', '');
+      if (a11yOpen) a11yOpen.setAttribute('aria-expanded', open ? 'true' : 'false');
+      document.body.style.overflow = open ? 'hidden' : '';
+      if (open && a11yPanel) {
+        setTimeout(function () { a11yPanel.focus(); }, 0);
+      } else if (a11yOpen) {
+        a11yOpen.focus();
+      }
+    }
+
+    a11yOpen && a11yOpen.addEventListener('click', function () { setA11yOpen(true); });
+    a11yRoot &&
+      a11yRoot.addEventListener('click', function (e) {
+        if (e.target.closest && e.target.closest('[data-a11y-close]')) setA11yOpen(false);
+      });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && a11yRoot && !a11yRoot.hasAttribute('hidden')) {
+        e.preventDefault();
+        setA11yOpen(false);
+      }
+    });
+
+    document.querySelectorAll('.tyer-a11y__chip[data-tyer-font]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var v = btn.getAttribute('data-tyer-font');
+        if (!v) return;
+        var p = readA11y();
+        p.font = v;
+        writeA11y(p);
+        applyA11y(p);
+      });
+    });
+    var elHc = document.getElementById('tyer-a11y-hc');
+    var elMo = document.getElementById('tyer-a11y-mo');
+    if (elHc) {
+      elHc.addEventListener('change', function () {
+        var p = readA11y();
+        p.contrast = elHc.checked;
+        writeA11y(p);
+        applyA11y(p);
+      });
+    }
+    if (elMo) {
+      elMo.addEventListener('change', function () {
+        var p = readA11y();
+        p.motion = elMo.checked;
+        writeA11y(p);
+        applyA11y(p);
+      });
+    }
+  })();
+</script>

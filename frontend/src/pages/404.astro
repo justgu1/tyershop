@@ -1,0 +1,31 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="404 — Not Found" noindex={true}>
+  <section class="nf">
+    <p class="nf__code">404</p>
+    <h1 class="nf__title">Page Not Found</h1>
+    <p class="nf__sub">The page you're looking for has dropped off the map.</p>
+    <div class="nf__actions">
+      <a href="/" class="btn btn-primary">Back Home</a>
+      <a href="/shop" class="btn btn-outline">Visit Shop</a>
+    </div>
+  </section>
+</Layout>
+<style>
+.nf {
+  min-height: 70vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 16px;
+  text-align: center; padding: 40px 20px;
+}
+.nf__code {
+  font-family: var(--font-title); font-size: clamp(80px, 15vw, 180px);
+  color: var(--c-accent); line-height: 1; letter-spacing: 0.05em;
+}
+.nf__title {
+  font-family: var(--font-title); font-size: clamp(28px, 5vw, 56px);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.nf__sub { font-size: 15px; color: var(--c-muted); max-width: 340px; }
+.nf__actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+</style>

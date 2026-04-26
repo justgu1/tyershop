@@ -1,0 +1,22 @@
+{
+  "name": "tyershop",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend",
+    "api",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "docker compose up",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "postinstall": "patch-package"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "patch-package": "^8.0.1"
+  }
+}

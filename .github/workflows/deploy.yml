@@ -1,0 +1,107 @@
+name: Build & Push Docker Images
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: justgu1/tyershop-backend
+  FRONTEND_IMAGE: justgu1/tyershop-frontend
+  API_IMAGE: justgu1/tyershop-api
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_PAT }}
+
+      - name: Docker meta backend
+        id: meta_backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: backend/Dockerfile
+          target: prod
+          push: true
+          tags: ${{ steps.meta_backend.outputs.tags }}
+          labels: ${{ steps.meta_backend.outputs.labels }}
+
+      - name: Docker meta frontend
+        id: meta_frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: frontend/Dockerfile
+          target: prod
+          push: true
+          tags: ${{ steps.meta_frontend.outputs.tags }}
+          labels: ${{ steps.meta_frontend.outputs.labels }}
+
+      - name: Docker meta api
+        id: meta_api
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.API_IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+
+      - name: Build and push api
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: api/Dockerfile
+          target: prod
+          push: true
+          tags: ${{ steps.meta_api.outputs.tags }}
+          labels: ${{ steps.meta_api.outputs.labels }}
+
+      - name: Update image tags in infra repo
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          SHA_TAG="sha-$(echo ${{ github.sha }} | cut -c1-7)"
+          git clone https://x-access-token:${GH_PAT}@github.com/justgu1/infra-swarm.git /tmp/infra
+          cd /tmp/infra
+          git config user.email "ci@tyershop.com"
+          git config user.name "GitHub Actions"
+          sed -i "s|TYERSHOP_BACKEND_TAG=.*|TYERSHOP_BACKEND_TAG=${SHA_TAG}|" .env.example || true
+          sed -i "s|TYERSHOP_FRONTEND_TAG=.*|TYERSHOP_FRONTEND_TAG=${SHA_TAG}|" .env.example || true
+          sed -i "s|TYERSHOP_API_TAG=.*|TYERSHOP_API_TAG=${SHA_TAG}|" .env.example || true
+          git diff --quiet && echo "No changes" && exit 0
+          git add .env.example
+          git commit -m "chore(tyershop): update image tags to ${SHA_TAG} [ci skip]"
+          git push

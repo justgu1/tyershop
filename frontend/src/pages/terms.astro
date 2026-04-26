@@ -1,0 +1,30 @@
+---
+import LegalLayout from '../layouts/LegalLayout.astro';
+import { getLangFromUrl } from '../i18n/utils';
+const lang = getLangFromUrl(Astro.url);
+const toc = [
+  { id: 'acceptance', label: 'Acceptance' },
+  { id: 'products', label: 'Products' },
+  { id: 'payments', label: 'Payments' },
+  { id: 'ip', label: 'Intellectual Property' },
+  { id: 'liability', label: 'Liability' },
+];
+---
+<LegalLayout title="Terms of Use" lang={lang} toc={toc} description="Tyer terms of use and conditions of sale.">
+  <p><strong>Last updated:</strong> January 2025</p>
+
+  <h2 id="acceptance">Acceptance of Terms</h2>
+  <p>By accessing and using tyer.com.br, you accept and agree to be bound by these Terms of Use. If you do not agree, please do not use our website.</p>
+
+  <h2 id="products">Products & Availability</h2>
+  <p>All products are subject to availability. Prices are in BRL and include applicable taxes. We reserve the right to modify prices at any time. Orders are confirmed via email.</p>
+
+  <h2 id="payments">Payments</h2>
+  <p>Payments are processed by Mercado Pago. By completing a purchase, you authorize the charge to your payment method. In case of payment failure, your order will not be processed.</p>
+
+  <h2 id="ip">Intellectual Property</h2>
+  <p>All content on this website — including images, logos, text, and designs — is owned by Tyer and protected by copyright law. Unauthorized use is strictly prohibited.</p>
+
+  <h2 id="liability">Limitation of Liability</h2>
+  <p>Tyer is not liable for indirect, incidental, or consequential damages arising from your use of our products or website. Our liability is limited to the purchase price of the relevant product.</p>
+</LegalLayout>

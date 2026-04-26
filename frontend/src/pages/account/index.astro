@@ -1,0 +1,201 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getLangFromUrl, t, getPathForLang } from '../../i18n/utils';
+import type { Lang } from '../../i18n/utils';
+const lang: Lang = getLangFromUrl(Astro.url);
+const pk = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
+---
+<Layout title={t(lang, 'account', 'my_account')} lang={lang} noindex>
+  <div class="account-page container">
+    <h1 class="account-page__title">{t(lang, 'account', 'my_account')}</h1>
+
+    <p id="account-guest" class="account-page__hint">
+      {t(lang, 'account', 'account_portal_hint')}
+    </p>
+
+    <div id="profile-panel" class="profile-panel" hidden>
+      <p id="profile-name" class="profile-panel__name"></p>
+      <nav class="profile-panel__nav">
+        <a href={getPathForLang('/account/orders', lang)} class="btn btn-outline">{t(lang, 'account', 'order_history')}</a>
+        <button type="button" id="account-logout-btn" class="btn btn-outline">{t(lang, 'account', 'logout')}</button>
+      </nav>
+      <form id="account-profile-form" class="account-form" novalidate>
+        <h2 class="account-form__title">Dados da conta</h2>
+        <div class="account-form__field">
+          <label for="account-first">Nome</label>
+          <input id="account-first" name="first_name" type="text" autocomplete="given-name" required />
+        </div>
+        <div class="account-form__field">
+          <label for="account-last">Sobrenome</label>
+          <input id="account-last" name="last_name" type="text" autocomplete="family-name" required />
+        </div>
+        <div class="account-form__field">
+          <label for="account-email">Email</label>
+          <input id="account-email" name="email" type="email" autocomplete="email" required />
+        </div>
+        <p class="account-form__status" id="account-profile-status" hidden></p>
+        <button type="submit" class="btn btn-primary">Salvar dados</button>
+      </form>
+
+      <form id="account-password-form" class="account-form" novalidate>
+        <h2 class="account-form__title">Alterar senha</h2>
+        <p class="account-form__hint">Vamos enviar um link de redefinição para o e-mail da sua conta.</p>
+        <p class="account-form__status" id="account-password-status" hidden></p>
+        <button type="submit" class="btn btn-primary">Enviar e-mail de redefinição</button>
+      </form>
+    </div>
+  </div>
+</Layout>
+
+<style>
+.account-page { padding-block: 64px; max-width: 520px; }
+.account-page__title { font-family: var(--font-title); font-size: 56px; text-transform: uppercase; margin-bottom: 24px; }
+.account-page__hint { font-size: 15px; line-height: 1.5; color: var(--c-muted); }
+.profile-panel { display: flex; flex-direction: column; gap: 24px; }
+.profile-panel__name { font-size: 18px; font-weight: 500; }
+.profile-panel__nav { display: flex; gap: 12px; flex-wrap: wrap; }
+.account-form { display:flex; flex-direction:column; gap:12px; padding:16px; border:1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-surface); }
+.account-form__title { font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: var(--c-muted); }
+.account-form__field { display:flex; flex-direction:column; gap:6px; }
+.account-form__field label { font-size:11px; text-transform: uppercase; letter-spacing:.08em; color: var(--c-muted); }
+.account-form__field input { background:#0d0d0d; border:1px solid #2a2a2a; border-radius: var(--r); min-height:36px; padding:0 10px; color:var(--c-text); }
+.account-form__status { font-size:12px; color:var(--c-muted); }
+.account-form__hint { font-size: 13px; color: var(--c-muted); line-height: 1.45; }
+</style>
+
+<script define:vars={{ pk }}>
+  (function () {
+    var guestEl = document.getElementById("account-guest");
+    var profile = document.getElementById("profile-panel");
+    var nameEl = document.getElementById("profile-name");
+    var profileForm = document.getElementById("account-profile-form");
+    var profileStatus = document.getElementById("account-profile-status");
+    var passwordForm = document.getElementById("account-password-form");
+    var passwordStatus = document.getElementById("account-password-status");
+    var firstInput = document.getElementById("account-first");
+    var lastInput = document.getElementById("account-last");
+    var emailInput = document.getElementById("account-email");
+    var customerEmail = "";
+
+    function showGuest() {
+      if (guestEl) guestEl.hidden = false;
+      if (profile) profile.hidden = true;
+    }
+    function showProfile(name) {
+      if (nameEl) nameEl.textContent = name;
+      if (guestEl) guestEl.hidden = true;
+      if (profile) profile.hidden = false;
+    }
+    function setStatus(el, message, isError) {
+      if (!(el instanceof HTMLElement)) return;
+      el.hidden = !message;
+      el.textContent = message || "";
+      el.style.color = isError ? "#f87171" : "var(--c-muted)";
+    }
+
+    async function refresh() {
+      var token = localStorage.getItem("tyer_token");
+      if (!token) {
+        window.location.href = "/";
+        return;
+      }
+      try {
+        var res = await fetch("/store/customers/me", {
+          headers: {
+            Authorization: "Bearer " + token,
+            "x-publishable-api-key": pk,
+          },
+        });
+        if (!res.ok) throw new Error("401");
+        var data = await res.json();
+        var c = data.customer;
+        if (c) {
+          localStorage.setItem("tyer_customer", JSON.stringify(c));
+          var label = [c.first_name, c.last_name].filter(Boolean).join(" ").trim() || c.email;
+          customerEmail = c.email || "";
+          if (firstInput instanceof HTMLInputElement) firstInput.value = c.first_name || "";
+          if (lastInput instanceof HTMLInputElement) lastInput.value = c.last_name || "";
+          if (emailInput instanceof HTMLInputElement) emailInput.value = c.email || "";
+          showProfile(label);
+          return;
+        }
+      } catch (e) {
+        /*  */
+      }
+      localStorage.removeItem("tyer_token");
+      localStorage.removeItem("tyer_customer");
+      window.location.href = "/";
+    }
+
+    document.getElementById("account-logout-btn")?.addEventListener("click", function () {
+      localStorage.removeItem("tyer_token");
+      localStorage.removeItem("tyer_customer");
+      window.location.href = "/";
+    });
+
+    profileForm?.addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var token = localStorage.getItem("tyer_token") || "";
+      if (!token) return;
+      var fd = new FormData(profileForm);
+      var payload = {
+        first_name: String(fd.get("first_name") || ""),
+        last_name: String(fd.get("last_name") || ""),
+        email: String(fd.get("email") || ""),
+      };
+      setStatus(profileStatus, "Salvando...", false);
+      try {
+        var res = await fetch("/store/customers/me", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-publishable-api-key": pk,
+            Authorization: "Bearer " + token,
+          },
+          body: JSON.stringify(payload),
+        });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data && data.message ? data.message : "Erro ao atualizar");
+        if (data && data.customer) {
+          localStorage.setItem("tyer_customer", JSON.stringify(data.customer));
+          var label = [data.customer.first_name, data.customer.last_name].filter(Boolean).join(" ").trim() || data.customer.email;
+          customerEmail = data.customer.email || "";
+          showProfile(label);
+        }
+        setStatus(profileStatus, "Dados atualizados com sucesso.", false);
+      } catch (err) {
+        setStatus(profileStatus, err instanceof Error ? err.message : "Erro ao atualizar dados.", true);
+      }
+    });
+
+    passwordForm?.addEventListener("submit", async function (e) {
+      e.preventDefault();
+      var token = localStorage.getItem("tyer_token") || "";
+      if (!token) return;
+      var email = customerEmail || (emailInput instanceof HTMLInputElement ? emailInput.value.trim() : "");
+      if (!email) {
+        setStatus(passwordStatus, "Não foi possível identificar o e-mail da conta.", true);
+        return;
+      }
+      setStatus(passwordStatus, "Enviando link de redefinição...", false);
+      try {
+        var res = await fetch("/auth/customer/emailpass/reset-password", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-publishable-api-key": pk,
+          },
+          body: JSON.stringify({ identifier: email }),
+        });
+        if (!res.ok) {
+          throw new Error("Não foi possível enviar o e-mail de redefinição agora.");
+        }
+        setStatus(passwordStatus, "Link de redefinição enviado para seu e-mail.", false);
+      } catch (err) {
+        setStatus(passwordStatus, err instanceof Error ? err.message : "Erro ao enviar redefinição.", true);
+      }
+    });
+
+    refresh();
+  })();
+</script>
