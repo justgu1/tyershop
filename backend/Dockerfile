@@ -14,7 +14,7 @@ COPY backend/package-lock.json* ./
 COPY patches/ ./patches
 
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --no-audit --no-fund
+    npm install --no-audit --no-fund
 
 # copia o código do serviço
 COPY backend/ ./
@@ -32,7 +32,7 @@ COPY backend/package.json backend/package-lock.json* ./
 COPY patches/ ./patches
 
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --no-audit --no-fund
+    npm install --no-audit --no-fund
 
 COPY backend/ ./
 
