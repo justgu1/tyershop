@@ -7,11 +7,20 @@ interface Props {
   description?: string;
   lang?: Lang;
   toc?: { id: string; label: string }[];
+  /** Largura maior e área útil para páginas como contato. */
+  wide?: boolean;
 }
-const { title, description, lang = 'pt', toc = [] } = Astro.props;
+const { title, description, lang = 'pt', toc = [], wide = false } = Astro.props;
 ---
 <Layout title={title} description={description} lang={lang} bodyClass="legal-body">
-  <div class="legal-wrap container">
+  <div
+    class:list={[
+      'legal-wrap',
+      'container',
+      wide && 'legal-wrap--wide',
+      toc.length > 0 ? 'legal-wrap--with-toc' : 'legal-wrap--single',
+    ]}
+  >
     {toc.length > 0 && (
       <aside class="legal-toc" aria-label={t(lang, 'legal', 'toc_aria')}>
         <p class="legal-toc__title">{t(lang, 'legal', 'toc_title')}</p>
@@ -34,12 +43,27 @@ const { title, description, lang = 'pt', toc = [] } = Astro.props;
 <style is:global>
 .legal-wrap {
   display: grid;
-  grid-template-columns: 220px 1fr;
   gap: 60px;
   padding-block: 64px;
   max-width: 960px;
 }
-@media (max-width: 768px) { .legal-wrap { grid-template-columns: 1fr; } .legal-toc { display: none; } }
+.legal-wrap--single {
+  grid-template-columns: 1fr;
+}
+.legal-wrap--with-toc {
+  grid-template-columns: 220px 1fr;
+}
+.legal-wrap--wide {
+  max-width: min(1200px, 100%);
+}
+@media (max-width: 768px) {
+  .legal-wrap--with-toc {
+    grid-template-columns: 1fr;
+  }
+  .legal-toc {
+    display: none;
+  }
+}
 
 .legal-toc { position: sticky; top: calc(var(--header-h) + 24px); align-self: start; }
 .legal-toc__title { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c-muted); margin-bottom: 12px; }
@@ -47,12 +71,15 @@ const { title, description, lang = 'pt', toc = [] } = Astro.props;
 .legal-toc__link:hover { color: var(--c-text); border-left-color: var(--c-accent); }
 
 .legal-title { font-family: var(--font-title); font-size: clamp(36px, 5vw, 64px); text-transform: uppercase; margin-bottom: 48px; }
-.legal-content h2 { font-family: var(--font-title); font-size: 28px; text-transform: uppercase; margin: 40px 0 12px; padding-top: 16px; }
+/* Só títulos de seção do texto jurídico (evita estilizar h2 dentro de componentes, ex.: contato). */
+.legal-content > h2 { font-family: var(--font-title); font-size: 28px; text-transform: uppercase; margin: 40px 0 12px; padding-top: 16px; }
 .legal-content p { font-size: 14px; line-height: 1.8; color: var(--c-muted); margin-bottom: 16px; }
-.legal-content ul, .legal-content ol { padding-left: 20px; margin-bottom: 16px; }
-.legal-content ul { list-style: disc; }
+.legal-content ul:not(.contact-aside__list),
+.legal-content ol { padding-left: 20px; margin-bottom: 16px; }
+.legal-content ul:not(.contact-aside__list) { list-style: disc; }
 .legal-content ol { list-style: decimal; }
-.legal-content li { font-size: 14px; line-height: 1.8; color: var(--c-muted); margin-bottom: 6px; }
+.legal-content ul:not(.contact-aside__list) li,
+.legal-content ol li { font-size: 14px; line-height: 1.8; color: var(--c-muted); margin-bottom: 6px; }
 .legal-content a { color: var(--c-accent); text-decoration: underline; }
 .legal-content strong { color: var(--c-text); }
 </style>

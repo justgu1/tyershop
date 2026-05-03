@@ -23,6 +23,12 @@ const medusaBase = (
   import.meta.env.PUBLIC_MEDUSA_URL || url
 ).replace(/\/$/, "");
 const resetSentHint = t(lang, "account", "reset_sent_hint");
+const searchRecentsTitle = t(lang, "search", "recents_title");
+const searchCloseAria = t(lang, "search", "close_aria");
+const searchResultsAria = t(lang, "search", "results_aria");
+const searchNoResults = t(lang, "search", "no_results");
+const searchGroupNewest = t(lang, "search", "group_newest");
+const searchGroupPopular = t(lang, "search", "group_popular");
 ---
 
 <header class="hdr" id="site-header">
@@ -364,7 +370,7 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
       <button
         class="search-overlay__close"
         id="search-close"
-        aria-label="Close search"
+        aria-label={searchCloseAria}
       >
         <svg
           width="18"
@@ -379,7 +385,7 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
     </div>
     <div class="search-overlay__body" id="search-body">
       <div class="search-recents" id="search-recents">
-        <p class="search-section-title">Recent Searches</p>
+        <p class="search-section-title">{searchRecentsTitle}</p>
         <ul class="search-recents__list" id="search-recents-list" role="list">
         </ul>
       </div>
@@ -387,8 +393,8 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
         <ul
           class="search-results__list"
           id="search-results-list"
-          role="listbox"
-          aria-label="Search results"
+          role="list"
+          aria-label={searchResultsAria}
         >
         </ul>
       </div>
@@ -1000,35 +1006,99 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
     color: var(--c-accent);
   }
   .search-results__list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 16px;
-    padding-top: 8px;
-  }
-  .search-result-item {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    gap: 28px;
+    padding: 8px 0 0;
+    margin: 0;
+    list-style: none;
+  }
+  /*
+   * Resultados montados via innerHTML não recebem data-astro do scope;
+   * precisam de :global dentro de .search-overlay para o flex em linha valer.
+   */
+  .search-overlay :global(.search-results__section) {
+    display: flex;
+    flex-direction: column;
     gap: 12px;
-    padding: 10px;
-    border-radius: var(--r-md);
-    background: var(--c-surface);
-    cursor: pointer;
-    transition: background var(--ease);
+    width: 100%;
+    min-width: 0;
+    list-style: none;
   }
-  .search-result-item:hover {
-    background: var(--c-surface2);
+  .search-overlay :global(.search-results__group-label) {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--c-muted);
   }
-  .search-result-img {
-    width: 48px;
-    height: 48px;
+  .search-overlay :global(.search-results__cards) {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 16px;
+    margin: 0;
+    padding: 0 0 8px;
+    list-style: none;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .search-overlay :global(.search-results__cards > li) {
+    flex: 0 0 auto;
+    width: 140px;
+    min-width: 140px;
+  }
+  .search-overlay :global(.search-result-card) {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.3s ease;
+  }
+  .search-overlay :global(.search-result-card:hover) {
+    transform: translateY(-4px);
+  }
+  .search-overlay :global(.search-result-card__media) {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    background: var(--c-bg-mute, #1a1a1a);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    margin-bottom: 12px;
+  }
+  .search-overlay :global(.search-result-card__img) {
+    width: 100%;
+    height: 100%;
     object-fit: cover;
-    border-radius: var(--r);
-    flex-shrink: 0;
+    display: block;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .search-result-name {
-    font-size: 13px;
+  .search-overlay :global(.search-result-card:hover .search-result-card__img) {
+    transform: scale(1.06);
+  }
+  .search-overlay :global(.search-result-card__name) {
+    font-size: 14px;
     font-weight: 500;
     line-height: 1.3;
+    color: var(--c-text);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-align: center;
+    min-height: 2.6em;
+  }
+  .search-overlay :global(.search-results__empty) {
+    width: 100%;
+    color: var(--c-muted);
+    font-size: 14px;
+    padding: 20px 0;
+    list-style: none;
   }
 
   /* Mobile menu */
@@ -1235,6 +1305,9 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
       "pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975",
     medusaBase,
     resetSentHint,
+    searchGroupNewest,
+    searchGroupPopular,
+    searchNoResults,
   }}
 >
   // ── Header scroll ──
@@ -1678,13 +1751,19 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
         const thumb = escapeHtml(p?.thumbnail || "/logo.webp");
         const label = escapeHtml(p?.title || "");
         const handle = escapeHtml(p?.handle || "");
-        return `<li role="option"><a class="search-result-item" href="/product/${handle}">
-          <img class="search-result-img" src="${thumb}" alt="" width="48" height="48" />
-          <span class="search-result-name">${label}</span>
+        return `<li role="listitem"><a class="search-result-card" href="/product/${handle}">
+          <div class="search-result-card__media">
+            <img class="search-result-card__img" src="${thumb}" alt="" width="240" height="240" loading="lazy" decoding="async" />
+          </div>
+          <span class="search-result-card__name">${label}</span>
         </a></li>`;
       })
       .join("");
-    return `<li style="grid-column:1/-1;color:#888;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 2px;">${title}</li>${items}`;
+    const head = escapeHtml(title);
+    return `<li class="search-results__section" role="presentation">
+      <div class="search-results__group-label">${head}</div>
+      <ul class="search-results__cards" role="list">${items}</ul>
+    </li>`;
   }
 
   async function renderDiscoverFallback() {
@@ -1694,8 +1773,8 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
       if (searchRecentsEl) searchRecentsEl.hidden = false;
       if (searchResultsList) {
         searchResultsList.innerHTML =
-          renderSearchProductsGroup("Mais novos", data.newest) +
-          renderSearchProductsGroup("Mais vendidos", data.popular);
+          renderSearchProductsGroup(searchGroupNewest, data.newest) +
+          renderSearchProductsGroup(searchGroupPopular, data.popular);
       }
     } catch {
       if (searchResultsEl) searchResultsEl.hidden = true;
@@ -1724,22 +1803,25 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
       if (searchResultsList) searchResultsList.innerHTML = "";
       if (!products || !products.length) {
         if (searchResultsList)
-          searchResultsList.innerHTML =
-            '<li style="color:#666;font-size:13px;padding:16px 0">No results found.</li>';
+          searchResultsList.innerHTML = `<li class="search-results__empty" role="status">${escapeHtml(searchNoResults)}</li>`;
         return;
       }
-      products.forEach((p) => {
-        const li = document.createElement("li");
-        li.setAttribute("role", "option");
-        const thumb = p.thumbnail || "/logo.webp";
-        const title = p.title || "";
-        const handle = p.handle || "";
-        li.innerHTML = `<a class="search-result-item" href="/product/${handle}">
-          <img class="search-result-img" src="${thumb}" alt="" width="48" height="48" />
-          <span class="search-result-name">${title}</span>
-        </a>`;
-        if (searchResultsList) searchResultsList.appendChild(li);
-      });
+      const cardItems = products
+        .map((p) => {
+          const thumb = escapeHtml(p.thumbnail || "/logo.webp");
+          const title = escapeHtml(p.title || "");
+          const handle = escapeHtml(p.handle || "");
+          return `<li role="listitem"><a class="search-result-card" href="/product/${handle}">
+          <div class="search-result-card__media">
+            <img class="search-result-card__img" src="${thumb}" alt="" width="240" height="240" loading="lazy" decoding="async" />
+          </div>
+          <span class="search-result-card__name">${title}</span>
+        </a></li>`;
+        })
+        .join("");
+      if (searchResultsList) {
+        searchResultsList.innerHTML = `<li class="search-results__section search-results__section--solo" role="presentation"><ul class="search-results__cards" role="list">${cardItems}</ul></li>`;
+      }
     } catch {}
   }
 
