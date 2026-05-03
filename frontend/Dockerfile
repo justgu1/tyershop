@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 # ─── Dev stage ───────────────────────────────────────────────
 FROM node:22-slim AS dev
 
@@ -11,8 +12,8 @@ ENV NPM_CONFIG_AUDIT=false \
 COPY frontend/package.json ./
 COPY frontend/package-lock.json* ./
 
-# instala dependências (lock do frontend pode ficar atrás do package.json no monorepo)
-RUN npm install --no-audit --no-fund \
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund \
   && npm install --no-audit --no-fund @astrojs/node@^10.0.6
 
 # copia o código do serviço
@@ -32,7 +33,8 @@ ENV NPM_CONFIG_AUDIT=false \
 
 COPY frontend/package.json frontend/package-lock.json* ./
 
-RUN npm install --no-audit --no-fund \
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund \
   && npm install --no-audit --no-fund @astrojs/node@^10.0.6
 
 COPY frontend/ ./

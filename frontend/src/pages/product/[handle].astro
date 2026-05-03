@@ -219,6 +219,7 @@ const jsonLd = productFound
   ogType="product"
   jsonLd={jsonLd ?? undefined}
   noindex={!productFound}
+  bodyClass="pdp-body"
 >
   {productFound ? (
     <>
@@ -289,7 +290,7 @@ const jsonLd = productFound
       </div>
 
       {related.length > 0 && (
-        <section class="pdp-hero__drop-rail section" aria-labelledby="pdp-drop-rail-title">
+        <section class="pdp-hero__drop-rail" aria-labelledby="pdp-drop-rail-title">
           <div class="pdp-hero__drop-rail-inner">
             <h2 class="pdp-hero__drop-rail-title" id="pdp-drop-rail-title">
               {t(lang, 'pdp', 'drop_section_title')}
@@ -595,7 +596,7 @@ const jsonLd = productFound
   )}
 
   {newest.length > 0 && (
-    <section class="pdp-related section" aria-labelledby="newest-title">
+    <section class="pdp-related" aria-labelledby="newest-title">
       <div class="container">
         <h2 class="section__title" id="newest-title">{t(lang, 'shop', 'section_novos')}</h2>
         <div class="pdp-product-rail pdp-carousel" id="pdp-newest-carousel" role="list">
@@ -674,18 +675,23 @@ const jsonLd = productFound
 <style>
   .pdp-hero {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    /* minmax(0, …) evita overflow horizontal; antes `auto` seguía min-content do card de compra */
+    grid-template-columns: minmax(0, 1fr) minmax(0, min(520px, 100%));
     gap: clamp(16px, 3vw, 40px);
     align-items: start;
     min-height: 75vh;
     min-height: 75svh;
-    padding: 24px clamp(16px, 3vw, 40px) 40px;
-    max-width: 1600px;
+    padding: 24px clamp(12px, 4vw, 40px) 40px;
     margin-inline: auto;
+    width: 100%;
+    min-width: 0;
+    max-width: min(1600px, 100%);
+    overflow-x: clip;
   }
   @media (max-width: 1024px) {
     .pdp-hero {
       grid-template-columns: 1fr;
+      padding-inline: clamp(12px, 4vw, 24px);
     }
   }
 
@@ -695,6 +701,9 @@ const jsonLd = productFound
     gap: clamp(14px, 2vw, 22px);
     min-height: min(75svh, 820px);
     align-items: stretch;
+    /* filho com rail horizontal tem min-content enorme — sem isto rebenta a largura da página */
+    min-width: 0;
+    max-width: 100%;
   }
 
   .pdp-hero__media-carousel-block {
@@ -703,6 +712,8 @@ const jsonLd = productFound
     flex: 1;
     min-height: min(70svh, 780px);
     align-items: stretch;
+    min-width: 0;
+    max-width: 100%;
   }
   @media (max-width: 1024px) {
     .pdp-hero__media {
@@ -719,9 +730,14 @@ const jsonLd = productFound
     margin: 0;
     border-top: 1px solid var(--c-border);
     padding-top: clamp(12px, 2vw, 20px);
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
   }
   .pdp-hero__drop-rail-inner {
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
   }
   .pdp-hero__drop-rail-title {
     font-family: var(--font-title);
@@ -730,6 +746,9 @@ const jsonLd = productFound
     letter-spacing: 0.06em;
     margin: 0 0 12px;
     color: var(--c-text);
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    max-width: 100%;
   }
   .pdp-hero__drop-rail-sub {
     font-weight: 500;
@@ -746,11 +765,16 @@ const jsonLd = productFound
     gap: 10px;
     height: 300px;
     max-height: 300px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
     overflow-x: auto;
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
     padding-bottom: 6px;
     scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
   }
   .pdp-product-rail > * {
     flex: 0 0 168px;
@@ -972,13 +996,21 @@ const jsonLd = productFound
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    align-items: flex-start;
+    align-items: stretch;
     padding-top: 8px;
     min-width: 0;
+    max-width: 100%;
+    width: 100%;
   }
+  /*
+   * NUNCA `align-items: center` aqui no mobile: em column flex o eixo cruzado é a largura
+   * e o filho passa a medir pelo min-content do card (fila de tamanhos) → overflow horizontal.
+   */
   @media (max-width: 1024px) {
     .pdp-hero__buy-col {
-      align-items: center;
+      align-items: stretch;
+      width: 100%;
+      max-width: 100%;
     }
   }
 
@@ -987,7 +1019,8 @@ const jsonLd = productFound
     flex-direction: column;
     gap: 14px;
     width: 100%;
-    max-width: 500px;
+    max-width: min(500px, 100%);
+    align-self: stretch;
     max-height: min(calc(100svh - 40px), 920px);
     overflow-y: auto;
     padding-right: 4px;
@@ -997,12 +1030,16 @@ const jsonLd = productFound
     .pdp-hero__sidebar-stack {
       max-height: none;
       overflow-y: visible;
+      max-width: 100%;
+      min-width: 0;
     }
   }
 
   .pdp-buy-card {
     width: 100%;
-    padding: 22px 22px 20px;
+    max-width: 100%;
+    min-width: 0;
+    padding: clamp(16px, 3vw, 22px) clamp(12px, 4vw, 22px) 20px;
     background: var(--c-surface);
     border: 1px solid var(--c-border);
     border-radius: var(--r-md);
@@ -1011,6 +1048,8 @@ const jsonLd = productFound
     flex-direction: column;
     gap: 12px;
     flex-shrink: 0;
+    overflow-wrap: break-word;
+    overflow-x: hidden;
   }
 
   .pdp-characteristics {
@@ -1036,6 +1075,10 @@ const jsonLd = productFound
     line-height: 1.4;
   }
 
+  .pdp-breadcrumb {
+    max-width: 100%;
+    min-width: 0;
+  }
   .pdp-breadcrumb__list {
     display: flex;
     align-items: center;
@@ -1043,6 +1086,15 @@ const jsonLd = productFound
     font-size: 11px;
     color: var(--c-muted);
     flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .pdp-breadcrumb__list li[aria-current='page'] {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1 1 8rem;
   }
   .pdp-breadcrumb__list a:hover {
     color: var(--c-text);
@@ -1066,6 +1118,9 @@ const jsonLd = productFound
     text-transform: uppercase;
     line-height: 1;
     margin: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    max-width: 100%;
   }
 
   .pdp-variation-heading {
@@ -1083,6 +1138,7 @@ const jsonLd = productFound
   .pdp-variation-heading__value {
     color: var(--c-text);
     font-weight: 600;
+    overflow-wrap: anywhere;
   }
 
   .pdp-variant-row {
@@ -1100,6 +1156,9 @@ const jsonLd = productFound
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+    max-width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
   }
   .pdp-variant-btn {
     border: 1px solid var(--c-border);
@@ -1112,6 +1171,19 @@ const jsonLd = productFound
     cursor: pointer;
     position: relative;
     overflow: hidden;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+  @media (max-width: 420px) {
+    .pdp-buy-card .pdp-variant-btn {
+      padding: 0 9px;
+      font-size: 10px;
+      min-height: 30px;
+    }
+    .pdp-buy-card .pdp-variant-values {
+      gap: 4px;
+    }
   }
   .pdp-variant-btn.is-selected {
     border-color: var(--c-accent);
@@ -1191,11 +1263,15 @@ const jsonLd = productFound
 
   .pdp-price-qty-row {
     display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: space-between;
-    gap: 14px;
-    flex-wrap: wrap;
+    gap: clamp(8px, 2.5vw, 14px);
     margin-top: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
   .pdp-price-block {
     display: flex;
@@ -1212,14 +1288,17 @@ const jsonLd = productFound
     color: var(--c-muted);
   }
   .pdp-price-current {
-    font-size: 22px;
+    font-size: clamp(17px, 4.5vw, 22px);
     font-weight: 800;
     color: var(--c-accent);
+    overflow-wrap: anywhere;
+    line-height: 1.1;
   }
 
   .pdp-qty-wrap {
     flex: 0 0 auto;
-    min-width: 120px;
+    flex-shrink: 0;
+    min-width: 108px;
     max-width: 160px;
     display: inline-flex;
     align-items: center;
@@ -1233,18 +1312,31 @@ const jsonLd = productFound
     align-items: stretch;
     gap: 10px;
     margin-top: 4px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .pdp-buy-actions .btn {
+    min-width: 0;
   }
   .pdp-buy-now {
-    flex: 3;
+    flex: 1 1 0;
     min-width: 0;
-    padding: 14px 18px;
+    max-width: 100%;
+    padding: 14px clamp(8px, 2.5vw, 18px);
     font-size: 12px;
     font-weight: 800;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
+    /* .btn global usa white-space: nowrap — força overflow em colunas estreitas */
+    white-space: normal;
+    line-height: 1.25;
+    text-align: center;
+    hyphens: auto;
   }
   .pdp-atc-icon {
-    flex: 1;
+    flex: 0 0 auto;
+    width: 52px;
     max-width: 56px;
     min-width: 48px;
     padding: 0;
@@ -1378,7 +1470,19 @@ const jsonLd = productFound
     margin-top: 24px;
   }
 
+  .pdp-related {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+  .pdp-related .container {
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .pdp-below-fold {
+    min-width: 0;
+    max-width: 100%;
     padding-bottom: 48px;
   }
 
@@ -1796,10 +1900,16 @@ const jsonLd = productFound
       const btn = rail.children[idx] as HTMLElement | undefined;
       if (!btn) return;
       const isMobile = window.matchMedia('(max-width: 1024px)').matches;
+      const behavior = reducedMotion ? 'auto' : 'smooth';
       if (isMobile) {
-        btn.scrollIntoView({ block: 'nearest', inline: 'start', behavior: reducedMotion ? 'auto' : 'smooth' });
+        /* Não usar scrollIntoView: o browser rola o documento inteiro e “puxa” a vista para a galeria / “Neste drop”. */
+        const maxL = Math.max(0, rail.scrollWidth - rail.clientWidth);
+        const targetL = btn.offsetLeft - (rail.clientWidth - btn.offsetWidth) / 2;
+        rail.scrollTo({ left: Math.max(0, Math.min(targetL, maxL)), top: 0, behavior });
       } else {
-        rail.scrollTo({ top: btn.offsetTop, behavior: reducedMotion ? 'auto' : 'smooth' });
+        const maxT = Math.max(0, rail.scrollHeight - rail.clientHeight);
+        const targetT = btn.offsetTop - (rail.clientHeight - btn.offsetHeight) / 2;
+        rail.scrollTo({ top: Math.max(0, Math.min(targetT, maxT)), left: 0, behavior });
       }
     }
 

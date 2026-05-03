@@ -1,5 +1,10 @@
 node_modules
 **/node_modules
+backend/node_modules
+backend/.medusa
+frontend/node_modules
+frontend/dist
+api/node_modules
 .git
 .github
 .env

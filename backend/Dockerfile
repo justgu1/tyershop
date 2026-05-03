@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 # ─── Dev stage ───────────────────────────────────────────────
 FROM node:22-slim AS dev
 
@@ -8,13 +9,12 @@ RUN npm install -g @medusajs/medusa-cli
 
 # copia lock do serviço e package do serviço
 COPY backend/package.json ./
-# Tentamos copiar o lock se existir, mas usamos npm install para garantir sincronia
 COPY backend/package-lock.json* ./
 
 COPY patches/ ./patches
 
-# instala dependências (usando install em vez de ci para dev)
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund
 
 # copia o código do serviço
 COPY backend/ ./
@@ -31,7 +31,8 @@ COPY backend/package.json backend/package-lock.json* ./
 
 COPY patches/ ./patches
 
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund
 
 COPY backend/ ./
 
@@ -44,7 +45,8 @@ WORKDIR /app
 
 COPY --chown=node:node --from=builder /app/package.json ./
 COPY --chown=node:node --from=builder /app/node_modules ./node_modules
-COPY --chown=node:node --from=builder /app/dist ./dist
+# Medusa 2 (`medusa build`) gera `.medusa/server` + `.medusa/admin`, não `dist`
+COPY --chown=node:node --from=builder /app/.medusa ./.medusa
 COPY --chown=node:node --from=builder /app/medusa-config.js ./
 
 USER node

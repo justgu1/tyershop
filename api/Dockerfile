@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 # ─── Dev stage ───────────────────────────────────────────────
 FROM node:22-slim AS dev
 
@@ -7,8 +8,8 @@ WORKDIR /app
 COPY api/package.json ./
 COPY api/package-lock.json* ./
 
-# instala dependências
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund
 
 # copia o código do serviço
 COPY api/ ./
@@ -23,7 +24,8 @@ WORKDIR /app
 
 COPY api/package.json api/package-lock.json* ./
 
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund
 
 COPY api/ ./
 
