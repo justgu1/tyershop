@@ -99,6 +99,10 @@ jobs:
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
+          if [ -z "${GH_PAT:-}" ]; then
+            echo "::error::Define o secret GH_PAT neste repositório (Settings → Secrets → Actions). Tem de ser um PAT com permissão de escrita em justgu1/infra-swarm (classic: scope repo; fine-grained: Contents write nesse repo). Se a org usa SSO, autoriza o PAT no SSO."
+            exit 1
+          fi
           SHA_TAG="sha-$(echo ${{ github.sha }} | cut -c1-7)"
           git clone https://x-access-token:${GH_PAT}@github.com/justgu1/infra-swarm.git /tmp/infra
           cd /tmp/infra
