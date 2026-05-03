@@ -97,14 +97,16 @@ jobs:
 
       - name: Update image tags in infra repo
         env:
+          INFRA_SWARM_TOKEN: ${{ secrets.INFRA_SWARM_TOKEN }}
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
-          if [ -z "${GH_PAT:-}" ]; then
-            echo "::error::Define o secret GH_PAT neste repositório (Settings → Secrets → Actions). Tem de ser um PAT com permissão de escrita em justgu1/infra-swarm (classic: scope repo; fine-grained: Contents write nesse repo). Se a org usa SSO, autoriza o PAT no SSO."
-            exit 1
+          TOKEN="${INFRA_SWARM_TOKEN:-$GH_PAT}"
+          if [ -z "${TOKEN:-}" ]; then
+            echo "::notice::Sem token para infra — imagens no GHCR ok; justgu1/infra-swarm não foi atualizado. Cria um Fine-grained PAT (Contents: Read and write só em infra-swarm) ou classic com repo, guarda como secret INFRA_SWARM_TOKEN (ou GH_PAT) em Settings → Secrets → Actions."
+            exit 0
           fi
           SHA_TAG="sha-$(echo ${{ github.sha }} | cut -c1-7)"
-          git clone https://x-access-token:${GH_PAT}@github.com/justgu1/infra-swarm.git /tmp/infra
+          git clone https://x-access-token:${TOKEN}@github.com/justgu1/infra-swarm.git /tmp/infra
           cd /tmp/infra
           git config user.email "ci@tyershop.com"
           git config user.name "GitHub Actions"
