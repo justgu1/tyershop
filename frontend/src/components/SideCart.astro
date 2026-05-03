@@ -206,6 +206,13 @@ const lang: Lang = Astro.props.lang ?? 'pt';
   flex: 1;
 }
 .sc :global(.sc-item__variant) { font-size: 11px; line-height: 1.4; color: var(--c-muted); }
+.sc :global(.sc-item__stock) {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #fecaca; background: rgba(127, 29, 29, 0.55);
+  border: 1px solid rgba(248, 113, 113, 0.4); border-radius: 999px;
+  padding: 3px 8px; margin-bottom: 6px;
+}
 .sc :global(.sc-item__footer) {
   display: flex;
   flex-wrap: wrap;
@@ -250,6 +257,8 @@ const lang: Lang = Astro.props.lang ?? 'pt';
   transition: background var(--ease);
 }
 .sc :global(.sc-item__stepper-btn):hover { background: var(--c-accent); color: #fff; }
+.sc :global(.sc-item__stepper-btn:disabled),
+.sc :global(.sc-item__stepper-input:disabled) { opacity: 0.45; cursor: not-allowed; }
 .sc :global(.sc-item__stepper-input) {
   min-width: 36px;
   padding: 0 4px;
@@ -297,6 +306,7 @@ const lang: Lang = Astro.props.lang ?? 'pt';
 .sc__coupon-feedback.is-error { color: #f87171; }
 .sc__coupon-feedback.is-success { color: #4ade80; }
 .sc__checkout { width: 100%; padding: 14px; font-size: 12px; letter-spacing: 0.1em; }
+.sc__warning { margin: 0; font-size: 11px; color: #fca5a5; }
 .sc__view-cart {
   text-align: center; font-size: 12px; color: var(--c-muted);
   text-decoration: underline; text-underline-offset: 3px;
@@ -306,7 +316,7 @@ const lang: Lang = Astro.props.lang ?? 'pt';
 </style>
 
 <script>
-  import { getCart, removeItem, updateQty, setQty, clearCart, getTotal, getAppliedPromoCode, setAppliedPromoCode } from '../lib/cart';
+  import { getCart, removeItem, updateQty, setQty, clearCart, getTotal, getAppliedPromoCode, setAppliedPromoCode, validateCartItems } from '../lib/cart';
   declare global {
     interface Window {
       __closeSideCart?: () => void;
@@ -355,6 +365,16 @@ const lang: Lang = Astro.props.lang ?? 'pt';
   function getCartItems() { return getCart(); }
   function getCartTotal() { return getTotal(); }
   function getItemCount() { return getCartItems().reduce((sum, item) => sum + Number(item.quantity || 0), 0); }
+  function hasOutOfStock(items: ReturnType<typeof getCartItems>) {
+    return items.some((item: any) => item.stockState === 'out_of_stock');
+  }
+  async function syncCartState() {
+    try {
+      await validateCartItems();
+    } catch {
+      // Falha de rede não deve quebrar a navegação.
+    }
+  }
 
   function renderFeedback(message: string, tone: string) {
     const el = document.getElementById('side-cart-coupon-feedback');
@@ -372,7 +392,7 @@ const lang: Lang = Astro.props.lang ?? 'pt';
   }
 
   async function fetchRegionId() {
-    const base = window.__MEDUSA_URL__ || 'http://localhost:9003';
+    const base = '';
     const key = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
     const res = await fetch(`${base}/store/regions?limit=1`, { headers: { 'x-publishable-api-key': key } });
     const data = await res.json();
@@ -380,7 +400,7 @@ const lang: Lang = Astro.props.lang ?? 'pt';
   }
 
   async function syncRemoteCart(items: Array<{ variantId: string; quantity: number }>) {
-    const base = window.__MEDUSA_URL__ || 'http://localhost:9003';
+    const base = '';
     const key = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
     const regionId = await fetchRegionId();
     if (!regionId) throw new Error('Sem regiao');
@@ -516,6 +536,7 @@ const lang: Lang = Astro.props.lang ?? 'pt';
     const saveTagEl = document.getElementById('side-cart-save-tag');
     const countEl = document.getElementById('side-cart-count');
     const clearAllBtn = document.getElementById('side-cart-clear-all');
+    const checkoutBtn = document.getElementById('side-cart-checkout');
     if (!body || !empty || !subtotalEl || !discountEl || !taxesEl || !shippingEl || !totalEl || !saveTagEl || !countEl || !clearAllBtn) return;
     const items = getCartItems();
     if (items.length === 0) {
@@ -541,6 +562,7 @@ const lang: Lang = Astro.props.lang ?? 'pt';
       const thumb = item.thumbnail || '/logo.webp';
       const maxQtyRaw = Number((item as any).maxQuantity ?? 0);
       const maxQty = Number.isFinite(maxQtyRaw) && maxQtyRaw > 0 ? Math.floor(maxQtyRaw) : 9999;
+      const isOutOfStock = (item as any).stockState === 'out_of_stock';
       el.innerHTML = `
         <div class="sc-item__head">
           <span class="sc-item__name">${titleH}</span>
@@ -553,13 +575,14 @@ const lang: Lang = Astro.props.lang ?? 'pt';
             <img class="sc-item__img" src="${thumb}" alt="" width="88" height="88" loading="lazy" decoding="async" />
           </div>
           <div class="sc-item__right">
+            ${isOutOfStock ? '<div class="sc-item__stock">Sem estoque</div>' : ''}
             ${variantH ? `<div class="sc-item__variant">${variantH}</div>` : ''}
             <div class="sc-item__footer">
               <span class="sc-item__price">${fmt((item.price || 0) * (item.quantity || 1))}</span>
               <div class="sc-item__stepper" role="group" aria-label="Quantidade">
-                <button class="sc-item__stepper-btn" data-id="${item.variantId}" data-action="dec" type="button" aria-label="Diminuir">−</button>
-                <input class="sc-item__stepper-input" inputmode="numeric" pattern="[0-9]*" data-id="${item.variantId}" data-action="set" type="number" min="1" max="${maxQty}" value="${item.quantity}" aria-label="Quantidade do item" />
-                <button class="sc-item__stepper-btn" data-id="${item.variantId}" data-action="inc" type="button" aria-label="Aumentar">+</button>
+                <button class="sc-item__stepper-btn" data-id="${item.variantId}" data-action="dec" type="button" aria-label="Diminuir" ${isOutOfStock ? 'disabled' : ''}>−</button>
+                <input class="sc-item__stepper-input" inputmode="numeric" pattern="[0-9]*" data-id="${item.variantId}" data-action="set" type="number" min="1" max="${maxQty}" value="${item.quantity}" aria-label="Quantidade do item" ${isOutOfStock ? 'disabled' : ''} />
+                <button class="sc-item__stepper-btn" data-id="${item.variantId}" data-action="inc" type="button" aria-label="Aumentar" ${isOutOfStock ? 'disabled' : ''}>+</button>
               </div>
             </div>
           </div>
@@ -581,6 +604,13 @@ const lang: Lang = Astro.props.lang ?? 'pt';
     totalEl.textContent = fmt(total);
     saveTagEl.hidden = savePct <= 0;
     saveTagEl.textContent = `${savePct}% OFF`;
+    if (checkoutBtn instanceof HTMLButtonElement) {
+      checkoutBtn.disabled = items.length === 0 || hasOutOfStock(items);
+    }
+    renderFeedback(
+      hasOutOfStock(items) ? 'Remova itens sem estoque para finalizar a compra.' : '',
+      hasOutOfStock(items) ? 'error' : ''
+    );
   }
 
   // Item interaction
@@ -677,8 +707,13 @@ const lang: Lang = Astro.props.lang ?? 'pt';
 
   // Checkout
   document.getElementById('side-cart-checkout')?.addEventListener('click', async () => {
+    await syncCartState();
     const items = getCartItems();
     if (!items.length) return;
+    if (hasOutOfStock(items)) {
+      renderFeedback('Remova itens sem estoque para finalizar a compra.', 'error');
+      return;
+    }
     const btn = document.getElementById('side-cart-checkout');
     if (!(btn instanceof HTMLButtonElement)) return;
     btn.disabled = true;
@@ -702,6 +737,7 @@ const lang: Lang = Astro.props.lang ?? 'pt';
 
   // Primeiro render; em seguida recria o carrinho Medusa e re-aplica o cupom salvo (F5)
   // Alterações no carrinho re-sincronizam o desconto após debounce
+  await syncCartState();
   renderCart();
   void rehydrateAppliedCoupon();
   window.addEventListener('cart:update', () => {

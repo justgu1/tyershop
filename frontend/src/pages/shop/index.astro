@@ -445,14 +445,6 @@ const infiniteStartOffset = 32;
 .shop-block__empty { color: var(--c-muted); font-size: 14px; }
 .shop-block--infinite { margin-bottom: 24px; }
 
-.shop-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 20px;
-  align-items: start;
-}
-.shop-grid > :global(*) { min-width: 0; }
-
 .shop-sentinel { height: 1px; }
 
 .shop-loading {
@@ -735,6 +727,112 @@ const infiniteStartOffset = 32;
       return Math.max(0, Math.floor(qty));
     }
 
+    function toImageUrlList(input) {
+      if (!Array.isArray(input)) return [];
+      return input
+        .map(function (entry) {
+          if (typeof entry === "string") return entry.trim();
+          if (entry && typeof entry.url === "string") return entry.url.trim();
+          if (entry && typeof entry.src === "string") return entry.src.trim();
+          return "";
+        })
+        .filter(Boolean);
+    }
+
+    function imageBelongsToVariant(image, variantId) {
+      if (!image || !variantId) return false;
+      var id = String(variantId);
+      if (image.variant_id && String(image.variant_id) === id) return true;
+      var vids = image.variant_ids;
+      if (Array.isArray(vids) && vids.some(function (x) { return String(x) === id; })) return true;
+      var vars = image.variants;
+      if (Array.isArray(vars)) {
+        return vars.some(function (v) { return String(v && v.id != null ? v.id : v) === id; });
+      }
+      return false;
+    }
+
+    function collectProductImageUrlsForVariant(p, variantId) {
+      var list = p && p.images;
+      if (!Array.isArray(list) || !variantId) return [];
+      var out = [];
+      for (var i = 0; i < list.length; i++) {
+        var img = list[i];
+        if (!imageBelongsToVariant(img, variantId)) continue;
+        var u = img && typeof img.url === "string" ? img.url.trim() : "";
+        if (u) out.push(u);
+      }
+      return out;
+    }
+
+    function pushDistinctOrder(order, u) {
+      u = String(u || "").trim();
+      if (!u || order.indexOf(u) >= 0) return;
+      order.push(u);
+    }
+
+    function getMetadataUrlsList(variant) {
+      var md = (variant && variant.metadata) || {};
+      var candidates = [md.variant_gallery, md.gallery, md.images, md.image_gallery, md.variant_images];
+      for (var c = 0; c < candidates.length; c++) {
+        var urls = toImageUrlList(candidates[c]);
+        if (urls.length) return urls;
+      }
+      return [];
+    }
+
+    function buildVariantImageOrder(variant, p) {
+      var order = [];
+      var m, u, j, k, a;
+      var meta = getMetadataUrlsList(variant);
+      for (m = 0; m < meta.length; m++) pushDistinctOrder(order, meta[m]);
+      if (variant) {
+        pushDistinctOrder(order, variant.thumbnail);
+        if (Array.isArray(variant.images)) {
+          for (j = 0; j < variant.images.length; j++) {
+            a = variant.images[j];
+            u = typeof a === "string" ? a.trim() : String((a && a.url) || "").trim();
+            pushDistinctOrder(order, u);
+          }
+        }
+      }
+      var forVar = collectProductImageUrlsForVariant(p, String((variant && variant.id) || ""));
+      for (k = 0; k < forVar.length; k++) pushDistinctOrder(order, forVar[k]);
+      if (p && p.thumbnail) pushDistinctOrder(order, p.thumbnail);
+      if (p && Array.isArray(p.images)) {
+        for (j = 0; j < p.images.length; j++) {
+          u = p.images[j] && p.images[j].url;
+          pushDistinctOrder(order, u);
+        }
+      }
+      return order;
+    }
+
+    function productGallerySlice(p) {
+      return buildVariantImageOrder(null, p).slice(0, 2);
+    }
+
+    /** [principal, secundária distinta] — alinhado a product-variant-gallery.ts */
+    function getVariantGalleryUrlsForProduct(variant, p) {
+      if (!variant) {
+        var s = productGallerySlice(p);
+        var p0 = s[0] || "/logo.webp";
+        var p1 = s[1] && s[1] !== p0 ? s[1] : "";
+        return [p0, p1];
+      }
+      var order = buildVariantImageOrder(variant, p);
+      var primary = order[0] || "/logo.webp";
+      for (var i = 1; i < order.length; i++) {
+        if (order[i] !== primary) return [primary, order[i]];
+      }
+      return [primary, ""];
+    }
+
+    function getVariantImageArrayForJson(variant, p) {
+      var pr = getVariantGalleryUrlsForProduct(variant, p);
+      return pr[1] ? [pr[0], pr[1]] : [pr[0]];
+    }
+
     function buildCard(p) {
       var variants = Array.isArray(p.variants) ? p.variants : [];
       var hasPositiveQtySignal = variants.some(function (variant) {
@@ -765,8 +863,6 @@ const infiniteStartOffset = 32;
       var stockSignalsAreReliable = hasPositiveQtySignal || hasBooleanStockSignal || hasStatusSignal;
       var v = variants.find(function (variant) { return !isVariantSoldOut(variant, stockSignalsAreReliable); }) || variants[0];
       var pr = priceFromVariant(v);
-      var thumb = p.thumbnail || "/logo.webp";
-      var hover = (p.images && p.images[1] && p.images[1].url) || "";
       var title = p.title || "";
       var handle = p.handle || "";
       var sold = variants.length
@@ -789,8 +885,12 @@ const infiniteStartOffset = 32;
           soldOut: isVariantSoldOut(variant, stockSignalsAreReliable),
           maxQty: getVariantMaxQty(variant),
           options: optionMapFromVariant(variant),
+          images: getVariantImageArrayForJson(variant, p),
         };
       });
+      var pair = getVariantGalleryUrlsForProduct(v, p);
+      var thumb = pair[0] || "/logo.webp";
+      var hover = pair[1] || "";
       var selectedDefault = optionMapFromVariant(v);
       var options = Array.isArray(p.options) ? p.options : [];
       var optionRows = options.map(function (opt) {
@@ -870,11 +970,12 @@ const infiniteStartOffset = 32;
       var tagBlock = "";
       if (priorityTags.length) tagBlock += '<div class="pc__tags pc__tags--priority">' + priorityTags.join("") + "</div>";
       if (categoryTags.length) tagBlock += '<div class="pc__tags pc__tags--category">' + categoryTags.join("") + "</div>";
-      var secondaryImg = hover
-        ? '<img src="' +
-          escapeHtml(hover) +
-          '" alt="" class="pc__img pc__img--secondary" width="480" height="480" loading="lazy" decoding="async" aria-hidden="true" />'
-        : "";
+      var secondaryImg =
+        '<img src="' +
+        escapeHtml(hover || thumb) +
+        '" alt="" class="pc__img pc__img--secondary" data-has-secondary="' +
+        (hover ? "true" : "false") +
+        '" width="480" height="480" loading="lazy" decoding="async" aria-hidden="true" />';
 
       return (
         '<article class="pc" role="listitem" data-variants="' +
@@ -891,7 +992,7 @@ const infiniteStartOffset = 32;
         '" alt="' +
         escapeHtml(title) +
         '" class="pc__img' +
-        (hover ? " pc__img--primary" : "") +
+        ' pc__img--primary' +
         '" width="480" height="480" loading="lazy" decoding="async" />' +
         secondaryImg +
         tagBlock +

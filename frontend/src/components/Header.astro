@@ -1,10 +1,19 @@
 ---
 import { t, getPathForLang, type Lang } from "../i18n/utils";
 
+interface NavDrop {
+  handle: string;
+  name: string;
+  num: string;
+  img: string;
+}
+
 interface Props {
   lang?: Lang;
+  drops: NavDrop[];
 }
 const lang: Lang = Astro.props.lang ?? "pt";
+const drops: NavDrop[] = Array.isArray(Astro.props.drops) ? Astro.props.drops : [];
 
 const url =
   import.meta.env.MEDUSA_INTERNAL_URL ||
@@ -13,26 +22,6 @@ const url =
 const medusaBase = (
   import.meta.env.PUBLIC_MEDUSA_URL || url
 ).replace(/\/$/, "");
-const pk =
-  "pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975";
-const headers = { "x-publishable-api-key": pk };
-
-let drops: any[] = [];
-try {
-  const res = await fetch(`${url}/store/collections?limit=50`, {
-    headers,
-    signal: AbortSignal.timeout(3000),
-  });
-  if (res.ok) {
-    const data = await res.json();
-    drops = (data.collections || []).map((c: any, i: number) => ({
-      handle: c.handle,
-      name: c.title,
-      num: String(i + 1).padStart(2, "0"),
-      img: `/collections/${c.handle}.webp`,
-    }));
-  }
-} catch {}
 const resetSentHint = t(lang, "account", "reset_sent_hint");
 ---
 
@@ -49,80 +38,80 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
 
     <!-- Nav -->
     <nav class="hdr__nav" aria-label="Main navigation">
-      <!-- Collections with megamenu -->
-      <div class="hdr__nav-item hdr__nav-item--mega" id="nav-collections-wrap">
-        <a
-          href={getPathForLang("/#collection", lang)}
-          class="hdr__nav-link"
-          aria-haspopup="true"
-          aria-expanded="false"
-          id="nav-collections-btn"
-        >
-          {t(lang, "nav", "collections")}
-          <svg
-            class="hdr__nav-chevron"
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg
+      {drops.length > 0 && (
+        <div class="hdr__nav-item hdr__nav-item--mega" id="nav-collections-wrap">
+          <a
+            href={getPathForLang("/#collection", lang)}
+            class="hdr__nav-link"
+            aria-haspopup="true"
+            aria-expanded="false"
+            id="nav-collections-btn"
           >
-        </a>
-        <!-- Megamenu -->
-        <div
-          class="mega"
-          id="mega-collections"
-          role="region"
-          aria-label="Collections"
-          aria-hidden="true"
-        >
-          <div class="mega__inner container">
-            <ul class="mega__list" role="list">
-              {
-                drops.map((drop, i) => (
-                  <li>
-                    <a
-                      href={getPathForLang(`/collections/${drop.handle}`, lang)}
-                      class={`mega__item${i === 0 ? " is-preloaded" : ""}`}
-                      data-img={drop.img}
-                      data-num={drop.num}
-                    >
-                      <span class="mega__item-num">{drop.num}</span>
-                      <span class="mega__item-name">{drop.name}</span>
-                      <svg
-                        class="mega__item-arrow"
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        aria-hidden="true"
+            {t(lang, "nav", "collections")}
+            <svg
+              class="hdr__nav-chevron"
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg
+            >
+          </a>
+          <div
+            class="mega"
+            id="mega-collections"
+            role="region"
+            aria-label="Collections"
+            aria-hidden="true"
+          >
+            <div class="mega__inner container">
+              <ul class="mega__list" role="list">
+                {
+                  drops.map((drop, i) => (
+                    <li>
+                      <a
+                        href={getPathForLang(`/collections/${drop.handle}`, lang)}
+                        class={`mega__item${i === 0 ? " is-preloaded" : ""}`}
+                        data-img={drop.img}
+                        data-num={drop.num}
                       >
-                        <path d="m9 18 6-6-6-6" />
-                      </svg>
-                    </a>
-                  </li>
-                ))
-              }
-            </ul>
-            <div class="mega__preview">
-              <img
-                src={drops[0]?.img || "/logo.webp"}
-                alt={drops[0]?.name || "Preview"}
-                id="mega-preview-img"
-                class="mega__preview-img"
-                width="320"
-                height="420"
-                loading="eager"
-                decoding="async"
-              />
+                        <span class="mega__item-num">{drop.num}</span>
+                        <span class="mega__item-name">{drop.name}</span>
+                        <svg
+                          class="mega__item-arrow"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          aria-hidden="true"
+                        >
+                          <path d="m9 18 6-6-6-6" />
+                        </svg>
+                      </a>
+                    </li>
+                  ))
+                }
+              </ul>
+              <div class="mega__preview">
+                <img
+                  src={drops[0]?.img || "/logo.webp"}
+                  alt={drops[0]?.name || "Preview"}
+                  id="mega-preview-img"
+                  class="mega__preview-img"
+                  width="320"
+                  height="420"
+                  loading="eager"
+                  decoding="async"
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       <a href={getPathForLang("/shop", lang)} class="hdr__nav-link"
         >{t(lang, "nav", "shop")}</a
@@ -213,8 +202,12 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
           aria-label={t(lang, "account", "my_account")}
           aria-hidden="true"
         >
+          <button type="button" class="hdr__account-close" id="hdr-account-close" aria-label={t(lang, "nav", "close_menu")}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+          </button>
           <div id="hdr-auth-logged" class="hdr-auth-logged" hidden>
-            <p class="hdr-auth-logged__name" id="hdr-profile-name"></p>
+            <p class="hdr-auth-greeting" id="hdr-auth-greeting" hidden></p>
+            <p class="hdr-auth-logged__name hdr-auth-logged__name--desktop" id="hdr-profile-name"></p>
             <a
               class="btn btn-outline hdr-auth-logged__btn"
               href={getPathForLang("/account", lang)}>{t(lang, "account", "my_account")}</a
@@ -431,12 +424,17 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
     </button>
   </div>
   <ul class="mob-menu__list">
+    {drops.length > 0 && (
+      <li>
+        <a
+          href={getPathForLang("/#collection", lang)}
+          class="mob-menu__link">{t(lang, "nav", "collections")}</a>
+      </li>
+    )}
     <li>
-      <a
-        href={getPathForLang("/collections/tyer-in-paris", lang)}
-        class="mob-menu__link">{t(lang, "nav", "collections")}</a>
+      <a href={getPathForLang("/#editorial", lang)} class="mob-menu__link">{t(lang, "nav", "editorial")}</a>
     </li>
-    {
+    {drops.length > 0 &&
       drops.map((d) => (
         <li>
           <a
@@ -454,8 +452,16 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
         >{t(lang, "nav", "shop")}</a>
     </li>
     <li>
-      <button type="button" class="mob-menu__link mob-menu__link--btn" id="mob-menu-account"
-        >{t(lang, "nav", "account")}</button>
+      <a href={getPathForLang("/faq", lang)} class="mob-menu__link">FAQ</a>
+    </li>
+    <li>
+      <a href={getPathForLang("/terms", lang)} class="mob-menu__link">Termos</a>
+    </li>
+    <li>
+      <a href={getPathForLang("/privacy", lang)} class="mob-menu__link">Privacidade</a>
+    </li>
+    <li>
+      <a href={getPathForLang("/returns", lang)} class="mob-menu__link">Trocas e devoluções</a>
     </li>
   </ul>
 </nav>
@@ -475,6 +481,7 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
       background 0.35s ease,
       border-color 0.35s ease;
     border-bottom: 1px solid transparent;
+    overflow-x: clip;
   }
   .hdr.is-scrolled {
     background: rgba(8, 8, 8, 0.94);
@@ -493,6 +500,8 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
     display: flex;
     align-items: center;
     gap: 32px;
+    width: 100%;
+    min-width: 0;
   }
   .hdr__logo {
     display: flex;
@@ -584,7 +593,7 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
     display: grid;
     grid-template-columns: 1fr 320px;
     gap: 48px;
-    align-items: center;
+    align-items: start;
     padding-block: 8px;
   }
 
@@ -665,6 +674,7 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
     align-items: center;
     gap: 4px;
     margin-left: auto;
+    flex-shrink: 0;
   }
   .hdr__icon-btn {
     position: relative;
@@ -740,6 +750,7 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
       transform 0.2s ease,
       visibility 0.2s;
   }
+  .hdr__account-close { display: none; }
   .hdr__account-wrap.is-open .hdr__account-panel {
     opacity: 1;
     visibility: visible;
@@ -829,6 +840,14 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
     display: flex;
     flex-direction: column;
     gap: 12px;
+  }
+  .hdr-auth-greeting {
+    display: none;
+    margin: 0 0 8px 0;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--c-text);
   }
   .hdr-auth-logged__name {
     font-size: 15px;
@@ -1119,6 +1138,17 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
   }
 
   @media (max-width: 900px) {
+    .hdr__inner {
+      gap: 10px;
+      padding-right: 8px;
+    }
+    .hdr__logo img {
+      height: 30px;
+    }
+    .hdr__icon-btn {
+      width: 36px;
+      height: 36px;
+    }
     .hdr__nav {
       display: none;
     }
@@ -1127,6 +1157,74 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
     }
     .hdr__burger {
       display: flex;
+      width: 36px;
+      height: 36px;
+      padding: 10px 8px;
+    }
+    /* `top`+`bottom` com antepassado filtrado (ex. backdrop no .hdr) faz o painel medir
+       só a altura do header. Altura em dvh liga à viewport, não ao bloco de contenção. */
+    .hdr__account-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      left: 0;
+      bottom: auto;
+      width: 100%;
+      min-width: 100%;
+      min-height: 100vh;
+      min-height: 100dvh;
+      max-width: none;
+      max-height: none;
+      height: auto;
+      border-radius: 0;
+      border-left: 0;
+      border-right: 0;
+      border-bottom: 0;
+      transform: translateX(100%);
+      opacity: 1;
+      visibility: visible;
+      pointer-events: none;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 64px 20px 24px;
+      z-index: 620;
+      transition: transform 0.3s ease;
+    }
+    .hdr__account-wrap.is-open .hdr__account-panel {
+      transform: translateX(0);
+      pointer-events: all;
+    }
+    .hdr__account-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 36px;
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--r);
+      border: 1px solid var(--c-border);
+      color: var(--c-muted);
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .hdr__account-name {
+      display: none !important;
+    }
+    #hdr-auth-logged:not([hidden]) .hdr-auth-greeting:not([hidden]) {
+      display: block;
+    }
+    .hdr-auth-logged__name--desktop {
+      display: none !important;
+    }
+  }
+
+  @media (min-width: 901px) {
+    .hdr-auth-greeting {
+      display: none !important;
+    }
+    .hdr-auth-logged__name--desktop {
+      display: block !important;
     }
   }
 </style>
@@ -1169,6 +1267,7 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
   const hdrAuthLogged = document.getElementById("hdr-auth-logged");
   const hdrAuthForms = document.getElementById("hdr-auth-forms");
   const hdrProfileName = document.getElementById("hdr-profile-name");
+  const hdrAuthGreeting = document.getElementById("hdr-auth-greeting");
   const hdrAccountName = document.getElementById("hdr-account-name");
   const hdrLoginForm = document.getElementById("hdr-login-form");
   const hdrRegForm = document.getElementById("hdr-register-form");
@@ -1183,10 +1282,8 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
     "x-publishable-api-key": publicKey,
   };
   const tResetSent = resetSentHint;
-  const storeApiBase = (
-    (window.__MEDUSA_URL__ && String(window.__MEDUSA_URL__)) ||
-    String(medusaBase || "http://localhost:9003")
-  ).replace(/\/$/, "");
+  // Mesma origem: proxy Vite (astro.config) encaminha /store e /auth ao Medusa — evita CORS no browser.
+  const storeApiBase = "";
   async function readJsonSafe(res) {
     const ct = res.headers.get("content-type") || "";
     if (ct.includes("application/json")) {
@@ -1200,9 +1297,19 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
     }
   }
 
+  function firstNameFromFullName(name) {
+    const t = String(name || "").trim();
+    if (!t) return "";
+    return t.split(/\s+/)[0] || "";
+  }
+
   function showAccountGuest() {
     if (hdrAuthLogged) hdrAuthLogged.hidden = true;
     if (hdrAuthForms) hdrAuthForms.hidden = false;
+    if (hdrAuthGreeting) {
+      hdrAuthGreeting.hidden = true;
+      hdrAuthGreeting.textContent = "";
+    }
     if (hdrAccountName) {
       hdrAccountName.hidden = true;
       hdrAccountName.textContent = "";
@@ -1211,6 +1318,11 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
 
   function showAccountLogged(name) {
     if (hdrProfileName) hdrProfileName.textContent = name;
+    const first = firstNameFromFullName(name);
+    if (hdrAuthGreeting) {
+      hdrAuthGreeting.textContent = first ? `Olá, ${first}` : "Olá";
+      hdrAuthGreeting.hidden = false;
+    }
     if (hdrAuthLogged) hdrAuthLogged.hidden = false;
     if (hdrAuthForms) hdrAuthForms.hidden = true;
     if (hdrAccountName) {
@@ -1272,6 +1384,9 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
     if (!hdrPanel || !hdrBtn) return;
     hdrPanel.setAttribute("aria-hidden", isOpen ? "false" : "true");
     hdrBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    if (window.matchMedia("(max-width: 900px)").matches) {
+      document.body.style.overflow = isOpen ? "hidden" : "";
+    }
   }
   if (hdrWrap) {
     hdrWrap.addEventListener("mouseenter", () => {
@@ -1305,10 +1420,10 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
       setAccountPanelOpen(open);
     });
   }
-  document.getElementById("mob-menu-account")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    closeMob();
-    openAccountPanel();
+  document.getElementById("hdr-account-close")?.addEventListener("click", () => {
+    hdrWrap?.classList.remove("is-open");
+    setAccountPanelOpen(false);
+    document.body.style.overflow = "";
   });
   document.addEventListener("click", (e) => {
     if (!hdrWrap || !e.target) return;
@@ -1491,7 +1606,6 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
 
   const RECENT_KEY = "tyer_searches";
   const VISITED_KEY = "tyer_visited";
-  const medusaUrl = window.__MEDUSA_URL__ || "http://localhost:9003";
   let discoverCache = null;
   function escapeHtml(value) {
     return String(value || "")
@@ -1691,9 +1805,16 @@ const resetSentHint = t(lang, "account", "reset_sent_hint");
     mobMenu?.setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
   }
-  burger?.addEventListener("click", openMob);
+  burger?.addEventListener("click", () => {
+    const isOpen = mobMenu?.classList.contains("is-open");
+    if (isOpen) closeMob();
+    else openMob();
+  });
   document.getElementById("menu-close")?.addEventListener("click", closeMob);
   mobBackdrop?.addEventListener("click", closeMob);
+  mobMenu?.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => closeMob());
+  });
 
   // ── Escape key ──
   document.addEventListener("keydown", (e) => {

@@ -1,6 +1,7 @@
 ---
 import { t, getPathForLang, type Lang } from '../i18n/utils';
-import { getVariantPriceInfo } from '../lib/medusa-pricing';
+import { getVariantGalleryUrls } from '../lib/product-variant-gallery';
+import { getProductVariantData, getVariantMaxQty, isVariantSoldOut } from '../lib/product-variants';
 
 interface Props {
   product: any;
@@ -14,171 +15,53 @@ interface Props {
 
 const { product, lang = 'pt', role, badges } = Astro.props;
 
-function isVariantSoldOut(v: any, enforceQtyWhenPresent = false): boolean {
-  if (!v) return true;
-  const nestedStockQty = (v.inventory_items ?? []).reduce((sum: number, item: any) => {
-    const levels = item?.inventory?.location_levels ?? [];
-    const levelSum = levels.reduce((inner: number, level: any) => {
-      const raw = Number(level?.stocked_quantity);
-      return Number.isFinite(raw) ? inner + raw : inner;
-    }, 0);
-    return sum + levelSum;
-  }, 0);
-  const qtyRaw =
-    nestedStockQty > 0 || nestedStockQty === 0
-      ? nestedStockQty
-      : v.inventory_quantity ?? v.calculated_inventory_quantity ?? v.stocked_quantity;
-  const qty = Number(qtyRaw);
-  const hasQty = Number.isFinite(qty);
-  const allowBackorder = v.allow_backorder === true;
-  const status = String(v.inventory_status ?? v.availability_status ?? '').toLowerCase();
+const {
+  stockReliable: stockSignalsAreReliable,
+  normalizedVariants: normalizedVariantsRaw,
+  optionRows,
+  defaultVariant,
+  defaultVariantTitle,
+} = getProductVariantData(product);
 
-  if (status.includes('out') || status.includes('sold')) return true;
-  if (status.includes('in_stock') || status.includes('available')) return false;
-  if (v.available_for_sale === true || v.in_stock === true) return false;
-  if (v.available_for_sale === false || v.in_stock === false) return true;
-
-  // Regra forte: quantidade explícita tem prioridade.
-  if (hasQty && qty > 0) return false;
-  if (enforceQtyWhenPresent && hasQty && qty <= 0 && !allowBackorder) return true;
-  if (hasQty && qty <= 0 && allowBackorder) return false;
-  // qty <= 0 sem status explícito não bloqueia: payload da Store API pode vir zerado mesmo com estoque.
-  return false;
-}
-
-function getVariantMaxQty(v: any): number | null {
-  if (!v) return null;
-  if (v.allow_backorder === true) return null;
-  const nestedStockQty = (v.inventory_items ?? []).reduce((sum: number, item: any) => {
-    const levels = item?.inventory?.location_levels ?? [];
-    const levelSum = levels.reduce((inner: number, level: any) => {
-      const raw = Number(level?.stocked_quantity);
-      return Number.isFinite(raw) ? inner + raw : inner;
-    }, 0);
-    return sum + levelSum;
-  }, 0);
-  const qtyRaw =
-    nestedStockQty > 0 || nestedStockQty === 0
-      ? nestedStockQty
-      : v.inventory_quantity ?? v.calculated_inventory_quantity ?? v.stocked_quantity;
-  const qty = Number(qtyRaw);
-  if (!Number.isFinite(qty)) return null;
-  return Math.max(0, Math.floor(qty));
-}
+/** Card: `images` (2) + preços formatados para atualizar o DOM ao trocar variação. */
+const normalizedVariants = normalizedVariantsRaw.map(
+  ({ images, id, title, price, soldOut, maxQty, options, optionTitles, priceDisplay, originalDisplay, discountPercent }) => ({
+    id,
+    title,
+    price,
+    soldOut,
+    maxQty,
+    options,
+    optionTitles,
+    images,
+    priceDisplay,
+    originalDisplay,
+    discountPercent,
+  })
+);
 
 const variants = product.variants ?? [];
-const hasPositiveQtySignal = variants.some((v: any) => {
-  const nested = (v?.inventory_items ?? []).reduce((sum: number, item: any) => {
-    const levels = item?.inventory?.location_levels ?? [];
-    return sum + levels.reduce((inner: number, level: any) => {
-      const n = Number(level?.stocked_quantity);
-      return Number.isFinite(n) ? inner + n : inner;
-    }, 0);
-  }, 0);
-  if (nested > 0) return true;
-  const n = Number(v?.inventory_quantity ?? v?.calculated_inventory_quantity ?? v?.stocked_quantity);
-  return Number.isFinite(n) && n > 0;
-});
-const hasBooleanStockSignal = variants.some(
-  (v: any) => v?.available_for_sale === true || v?.available_for_sale === false || v?.in_stock === true || v?.in_stock === false
-);
-const hasStatusSignal = variants.some((v: any) => {
-  const status = String(v?.inventory_status ?? v?.availability_status ?? '').toLowerCase();
-  return status.includes('out') || status.includes('sold') || status.includes('in_stock') || status.includes('available');
-});
-const stockSignalsAreReliable = hasPositiveQtySignal || hasBooleanStockSignal || hasStatusSignal;
-
-const defaultVariant = variants.find((v: any) => !isVariantSoldOut(v, stockSignalsAreReliable)) ?? variants[0];
-const priceInfo = getVariantPriceInfo(defaultVariant);
-const priceVal = priceInfo?.display ?? null;
+const priceInfo =
+  normalizedVariantsRaw.find((n) => n.id === defaultVariant?.id) ?? normalizedVariantsRaw[0];
+const priceVal = priceInfo?.priceDisplay ?? null;
 const originalPriceVal = priceInfo?.originalDisplay ?? null;
-const priceCents = priceInfo?.amountCents;
+const priceCents = priceInfo?.price ?? 0;
 const isSoldOut = variants.length > 0
   ? variants.every((v: any) => isVariantSoldOut(v, stockSignalsAreReliable))
   : isVariantSoldOut(defaultVariant, stockSignalsAreReliable);
-const originalCents = Number(priceInfo?.originalAmountCents ?? 0);
-const calculatedCents = Number(priceInfo?.amountCents ?? 0);
-const discountPercent =
-  originalCents > 0 && calculatedCents > 0 && originalCents > calculatedCents
-    ? Math.round(((originalCents - calculatedCents) / originalCents) * 100)
-    : 0;
+const discountPercent = priceInfo?.discountPercent ?? 0;
 const exclusiveMeta = String(product.metadata?.exclusive ?? product.metadata?.is_exclusive ?? '').toLowerCase();
 const isExclusive =
   exclusiveMeta === 'true' || exclusiveMeta === '1' || exclusiveMeta === 'yes' || exclusiveMeta === 'sim';
 const hasPopularBadge = !!badges?.isPopular;
 const hasNewBadge = !!badges?.isNew;
 const handle = product.handle ?? '';
-const thumb = product.thumbnail ?? product.images?.[0]?.url ?? '/logo.webp';
-const hoverThumb = product.images?.[1]?.url ?? '';
 
-const normalizedVariants = variants.map((v: any) => {
-  const mapped: Record<string, string> = {};
-  const titles: Record<string, string> = {};
-  (v.options ?? []).forEach((opt: any) => {
-    const key = String(opt.option_id ?? opt.id ?? '').trim();
-    if (key) {
-      mapped[key] = String(opt.value ?? '').trim();
-      titles[key] = String(opt.option?.title ?? opt.option_title ?? '').trim();
-    }
-  });
-  return {
-    id: v.id,
-    title: v.title ?? '',
-    price: getVariantPriceInfo(v)?.amountCents ?? 0,
-    soldOut: isVariantSoldOut(v, stockSignalsAreReliable),
-    maxQty: getVariantMaxQty(v),
-    options: mapped,
-    optionTitles: titles,
-  };
-});
-
-const optionRowsFromProduct = (product.options ?? [])
-  .map((opt: any) => {
-    const id = String(opt.id ?? '').trim();
-    if (!id) return null;
-    const values = Array.from(
-      new Set(
-        normalizedVariants
-          .map((variant: any) => String(variant.options?.[id] ?? '').trim())
-          .filter((value: string) => value.length > 0)
-      )
-    );
-    return { id, title: String(opt.title ?? '').trim(), values };
-  })
-  .filter(Boolean);
-
-const fallbackOptionMap = new Map<string, { id: string; title: string; values: string[] }>();
-normalizedVariants.forEach((variant: any) => {
-  Object.entries(variant.options ?? {}).forEach(([id, rawValue]) => {
-    const value = String(rawValue ?? '').trim();
-    if (!value) return;
-    const existing = fallbackOptionMap.get(id);
-    const optionTitle = String(variant.optionTitles?.[id] ?? id).trim();
-    if (!existing) {
-      fallbackOptionMap.set(id, { id, title: optionTitle, values: [value] });
-      return;
-    }
-    if (!existing.values.includes(value)) existing.values.push(value);
-  });
-});
-
-const optionRowsRaw = optionRowsFromProduct.length
-  ? (optionRowsFromProduct as Array<{ id: string; title: string; values: string[] }>)
-  : Array.from(fallbackOptionMap.values());
-const optionRows = optionRowsRaw.filter((row) => row.title.trim().toLowerCase() !== 'title');
+const [thumb, hoverThumb] = getVariantGalleryUrls(defaultVariant, product);
 
 const selectedDefaultByOption = Object.fromEntries(
   (defaultVariant?.options ?? []).map((opt: any) => [String(opt.option_id ?? opt.id ?? ''), String(opt.value ?? '')])
 );
-const defaultVariantTitle =
-  optionRows
-    .map((row) => {
-      const val = String(selectedDefaultByOption[row.id] ?? '').trim();
-      if (!val) return '';
-      return `${row.title}: ${val}`;
-    })
-    .filter((s) => s.length > 0)
-    .join(' | ') || defaultVariant?.title || '';
 ---
 
 <article
@@ -192,21 +75,20 @@ const defaultVariantTitle =
       <img
         src={thumb}
         alt={product.title ?? ''}
-        class={`pc__img${hoverThumb ? ' pc__img--primary' : ''}`}
+        class="pc__img pc__img--primary"
         width="480" height="480"
         loading="lazy" decoding="async"
       />
-      {hoverThumb && (
-        <img
-          src={hoverThumb}
-          alt=""
-          class="pc__img pc__img--secondary"
-          width="480" height="480"
-          loading="lazy"
-          decoding="async"
-          aria-hidden="true"
-        />
-      )}
+      <img
+        src={hoverThumb || thumb}
+        alt=""
+        class="pc__img pc__img--secondary"
+        data-has-secondary={hoverThumb ? 'true' : 'false'}
+        width="480" height="480"
+        loading="lazy"
+        decoding="async"
+        aria-hidden="true"
+      />
       <div class="pc__tags pc__tags--priority">
         {isSoldOut ? (
           <span class="pc__tag pc__tag--soldout">
@@ -214,7 +96,9 @@ const defaultVariantTitle =
             Sem estoque
           </span>
         ) : (
-          discountPercent > 0 && <span class="pc__tag pc__tag--discount">{discountPercent}% off</span>
+          <span class="pc__tag pc__tag--discount" style={discountPercent > 0 ? undefined : 'display:none'}>
+            {discountPercent > 0 ? `${discountPercent}% off` : ''}
+          </span>
         )}
       </div>
       <div class="pc__tags pc__tags--category">
@@ -264,7 +148,7 @@ const defaultVariantTitle =
     )}
     <div class="pc__bottom">
       <div class={`pc__price-box${discountPercent > 0 ? ' pc__price-box--discount' : ''}`}>
-        {originalPriceVal && <span class="pc__price-striked">{originalPriceVal}</span>}
+        <span class="pc__price-striked" hidden={!originalPriceVal}>{originalPriceVal ?? ''}</span>
         {priceVal && <span class="pc__price-current">{priceVal}</span>}
       </div>
       
@@ -390,7 +274,18 @@ const defaultVariantTitle =
 <script>
   if (document.documentElement.dataset.pcInitDone !== 'true') {
     document.documentElement.dataset.pcInitDone = 'true';
-    type VariantMap = { id: string; title: string; price: number; soldOut: boolean; maxQty?: number | null; options: Record<string, string> };
+    type VariantMap = {
+      id: string;
+      title: string;
+      price: number;
+      soldOut: boolean;
+      maxQty?: number | null;
+      options: Record<string, string>;
+      images?: string[];
+      priceDisplay?: string;
+      originalDisplay?: string | null;
+      discountPercent?: number;
+    };
     type OptionRow = { id: string; title: string; values: string[] };
     type SelectedMap = Record<string, string>;
 
@@ -426,6 +321,10 @@ const defaultVariantTitle =
     const bindHoverReady = (img: HTMLImageElement) => {
       const parent = img.closest('.pc__img-wrap');
       if (!(parent instanceof HTMLElement)) return;
+      if (img.dataset.hasSecondary !== 'true') {
+        parent.classList.remove('is-hover-ready');
+        return;
+      }
       if (img.complete && img.naturalWidth > 0) {
         parent.classList.add('is-hover-ready');
       } else {
@@ -461,6 +360,18 @@ const defaultVariantTitle =
       const variants = decodeJson<VariantMap[]>(card.dataset.variants || '') || [];
       const optionRows = decodeJson<OptionRow[]>(card.dataset.optionRows || '') || [];
       if (!Array.isArray(variants) || !Array.isArray(optionRows) || !optionRows.length) return;
+      const primaryImage = card.querySelector('.pc__img--primary');
+      const secondaryImage = card.querySelector('.pc__img--secondary');
+      const imgWrap = card.querySelector('.pc__img-wrap');
+      const priceCurrent = card.querySelector('.pc__price-current');
+      const priceStriked = card.querySelector('.pc__price-striked');
+      const priceBox = card.querySelector('.pc__price-box');
+      const discountTag = card.querySelector('.pc__tag--discount');
+      const fallbackGallery = [quickBtn.dataset.thumbnail || '/logo.webp'].filter(Boolean);
+      if (secondaryImage instanceof HTMLImageElement) {
+        const secondarySrc = secondaryImage.getAttribute('src') || '';
+        if (secondarySrc && secondarySrc !== fallbackGallery[0]) fallbackGallery.push(secondarySrc);
+      }
       const allowedOptionIds = new Set(optionRows.map((row) => row.id));
 
       const selected: SelectedMap = {};
@@ -472,6 +383,22 @@ const defaultVariantTitle =
           selected[k] = String(v || '');
         });
       }
+
+      const applyGallery = (urls: string[]) => {
+        const source = (Array.isArray(urls) && urls.length ? urls : fallbackGallery).slice(0, 2);
+        const main = source[0] || '/logo.webp';
+        const second = source[1] || '';
+        if (primaryImage instanceof HTMLImageElement) {
+          primaryImage.src = main;
+        }
+        if (secondaryImage instanceof HTMLImageElement) {
+          secondaryImage.dataset.hasSecondary = second ? 'true' : 'false';
+          secondaryImage.src = second || main;
+          if (second) bindHoverReady(secondaryImage);
+          else imgWrap?.classList.remove('is-hover-ready');
+        }
+        quickBtn.dataset.thumbnail = main;
+      };
 
       const setFromVariant = (variant: VariantMap | null) => {
         if (!variant) return;
@@ -488,6 +415,31 @@ const defaultVariantTitle =
           .join(' | ');
         quickBtn.dataset.variantTitle = optionTitle || variant.title || '';
         quickBtn.disabled = !!variant.soldOut;
+        applyGallery(variant.images || []);
+        if (priceCurrent instanceof HTMLElement) {
+          priceCurrent.textContent = variant.priceDisplay ?? '';
+        }
+        if (priceStriked instanceof HTMLElement) {
+          if (variant.originalDisplay) {
+            priceStriked.textContent = variant.originalDisplay;
+            priceStriked.hidden = false;
+          } else {
+            priceStriked.textContent = '';
+            priceStriked.hidden = true;
+          }
+        }
+        if (priceBox instanceof HTMLElement) {
+          priceBox.classList.toggle('pc__price-box--discount', (variant.discountPercent ?? 0) > 0);
+        }
+        if (discountTag instanceof HTMLElement) {
+          const p = variant.discountPercent ?? 0;
+          if (p > 0) {
+            discountTag.textContent = `${p}% off`;
+            discountTag.style.display = '';
+          } else {
+            discountTag.style.display = 'none';
+          }
+        }
       };
 
       const update = () => {

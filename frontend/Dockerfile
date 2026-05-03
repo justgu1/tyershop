@@ -3,12 +3,17 @@ FROM node:22-slim AS dev
 
 WORKDIR /app
 
+ENV NPM_CONFIG_AUDIT=false \
+    NPM_CONFIG_FUND=false \
+    NPM_CONFIG_LOGLEVEL=error
+
 # copia lock do serviço e package do serviço
 COPY frontend/package.json ./
 COPY frontend/package-lock.json* ./
 
-# instala dependências
-RUN npm install
+# instala dependências (lock do frontend pode ficar atrás do package.json no monorepo)
+RUN npm install --no-audit --no-fund \
+  && npm install --no-audit --no-fund @astrojs/node@^10.0.6
 
 # copia o código do serviço
 COPY frontend/ ./
@@ -21,9 +26,14 @@ FROM node:22-slim AS builder
 
 WORKDIR /app
 
+ENV NPM_CONFIG_AUDIT=false \
+    NPM_CONFIG_FUND=false \
+    NPM_CONFIG_LOGLEVEL=error
+
 COPY frontend/package.json frontend/package-lock.json* ./
 
-RUN npm install
+RUN npm install --no-audit --no-fund \
+  && npm install --no-audit --no-fund @astrojs/node@^10.0.6
 
 COPY frontend/ ./
 

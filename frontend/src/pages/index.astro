@@ -33,16 +33,6 @@ try {
   }
 } catch {}
 
-if (collections.length === 0) {
-  collections = [
-    { id: '1', title: 'Tyer In Paris', handle: 'tyer-in-paris', products_count: 12 },
-    { id: '2', title: 'Five Stars',    handle: 'five-stars',    products_count: 8  },
-    { id: '3', title: 'Drop MVP',      handle: 'mvp',           products_count: 15 },
-    { id: '4', title: 'Tyer Pro',      handle: 'tyer-pro',      products_count: 10 },
-    { id: '5', title: 'Red Rose',      handle: 'red-rose',      products_count: 6  },
-  ];
-}
-
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebSite',
@@ -75,7 +65,28 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 
   <!-- HERO -->
   <section class="hero" aria-label="Hero">
-    <video class="hero__video" autoplay loop muted playsinline preload="none" aria-hidden="true">
+    <picture class="hero__picture">
+      <source srcset="/hero.avif" type="image/avif" />
+      <source srcset="/hero.webp" type="image/webp" />
+      <source srcset="/hero.jpg" type="image/jpeg" />
+  
+      <img
+        src="/hero.jpg"
+        alt="Hero"
+        class="hero__image"
+        loading="eager"
+        decoding="async"
+      />
+    </picture>
+  
+    <video
+      class="hero__video"
+      muted
+      loop
+      playsinline
+      preload="auto"
+      aria-hidden="true"
+    >
       <source src="/video/hero.mp4" type="video/mp4" />
     </video>
     <div class="hero__overlay" aria-hidden="true"></div>
@@ -136,13 +147,18 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
     </div>
   </section>
 
-  <!-- COLLECTIONS CAROUSEL -->
+  {collections.length > 0 && (
   <section id="collection" class="section collections-section" aria-labelledby="collections-title">
     <div class="section-bg" style="background-image:url('/collections-section-background.webp')"></div>
     <div class="section-overlay"></div>
     <div class="section-content collections-wrap">
       <h2 class="collections-title section__title" id="collections-title">Drops</h2>
-      <div class="carousel-stage" id="carousel-stage" role="region" aria-label="Collections">
+      <div
+        class:list={['carousel-stage', { 'carousel-stage--single': collections.length === 1 }]}
+        id="carousel-stage"
+        role="region"
+        aria-label="Collections"
+      >
         <div class="carousel-track" id="carousel-track">
           {collections.map((col, i) => (
             <article
@@ -161,7 +177,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
                   decoding="async"
                 />
                 {col.products_count === 0 && (
-                  <div class="col-card__ribbon"><span>SOLD OUT</span></div>
+                  <div class="col-card__ribbon"><span>ESGOTADO</span></div>
                 )}
                 <div class="col-card__content">
                   <h3 class="col-card__name">{col.title}</h3>
@@ -192,6 +208,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
       </div>
     </div>
   </section>
+  )}
 
   <!-- EDITORIAL -->
   <section id="editorial" class="section editorial-section" aria-labelledby="editorial-title">
@@ -330,12 +347,42 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
   overflow: hidden;
   margin-top: calc(-1 * var(--header-h));
 }
+.hero__picture {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 1;
+  transition: opacity 0.45s ease;
+}
+.hero__picture.is-hidden {
+  opacity: 0;
+}
+.hero__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .hdr:has(.hdr__nav-item--mega:hover) {
   background: var(--c-bg); /* Match megamenu background */
   backdrop-filter: none;
 }
 .hdr__inner { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
-.hero__video { width: 100%; height: 100svh; object-fit: cover; }
+.hero__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.45s ease;
+}
+.hero__video.is-ready {
+  opacity: 1;
+  visibility: visible;
+}
 .hero__overlay { position: absolute; inset: 0; z-index: 1; background: linear-gradient(to bottom, rgba(0,0,0,.75) 0%, transparent); }
 .hero__scroll {
   position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
@@ -451,6 +498,10 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
   height: 480px;
   overflow: hidden;
 }
+.carousel-stage--single .carousel-nav,
+.carousel-stage--single .carousel-dots {
+  display: none;
+}
 
 /* Track: all cards are absolute, stacked at center */
 .carousel-track {
@@ -536,8 +587,12 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
   transition: background var(--ease); backdrop-filter: blur(6px);
 }
 .carousel-nav:hover { background: rgba(0,0,0,0.9); }
-.carousel-nav--prev { left: 16px; }
-.carousel-nav--next { right: 16px; }
+.carousel-nav--prev {
+  left: max(1rem, env(safe-area-inset-left, 0px));
+}
+.carousel-nav--next {
+  right: max(1rem, env(safe-area-inset-right, 0px));
+}
 
 /* Dots */
 .carousel-dots {
@@ -550,12 +605,43 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 @media (max-width: 700px) {
   .carousel-stage { height: 380px; }
   .col-card { width: 200px; height: 310px; margin-top: -155px; margin-left: -100px; }
-  .carousel-nav { display: none; }
+  .carousel-nav {
+    display: flex;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+  }
+  .carousel-nav--prev {
+    left: max(1rem, env(safe-area-inset-left, 0px));
+  }
+  .carousel-nav--next {
+    right: max(1rem, env(safe-area-inset-right, 0px));
+  }
 }
 
 /* ── Editorial ── */
 .editorial__content { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; max-width: var(--max-w); margin: 0 auto; padding: 0 40px; }
-@media (max-width: 768px) { .editorial__content { grid-template-columns: 1fr; gap: 32px; } }
+@media (max-width: 768px) {
+  .editorial__content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+  }
+  .editorial__left,
+  .editorial__right {
+    width: 100%;
+    align-items: center;
+    text-align: center;
+  }
+  .editorial__right-link {
+    width: 100%;
+  }
+}
 .editorial__left { display: flex; align-items: center; justify-content: center; padding: 40px; }
 .editorial__left img { max-width: 240px; height: auto; opacity: 0.9; }
 .editorial__right-link { display: block; border-radius: 8px; overflow: hidden; transition: transform 0.25s ease, box-shadow 0.25s ease; }
@@ -566,7 +652,21 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 }
 .editorial__right { display: flex; flex-direction: column; align-items: flex-start; gap: 24px; }
 .editorial__right-img { width: 100%; height: auto; display: block; vertical-align: top; }
-.editorial__social { width:100%; list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 20px; }
+.editorial__social {
+  width: 100%;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.editorial__social::-webkit-scrollbar { display: none; }
 .editorial__social li { display: flex; align-items: center; }
 .editorial__social-link {
   display: flex; align-items: center; justify-content: center;
@@ -622,115 +722,225 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 </style>
 
 <script>
-(function () {
-  /* ─────────────────────────────────────────────
-     FLAT 2D carousel — no preserve-3d, no z-index BS.
-     Cards sit at center; JS moves them with translateX + scale.
-     Active card always gets highest z-index via JS.
-  ───────────────────────────────────────────── */
-  const stage   = document.getElementById('carousel-stage');
-  const track   = document.getElementById('carousel-track');
-  const prevBtn = document.getElementById('col-prev');
-  const nextBtn = document.getElementById('col-next');
-  const dotsEl  = document.getElementById('carousel-dots');
-  if (!stage || !track) return;
-
-  const cards = Array.from(track.querySelectorAll('.col-card'));
-  const dots  = dotsEl ? Array.from(dotsEl.querySelectorAll('.carousel-dot')) : [];
-  const n = cards.length;
-  let current = 0;
-  let autoTimer;
-
-  // Slot positions [leftmost … rightmost]
-  // Adjust x / scale / opacity to taste
-  const SLOTS = [
-    { x: -430, scale: 0.62, opacity: 0.35, zi: 1 },
-    { x: -238, scale: 0.80, opacity: 0.60, zi: 2 },
-    { x:    0, scale: 1.00, opacity: 1.00, zi: 5 },
-    { x:  238, scale: 0.80, opacity: 0.60, zi: 2 },
-    { x:  430, scale: 0.62, opacity: 0.35, zi: 1 },
-  ];
-  const HALF = Math.floor(SLOTS.length / 2); // 2
-
-  function positionCards(activeIdx) {
-    cards.forEach((card, i) => {
-      // Signed relative position (-2 to +2)
-      let rel = ((i - activeIdx) % n + n) % n;
-      if (rel > n - 1 - HALF) rel -= n;
-
-      const slotIdx = rel + HALF; // maps to 0..4
-
-      if (slotIdx < 0 || slotIdx >= SLOTS.length) {
-        // Card is "behind" and not shown in any slot (n > 5 case)
-        card.style.transform = 'translateX(0) scale(0.3)';
-        card.style.opacity = '0';
-        card.style.zIndex = '0';
-        card.style.pointerEvents = 'none';
-        card.classList.remove('is-active');
-        return;
+  // @ts-nocheck
+  (function () {
+  
+    /* ─────────────────────────────────────────────
+       HERO VIDEO LAZY INIT
+    ───────────────────────────────────────────── */
+  
+    const heroVideo   = document.querySelector('.hero__video');
+    const heroPicture = document.querySelector('.hero__picture');
+  
+    if (heroVideo && heroPicture) {
+  
+      function startHeroVideo() {
+  
+        // evita iniciar duas vezes
+        if (heroVideo.dataset.started) return;
+        heroVideo.dataset.started = 'true';
+  
+        // força load
+        heroVideo.load();
+  
+        heroVideo.addEventListener('canplaythrough', async () => {
+          try {
+  
+            await heroVideo.play();
+  
+            heroVideo.classList.add('is-ready');
+            heroPicture.classList.add('is-hidden');
+  
+          } catch (err) {
+            console.error('Video autoplay failed:', err);
+          }
+        }, { once: true });
       }
-
-      const slot = SLOTS[slotIdx];
-      const isActive = slotIdx === HALF;
-
-      card.style.transform = `translateX(${slot.x}px) scale(${slot.scale})`;
-      card.style.opacity = String(slot.opacity);
-      card.style.zIndex  = String(slot.zi);
-      card.style.filter  = isActive ? 'grayscale(0%)' : 'grayscale(100%)';
+  
+      // inicia quando entrar na viewport
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+  
+          if (entry.isIntersecting) {
+            startHeroVideo();
+            observer.disconnect();
+          }
+  
+        });
+      }, {
+        threshold: 0.35
+      });
+  
+      observer.observe(heroVideo);
+    }
+  
+    /* ─────────────────────────────────────────────
+       CAROUSEL
+    ───────────────────────────────────────────── */
+  
+    const stage   = document.getElementById('carousel-stage');
+    const track   = document.getElementById('carousel-track');
+    const prevBtn = document.getElementById('col-prev');
+    const nextBtn = document.getElementById('col-next');
+    const dotsEl  = document.getElementById('carousel-dots');
+  
+    if (!stage || !track) return;
+  
+    const cards = Array.from(track.querySelectorAll('.col-card'));
+    const dots  = dotsEl ? Array.from(dotsEl.querySelectorAll('.carousel-dot')) : [];
+    const n = cards.length;
+  
+    let current = 0;
+    let autoTimer;
+  
+    if (n === 1) {
+      const card = cards[0];
+      card.style.transform = 'translateX(0) scale(1)';
+      card.style.opacity = '1';
+      card.style.zIndex = '5';
+      card.style.filter = 'grayscale(0%)';
       card.style.pointerEvents = 'all';
-      card.classList.toggle('is-active', isActive);
-      card.setAttribute('aria-current', isActive ? 'true' : 'false');
+      card.classList.add('is-active');
+      card.setAttribute('aria-current', 'true');
+      return;
+    }
+  
+    const SLOTS = [
+      { x: -430, scale: 0.62, opacity: 0.35, zi: 1 },
+      { x: -238, scale: 0.80, opacity: 0.60, zi: 2 },
+      { x:    0, scale: 1.00, opacity: 1.00, zi: 5 },
+      { x:  238, scale: 0.80, opacity: 0.60, zi: 2 },
+      { x:  430, scale: 0.62, opacity: 0.35, zi: 1 },
+    ];
+  
+    const HALF = Math.floor(SLOTS.length / 2);
+  
+    function positionCards(activeIdx) {
+  
+      cards.forEach((card, i) => {
+  
+        let rel = ((i - activeIdx) % n + n) % n;
+  
+        if (rel > n - 1 - HALF) rel -= n;
+  
+        const slotIdx = rel + HALF;
+  
+        if (slotIdx < 0 || slotIdx >= SLOTS.length) {
+  
+          card.style.transform = 'translateX(0) scale(0.3)';
+          card.style.opacity = '0';
+          card.style.zIndex = '0';
+          card.style.pointerEvents = 'none';
+          card.classList.remove('is-active');
+  
+          return;
+        }
+  
+        const slot = SLOTS[slotIdx];
+        const isActive = slotIdx === HALF;
+  
+        card.style.transform =
+          `translateX(${slot.x}px) scale(${slot.scale})`;
+  
+        card.style.opacity = String(slot.opacity);
+        card.style.zIndex  = String(slot.zi);
+        card.style.filter  =
+          isActive ? 'grayscale(0%)' : 'grayscale(100%)';
+  
+        card.style.pointerEvents = 'all';
+  
+        card.classList.toggle('is-active', isActive);
+  
+        card.setAttribute(
+          'aria-current',
+          isActive ? 'true' : 'false'
+        );
+      });
+  
+      dots.forEach((dot, i) => {
+  
+        dot.classList.toggle('is-active', i === activeIdx);
+  
+        dot.setAttribute(
+          'aria-selected',
+          i === activeIdx ? 'true' : 'false'
+        );
+      });
+    }
+  
+    function goTo(idx) {
+      current = ((idx % n) + n) % n;
+      positionCards(current);
+    }
+  
+    function startAuto() {
+      clearInterval(autoTimer);
+      autoTimer = setInterval(() => goTo(current + 1), 4500);
+    }
+  
+    function stopAuto() {
+      clearInterval(autoTimer);
+    }
+  
+    positionCards(0);
+  
+    prevBtn?.addEventListener('click', () => {
+      goTo(current - 1);
+      stopAuto();
+      startAuto();
     });
-
+  
+    nextBtn?.addEventListener('click', () => {
+      goTo(current + 1);
+      stopAuto();
+      startAuto();
+    });
+  
     dots.forEach((dot, i) => {
-      dot.classList.toggle('is-active', i === activeIdx);
-      dot.setAttribute('aria-selected', i === activeIdx ? 'true' : 'false');
-    });
-  }
-
-  function goTo(idx) {
-    current = ((idx % n) + n) % n;
-    positionCards(current);
-  }
-
-  function startAuto() {
-    clearInterval(autoTimer);
-    autoTimer = setInterval(() => goTo(current + 1), 4500);
-  }
-  function stopAuto() { clearInterval(autoTimer); }
-
-  // Init
-  positionCards(0);
-
-  // Nav buttons
-  prevBtn?.addEventListener('click', () => { goTo(current - 1); stopAuto(); startAuto(); });
-  nextBtn?.addEventListener('click', () => { goTo(current + 1); stopAuto(); startAuto(); });
-
-  // Dots
-  dots.forEach((dot, i) => dot.addEventListener('click', () => { goTo(i); stopAuto(); startAuto(); }));
-
-  // Click a non-active card → bring to front
-  cards.forEach((card, i) => {
-    card.addEventListener('click', (e) => {
-      if (i !== current) {
-        e.preventDefault();
+      dot.addEventListener('click', () => {
         goTo(i);
+        stopAuto();
+        startAuto();
+      });
+    });
+  
+    cards.forEach((card, i) => {
+  
+      card.addEventListener('click', (e) => {
+  
+        if (i !== current) {
+  
+          e.preventDefault();
+  
+          goTo(i);
+  
+          stopAuto();
+          startAuto();
+        }
+      });
+    });
+  
+    stage.setAttribute('tabindex', '0');
+  
+    stage.addEventListener('keydown', (e) => {
+  
+      if (e.key === 'ArrowLeft') {
+        goTo(current - 1);
+        stopAuto();
+        startAuto();
+      }
+  
+      if (e.key === 'ArrowRight') {
+        goTo(current + 1);
         stopAuto();
         startAuto();
       }
     });
-  });
-
-  // Keyboard navigation
-  stage.setAttribute('tabindex', '0');
-  stage.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft')  { goTo(current - 1); stopAuto(); startAuto(); }
-    if (e.key === 'ArrowRight') { goTo(current + 1); stopAuto(); startAuto(); }
-  });
-
-  // Pause auto on hover
-  stage.addEventListener('mouseenter', stopAuto);
-  stage.addEventListener('mouseleave', startAuto);
-  startAuto();
-})();
+  
+    stage.addEventListener('mouseenter', stopAuto);
+    stage.addEventListener('mouseleave', startAuto);
+  
+    startAuto();
+  
+  })();
 </script>

@@ -3,49 +3,23 @@ import Layout from '../../layouts/Layout.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import { getLangFromUrl, t, getPathForLang } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
+import { getMedusaStoreUrl } from '../../lib/medusa-env';
 import { getProductListQueryString, getVariantPriceInfo, resolveDefaultRegionId } from '../../lib/medusa-pricing';
+import { getVariantSlideUrls } from '../../lib/product-variant-gallery';
+import { formatVariationValuesOnly, getProductVariantData } from '../../lib/product-variants';
+import { cssColorForOptionValue, isColorOptionRow } from '../../lib/variant-color-swatches';
+import {
+  compositionText,
+  metaString,
+  parseFaqItems,
+  parseProductDetailBlocks,
+  parseTechSheetRows,
+} from '../../lib/product-pdp-metadata';
+
+/** PDP dinâmica: qualquer `handle` válido na Medusa (não depende só do pré-render). */
+export const prerender = false;
 
 const lang: Lang = getLangFromUrl(Astro.url);
-
-export async function getStaticPaths() {
-  try {
-    const url =
-      import.meta.env.MEDUSA_INTERNAL_URL ||
-      import.meta.env.MEDUSA_URL ||
-      import.meta.env.PUBLIC_MEDUSA_URL ||
-      'http://backend:9000';
-    const publishableKey =
-      import.meta.env.PUBLIC_MEDUSA_PUBLISHABLE_KEY ||
-      'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
-    const handles: string[] = [];
-    const limit = 100;
-    let offset = 0;
-    let hasMore = true;
-
-    while (hasMore) {
-      const res = await fetch(
-        `${url}/store/products?limit=${limit}&offset=${offset}&fields=handle`,
-        {
-          headers: { 'x-publishable-api-key': publishableKey },
-          signal: AbortSignal.timeout(8000),
-        }
-      );
-      if (!res.ok) break;
-      const { products } = await res.json();
-      const batch = (products ?? [])
-        .map((p: any) => String(p?.handle || '').trim())
-        .filter((h: string) => h.length > 0);
-      handles.push(...batch);
-      hasMore = batch.length === limit;
-      offset += limit;
-    }
-
-    if (handles.length > 0) {
-      return Array.from(new Set(handles)).map((h) => ({ params: { handle: h } }));
-    }
-  } catch {}
-  return [{ params: { handle: 'placeholder' } }];
-}
 
 const { handle } = Astro.params;
 const pk = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
@@ -55,7 +29,7 @@ let related: any[] = [];
 let newest: any[] = [];
 
 try {
-  const url = import.meta.env.MEDUSA_INTERNAL_URL || import.meta.env.MEDUSA_URL || 'http://localhost:9003';
+  const url = getMedusaStoreUrl();
   const regionId = await resolveDefaultRegionId(url, medusaHeaders);
   const q = getProductListQueryString(regionId);
   const res = await fetch(
@@ -75,10 +49,10 @@ try {
         related = (rp ?? []).filter((p: any) => p.handle !== handle).slice(0, 8);
       }
     }
-    const newestRes = await fetch(
-      `${url}/store/products?${q}&limit=16`,
-      { headers: medusaHeaders, signal: AbortSignal.timeout(5000) }
-    );
+    const newestRes = await fetch(`${url}/store/products?${q}&limit=16`, {
+      headers: medusaHeaders,
+      signal: AbortSignal.timeout(5000),
+    });
     if (newestRes.ok) {
       const { products: np } = await newestRes.json();
       newest = [...(np ?? [])]
@@ -92,26 +66,15 @@ try {
   }
 } catch {}
 
-if (!product) {
-  product = {
-    id: 'placeholder',
-    title: String(handle ?? '').replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || 'Product',
-    description: 'Limited edition streetwear.',
-    thumbnail: '/logo.webp',
-    images: [{ url: '/logo.webp' }],
-    variants: [],
-    metadata: {},
-  };
+const productFound = !!product;
+if (!productFound) {
+  Astro.response.status = 404;
 }
 
-const images = product.images ?? (product.thumbnail ? [{ url: product.thumbnail }] : []);
-const variants = product.variants ?? [];
-const defaultVariant = variants[0];
-const defaultPriceInfo = getVariantPriceInfo(defaultVariant);
-const priceVal = defaultPriceInfo?.display ?? null;
-const dropHandleRaw =
-  String(product?.metadata?.drop ?? '').trim() ||
-  String(product?.collection?.handle ?? '').trim();
+const md = (productFound ? (product!.metadata ?? {}) : {}) as Record<string, unknown>;
+const dropHandleRaw = productFound
+  ? String(product!.metadata?.drop ?? '').trim() || String(product!.collection?.handle ?? '').trim()
+  : '';
 const dropHandle = dropHandleRaw.toLowerCase().replace(/[^a-z0-9-_]/g, '');
 const customDropModules = import.meta.glob('../../components/drops/**/*.astro', { eager: true }) as Record<
   string,
@@ -128,414 +91,2127 @@ const CustomDropComponent =
   (dropPageKey ? customDropModules[dropPageKey]?.default : null) ||
   null;
 
-function getVariantMaxQty(v: any): number | null {
-  if (!v) return null;
-  if (v.allow_backorder === true) return null;
-  const nestedStockQty = (v.inventory_items ?? []).reduce((sum: number, item: any) => {
-    const levels = item?.inventory?.location_levels ?? [];
-    const levelSum = levels.reduce((inner: number, level: any) => {
-      const raw = Number(level?.stocked_quantity);
-      return Number.isFinite(raw) ? inner + raw : inner;
-    }, 0);
-    return sum + levelSum;
-  }, 0);
-  const qtyRaw =
-    nestedStockQty > 0 || nestedStockQty === 0
-      ? nestedStockQty
-      : v.inventory_quantity ?? v.calculated_inventory_quantity ?? v.stocked_quantity;
-  const qty = Number(qtyRaw);
-  if (!Number.isFinite(qty)) return null;
-  return Math.max(0, Math.floor(qty));
-}
+const {
+  stockReliable,
+  normalizedVariants: normalizedVariantsRaw,
+  optionRows,
+  defaultVariant,
+  defaultVariantTitle,
+} = productFound
+  ? getProductVariantData(product!)
+  : {
+      stockReliable: false,
+      normalizedVariants: [],
+      optionRows: [],
+      defaultVariant: null,
+      defaultVariantTitle: '',
+    };
 
-function getVariantLabel(v: any): string {
-  const options = (v?.options ?? [])
-    .map((opt: any) => {
-      const optionTitle = String(opt?.option?.title ?? opt?.option_title ?? opt?.title ?? '').trim();
-      const value = String(opt?.value ?? '').trim();
-      if (!optionTitle || !value) return '';
-      return `${optionTitle}: ${value}`;
-    })
-    .filter((s: string) => s.length > 0);
-  if (options.length) return options.join(' | ');
-  return String(v?.title ?? '').trim();
-}
+const variantById = productFound
+  ? new Map<string, any>((product!.variants ?? []).map((v: any) => [String(v.id ?? ''), v]))
+  : new Map<string, any>();
 
-const jsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'Product',
-  name: product.title,
-  description: product.description,
-  image: images.map((i: any) => `https://tyer.com.br${i.url}`),
-  brand: { '@type': 'Brand', name: 'Tyer' },
-  ...(defaultPriceInfo && {
-    offers: {
-      '@type': 'Offer',
-      price: defaultPriceInfo.amountCents / 100,
-      priceCurrency: defaultPriceInfo.currency,
-      availability: 'https://schema.org/InStock',
-    }
-  }),
+const defaultPriceInfo = productFound ? getVariantPriceInfo(defaultVariant) : null;
+const defaultNorm =
+  normalizedVariantsRaw.find((n) => n.id === defaultVariant?.id) ?? normalizedVariantsRaw[0];
+const initialSlides = productFound
+  ? getVariantSlideUrls(defaultVariant, product!)
+  : ['/logo.webp'];
+const defaultMaxQty = defaultNorm?.maxQty;
+const defaultMaxQtyAttr =
+  defaultMaxQty != null && Number.isFinite(Number(defaultMaxQty)) ? String(Math.max(0, Math.floor(Number(defaultMaxQty)))) : '';
+const defaultDiscountPct = defaultNorm?.discountPercent ?? 0;
+const variationValuesLine = formatVariationValuesOnly(defaultVariant, optionRows);
+const pdpVariantsPayload = normalizedVariantsRaw.map((v) => ({
+  id: v.id,
+  title: v.title,
+  price: v.price,
+  soldOut: v.soldOut,
+  maxQty: v.maxQty,
+  options: v.options,
+  images: v.images,
+  slideUrls: v.slideUrls,
+  priceDisplay: v.priceDisplay,
+  originalDisplay: v.originalDisplay,
+  discountPercent: v.discountPercent,
+  allowBackorder: variantById.get(v.id)?.allow_backorder === true,
+}));
+
+const stockMsgs = {
+  out: t(lang, 'pdp', 'stock_out'),
+  backorder: t(lang, 'pdp', 'stock_backorder'),
+  unverified: t(lang, 'pdp', 'stock_unverified'),
+  available: t(lang, 'pdp', 'stock_available'),
+  units: t(lang, 'pdp', 'stock_units'),
 };
+
+function initialStockLine(): string {
+  if (!productFound || !defaultNorm) return '';
+  if (defaultNorm.soldOut) return stockMsgs.out;
+  const raw = variantById.get(defaultNorm.id);
+  if (raw?.allow_backorder === true) return stockMsgs.backorder;
+  if (!stockReliable) return stockMsgs.unverified;
+  if (defaultNorm.maxQty != null && defaultNorm.maxQty > 0) {
+    return stockMsgs.units.replace('{count}', String(defaultNorm.maxQty));
+  }
+  return stockMsgs.available;
+}
+
+const galleryImages = productFound
+  ? product!.images ?? (product!.thumbnail ? [{ url: product!.thumbnail }] : [])
+  : [];
+const sizeGuideUrl = metaString(md, 'size_guide_image_url');
+const modelSizeUrl = metaString(md, 'model_size_image_url');
+const composition = compositionText(md);
+const techRows = parseTechSheetRows(md);
+const faqItemsRaw = parseFaqItems(md);
+const faqItems =
+  faqItemsRaw.length > 0
+    ? faqItemsRaw
+    : [
+        { q: t(lang, 'pdp', 'faq_default_q1'), a: t(lang, 'pdp', 'faq_default_a1') },
+        { q: t(lang, 'pdp', 'faq_default_q2'), a: t(lang, 'pdp', 'faq_default_a2') },
+      ];
+
+const productDetailBlocksRaw = parseProductDetailBlocks(md);
+const productDescriptionPlain =
+  productFound && typeof product!.description === 'string' ? product!.description.trim() : '';
+let productDetailBlocks = productDetailBlocksRaw;
+if (productDetailBlocks.length === 0 && productDescriptionPlain) {
+  productDetailBlocks = [{ title: t(lang, 'pdp', 'about_product_fallback'), body: productDescriptionPlain }];
+}
+
+const sizeGuideOpensNewTab = sizeGuideUrl ? /^https?:\/\//i.test(sizeGuideUrl) : false;
+
+const imgUrl = (i: number) => galleryImages[i]?.url ?? null;
+const storyA = productFound
+  ? metaString(md, 'pdp_story_a') ?? product!.description ?? t(lang, 'product', 'inspiration_text')
+  : '';
+const storyB = productFound
+  ? metaString(md, 'pdp_story_b') ?? product!.description ?? t(lang, 'product', 'feature_1')
+  : '';
+
+const jsonLd = productFound
+  ? {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product!.title,
+      description: product!.description,
+      image: galleryImages.map((i: any) => `https://tyer.com.br${i.url}`),
+      brand: { '@type': 'Brand', name: 'Tyer' },
+      ...(defaultPriceInfo && {
+        offers: {
+          '@type': 'Offer',
+          price: defaultPriceInfo.amountCents / 100,
+          priceCurrency: defaultPriceInfo.currency,
+          availability: 'https://schema.org/InStock',
+        },
+      }),
+    }
+  : null;
 ---
 
 <Layout
-  title={product.title}
-  description={product.description ?? 'Limited edition streetwear piece by Tyer.'}
+  title={productFound ? product!.title : 'Produto não encontrado'}
+  description={productFound ? (product!.description ?? 'Limited edition streetwear piece by Tyer.') : 'Esta página não existe ou o produto foi removido.'}
   lang={lang}
-  ogImage={product.thumbnail ?? '/logo.webp'}
+  ogImage={productFound ? (product!.thumbnail ?? '/logo.webp') : '/logo.webp'}
   ogType="product"
-  jsonLd={jsonLd}
+  jsonLd={jsonLd ?? undefined}
+  noindex={!productFound}
 >
-  <!-- Hero -->
-  <section class="pdp-hero" aria-labelledby="pdp-title">
-    <div class="pdp-hero__gallery" aria-label="Product images">
-      {images.slice(0, 4).map((img: any, i: number) => (
-        <div class="pdp-hero__img-wrap" data-index={i} aria-hidden={i > 0 ? 'true' : 'false'}>
-          <img
-            src={img.url}
-            alt={`${product.title} — view ${i + 1}`}
-            class="pdp-hero__img"
-            width="800" height="1000"
-            loading={i === 0 ? 'eager' : 'lazy'}
-            decoding={i === 0 ? 'sync' : 'async'}
-            fetchpriority={i === 0 ? 'high' : 'auto'}
-          />
-        </div>
-      ))}
-      {images.length > 1 && (
-        <div class="pdp-hero__thumbs" role="list" aria-label="Image thumbnails">
-          {images.slice(0, 4).map((img: any, i: number) => (
-            <button class={`pdp-hero__thumb ${i === 0 ? 'is-active' : ''}`} data-gallery-idx={i} role="listitem" aria-label={`View image ${i + 1}`} aria-pressed={i === 0 ? 'true' : 'false'}>
-              <img src={img.url} alt="" width="80" height="100" loading="lazy" />
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-
-    <div class="pdp-hero__info">
-      <nav class="pdp-breadcrumb" aria-label="Breadcrumb">
-        <ol class="pdp-breadcrumb__list">
-          <li><a href={getPathForLang('/', lang)}>Tyer</a></li>
-          <li aria-hidden="true">/</li>
-          <li><a href={getPathForLang('/shop', lang)}>{t(lang, 'nav', 'shop')}</a></li>
-          <li aria-hidden="true">/</li>
-          <li aria-current="page">{product.title}</li>
-        </ol>
-      </nav>
-
-      {product.metadata?.badge && <span class="pdp-badge">{product.metadata.badge}</span>}
-      <h1 class="pdp-title" id="pdp-title">{product.title}</h1>
-      {priceVal && <p class="pdp-price" aria-label={`Price: ${priceVal}`}>{priceVal}</p>}
-
-      {product.description && <p class="pdp-desc">{product.description}</p>}
-
-      <!-- Variants -->
-      {variants.length > 1 && (
-        <div class="pdp-variants" role="group" aria-label={t(lang, 'product', 'select_size')}>
-          <p class="pdp-label">{t(lang, 'product', 'select_size')}</p>
-          <div class="pdp-sizes" role="radiogroup">
-            {variants.map((v: any, i: number) => (
+  {productFound ? (
+    <>
+  <section
+    class="pdp-hero"
+    data-pdp-root
+    data-stock-reliable={stockReliable ? 'true' : 'false'}
+    data-stock-msgs={JSON.stringify(stockMsgs)}
+    data-variants={encodeURIComponent(JSON.stringify(pdpVariantsPayload))}
+    data-option-rows={encodeURIComponent(JSON.stringify(optionRows))}
+    aria-labelledby="pdp-title"
+  >
+    <div class="pdp-hero__media">
+      <div class="pdp-hero__media-carousel-block">
+        <div class="pdp-hero__thumbs-rail-wrap">
+          <div class="pdp-hero__thumbs-rail" id="pdp-thumbs-rail" role="tablist" aria-label={t(lang, 'pdp', 'gallery_thumbs')}>
+            {initialSlides.map((url: string, i: number) => (
               <button
-                class={`pdp-size-btn ${i === 0 ? 'is-active' : ''}`}
-                data-variant-id={v.id}
-                data-price={getVariantPriceInfo(v)?.amountCents ?? ''}
-                data-variant-title={getVariantLabel(v)}
-                data-max-qty={getVariantMaxQty(v) ?? ''}
-                role="radio"
-                aria-checked={i === 0 ? 'true' : 'false'}
-                aria-label={v.title}
-              >{v.title}</button>
+                type="button"
+                class:list={['pdp-hero__thumb', { 'is-active': i === 0 }]}
+                data-slide-idx={i}
+                role="tab"
+                aria-selected={i === 0 ? 'true' : 'false'}
+                aria-label={`${t(lang, 'pdp', 'slide')} ${i + 1}`}
+              >
+                <img src={url} alt="" width="64" height="80" loading={i === 0 ? 'eager' : 'lazy'} decoding="async" />
+              </button>
             ))}
           </div>
         </div>
-      )}
-
-      <button
-        class="btn btn-primary pdp-atc"
-        id="pdp-atc"
-        data-variant-id={defaultVariant?.id}
-        data-title={product.title}
-        data-price={defaultPriceInfo?.amountCents ?? ''}
-        data-thumbnail={product.thumbnail}
-        data-variant-title={getVariantLabel(defaultVariant)}
-        data-max-qty={getVariantMaxQty(defaultVariant) ?? ''}
-        data-qty="1"
-        aria-label={t(lang, 'product', 'add_to_cart')}
-      >
-        {t(lang, 'product', 'add_to_cart')} →
-      </button>
-      <div class="pdp-qty-wrap" role="group" aria-label="Quantidade">
-        <button type="button" class="pdp-qty-btn" id="pdp-qty-dec" aria-label="Diminuir quantidade">−</button>
-        <input
-          id="pdp-qty-input"
-          class="pdp-qty-input"
-          type="number"
-          min="1"
-          step="1"
-          value="1"
-          inputmode="numeric"
-          pattern="[0-9]*"
-          aria-label="Quantidade selecionada"
-        />
-        <button type="button" class="pdp-qty-btn" id="pdp-qty-inc" aria-label="Aumentar quantidade">+</button>
-      </div>
-    </div>
-  </section>
-
-  {CustomDropComponent ? (
-    <CustomDropComponent product={product} lang={lang} related={related} newest={newest} />
-  ) : (
-    <>
-  <!-- Inspiration -->
-  <section class="pdp-section pdp-inspiration" aria-labelledby="inspo-title">
-    <div class="container pdp-inspiration__inner">
-      <div class="pdp-inspiration__text">
-        <p class="section-label">01 — {t(lang, 'product', 'inspiration')}</p>
-        <h2 class="pdp-section-title" id="inspo-title">{t(lang, 'product', 'inspiration')}</h2>
-        <p class="pdp-inspiration__body">
-          {product.metadata?.inspiration ?? product.description ?? t(lang, 'product', 'inspiration_text')}
-        </p>
-      </div>
-      {images[1] && (
-        <div class="pdp-inspiration__img">
-          <img src={images[1].url} alt={`${product.title} inspiration`} width="640" height="800" loading="lazy" decoding="async" />
-        </div>
-      )}
-    </div>
-  </section>
-
-  <!-- Features -->
-  <section class="pdp-features section" aria-labelledby="features-title">
-    <div class="container">
-      <p class="section-label">02 — {t(lang, 'product', 'features')}</p>
-      <h2 class="pdp-section-title" id="features-title">{t(lang, 'product', 'features')}</h2>
-      <div class="pdp-features__grid">
-        {[
-          { num: '01', key: 'feature_1' },
-          { num: '02', key: 'feature_2' },
-          { num: '03', key: 'feature_3' },
-        ].map(f => (
-          <div class="pdp-feature">
-            <span class="pdp-feature__num">{f.num}</span>
-            <p class="pdp-feature__text">{t(lang, 'product', f.key)}</p>
+        <div class="pdp-hero__stage">
+          <button type="button" class="pdp-hero__nav pdp-hero__nav--prev" id="pdp-carousel-prev" aria-label={t(lang, 'pdp', 'prev_slide')}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <div class="pdp-hero__main">
+            <div class="pdp-hero__main-carousel" id="pdp-main-carousel">
+              <span
+                class="pdp-main-discount"
+                id="pdp-main-discount"
+                hidden={defaultDiscountPct <= 0}
+              >
+                {defaultDiscountPct > 0 ? `−${defaultDiscountPct}%` : ''}
+              </span>
+              <button
+                type="button"
+                class="pdp-hero__main-img-wrap"
+                id="pdp-main-img-wrap"
+                aria-label={t(lang, 'pdp', 'gallery_fullscreen')}
+              >
+                <img
+                  id="pdp-main-img"
+                  src={initialSlides[0] ?? '/logo.webp'}
+                  alt={product.title}
+                  class="pdp-hero__main-img"
+                  width="900"
+                  height="1125"
+                  loading="eager"
+                  decoding="async"
+                  fetchpriority="high"
+                />
+              </button>
+            </div>
           </div>
-        ))}
+          <button type="button" class="pdp-hero__nav pdp-hero__nav--next" id="pdp-carousel-next" aria-label={t(lang, 'pdp', 'next_slide')}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+      </div>
+
+      {related.length > 0 && (
+        <section class="pdp-hero__drop-rail section" aria-labelledby="pdp-drop-rail-title">
+          <div class="pdp-hero__drop-rail-inner">
+            <h2 class="pdp-hero__drop-rail-title" id="pdp-drop-rail-title">
+              {t(lang, 'pdp', 'drop_section_title')}
+              {product.collection?.title && (
+                <span class="pdp-hero__drop-rail-sub"> — {product.collection.title}</span>
+              )}
+            </h2>
+            <div class="pdp-product-rail pdp-hero__drop-carousel" role="list">
+              {related.map((p) => (
+                <ProductCard product={p} lang={lang} role="listitem" />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+
+    <div class="pdp-hero__buy-col">
+      <div class="pdp-hero__sidebar-stack">
+      <div class="pdp-buy-card" data-pdp-buy-card>
+        <nav class="pdp-breadcrumb" aria-label="Breadcrumb">
+          <ol class="pdp-breadcrumb__list">
+            <li><a href={getPathForLang('/', lang)}>Tyer</a></li>
+            <li aria-hidden="true">/</li>
+            {product.collection?.handle ? (
+              <>
+                <li>
+                  <a href={getPathForLang(`/collections/${product.collection.handle}`, lang)}>
+                    {product.collection.title ?? product.collection.handle}
+                  </a>
+                </li>
+                <li aria-hidden="true">/</li>
+                <li aria-current="page">{product.title}</li>
+              </>
+            ) : (
+              <>
+                <li>
+                  <a href={getPathForLang('/shop', lang)}>{t(lang, 'nav', 'shop')}</a>
+                </li>
+                <li aria-hidden="true">/</li>
+                <li aria-current="page">{product.title}</li>
+              </>
+            )}
+          </ol>
+        </nav>
+
+        {product.metadata?.badge && <span class="pdp-badge">{String(product.metadata.badge)}</span>}
+        <h1 class="pdp-title" id="pdp-title">{product.title}</h1>
+
+        {optionRows.length > 0 && (
+          <>
+            <p class="pdp-variation-heading" id="pdp-variation-heading">
+              <span class="pdp-variation-heading__label">{t(lang, 'pdp', 'variation_label')}</span>{' '}
+              <span class="pdp-variation-heading__value" id="pdp-variation-value">
+                {variationValuesLine || defaultVariantTitle}
+              </span>
+            </p>
+            <div class="pdp-variants" role="group" aria-label={t(lang, 'product', 'select_size')}>
+              {optionRows.map((row: { id: string; title: string; values: string[] }) => {
+                const colorRow = isColorOptionRow(row.title);
+                return (
+                  <div class="pdp-variant-row">
+                    <p class="pdp-label">{row.title}</p>
+                    <div class="pdp-variant-values" role="radiogroup" aria-label={row.title}>
+                      {row.values.map((val: string) => {
+                        const sel = (defaultVariant?.options ?? []).find(
+                          (o: any) => String(o.option_id ?? o.id) === row.id
+                        );
+                        const isSel = String(sel?.value ?? '') === val;
+                        const swatchHex = colorRow ? cssColorForOptionValue(val) : null;
+                        return (
+                          <button
+                            type="button"
+                            class:list={[
+                              'pdp-variant-btn',
+                              { 'is-selected': isSel, 'is-unavailable': false, 'pdp-variant-btn--color': colorRow },
+                            ]}
+                            data-option-id={row.id}
+                            data-option-value={val}
+                            aria-checked={isSel ? 'true' : 'false'}
+                          >
+                            {swatchHex && (
+                              <span
+                                class="pdp-variant-swatch"
+                                style={`background-color: ${swatchHex}`}
+                                aria-hidden="true"
+                              />
+                            )}
+                            <span class="pdp-variant-btn-text">{val}</span>
+                            <span class="pdp-variant-x" aria-hidden="true">×</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {sizeGuideUrl && (
+              <p class="pdp-size-chart-row">
+                <a
+                  href={sizeGuideUrl}
+                  class="pdp-size-chart-link"
+                  target={sizeGuideOpensNewTab ? '_blank' : undefined}
+                  rel={sizeGuideOpensNewTab ? 'noopener noreferrer' : undefined}
+                >
+                  {t(lang, 'pdp', 'size_chart')}
+                </a>
+              </p>
+            )}
+          </>
+        )}
+
+        <div class="pdp-measure-btns">
+          {modelSizeUrl && (
+            <button type="button" class="pdp-pill-btn pdp-pill-btn--ghost" id="pdp-open-model" data-modal-target="pdp-modal-model">
+              {t(lang, 'pdp', 'model_measures')}
+            </button>
+          )}
+        </div>
+
+        <div class="pdp-price-qty-row">
+          <div class="pdp-price-block" id="pdp-price-block">
+            <span
+              class="pdp-price-striked"
+              id="pdp-price-original"
+              hidden={!defaultPriceInfo?.originalDisplay}
+            >
+              {defaultPriceInfo?.originalDisplay ?? ''}
+            </span>
+            <span class="pdp-price-current" id="pdp-price-current">{defaultPriceInfo?.display ?? ''}</span>
+          </div>
+          <div class="pdp-qty-wrap" role="group" aria-label={t(lang, 'pdp', 'qty_label')}>
+            <button type="button" class="pdp-qty-btn" id="pdp-qty-dec" aria-label={t(lang, 'pdp', 'qty_dec')}>−</button>
+            <input
+              id="pdp-qty-input"
+              class="pdp-qty-input"
+              type="number"
+              min="1"
+              step="1"
+              value="1"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              aria-label={t(lang, 'pdp', 'qty_label')}
+            />
+            <button type="button" class="pdp-qty-btn" id="pdp-qty-inc" aria-label={t(lang, 'pdp', 'qty_inc')}>+</button>
+          </div>
+        </div>
+
+        <p class="pdp-stock" id="pdp-stock-line" role="status">{initialStockLine()}</p>
+
+        <div class="pdp-buy-actions">
+          <button type="button" class="btn btn-primary pdp-buy-now" id="pdp-buy-now">
+            {t(lang, 'pdp', 'buy_now')}
+          </button>
+          <button
+            type="button"
+            class="btn pdp-atc-icon"
+            id="pdp-atc"
+            data-variant-id={defaultVariant?.id}
+            data-title={product.title}
+            data-price={defaultPriceInfo?.amountCents ?? ''}
+            data-thumbnail={initialSlides[0] ?? product.thumbnail ?? ''}
+            data-variant-title={defaultVariantTitle}
+            data-max-qty={defaultMaxQtyAttr}
+            data-qty="1"
+            aria-label={t(lang, 'product', 'add_to_cart')}
+          >
+            <img src="/icons/quick-cart.svg" alt="" width="22" height="22" />
+          </button>
+        </div>
+
+        <div class="pdp-shipping">
+          <label class="pdp-label" for="pdp-cep-input">{t(lang, 'pdp', 'shipping_cep')}</label>
+          <div class="pdp-cep-row">
+            <input
+              id="pdp-cep-input"
+              class="pdp-cep-input"
+              type="text"
+              inputmode="numeric"
+              autocomplete="postal-code"
+              maxlength="9"
+              placeholder="00000-000"
+              aria-describedby="pdp-cep-hint"
+            />
+          </div>
+          <p id="pdp-cep-hint" class="pdp-cep-hint" role="status"></p>
+          <p class="pdp-cep-static">{t(lang, 'pdp', 'shipping_estimate_placeholder')}</p>
+        </div>
+      </div>
+
+        {(composition || techRows.length > 0) && (
+          <div class="pdp-characteristics">
+            {composition && (
+              <details class="pdp-details">
+                <summary>{t(lang, 'pdp', 'differentials')}</summary>
+                <div class="pdp-details__body">
+                  <p class="pdp-composition">{composition}</p>
+                </div>
+              </details>
+            )}
+
+            {techRows.length > 0 && (
+              <details class="pdp-details">
+                <summary>{t(lang, 'pdp', 'tech_sheet')}</summary>
+                <dl class="pdp-tech-dl">
+                  {techRows.map((row) => (
+                    <>
+                      <dt>{row.label}</dt>
+                      <dd>{row.value}</dd>
+                    </>
+                  ))}
+                </dl>
+              </details>
+            )}
+          </div>
+        )}
       </div>
     </div>
   </section>
 
-  <!-- Street -->
-  {images[2] && (
-    <section class="pdp-street" aria-labelledby="street-title">
-      <img src={images[2].url} alt={`${product.title} street style`} class="pdp-street__img" width="1440" height="800" loading="lazy" decoding="async" />
-      <div class="pdp-street__content container">
-        <h2 class="pdp-street__title" id="street-title">03 — {t(lang, 'product', 'street')}</h2>
-      </div>
-    </section>
-  )}
-
-    </>
-  )}
-
-  <!-- Related -->
-  {related.length > 0 && (
-    <section class="pdp-related section" aria-labelledby="related-title">
-      <div class="container">
-        <h2 class="section__title" id="related-title">Quem compra também compra...</h2>
-        <div class="pdp-carousel" id="pdp-related-carousel" role="list">
-          {related.map(p => <ProductCard product={p} lang={lang} role="listitem" />)}
+  <div class="pdp-below-fold">
+    {(productDetailBlocks.length > 0 || faqItems.length > 0) && (
+      <section
+        class="pdp-accordion-row section container"
+        aria-label={`${t(lang, 'pdp', 'product_details_title')} · ${t(lang, 'pdp', 'faq_title')}`}
+      >
+        <div
+          class:list={[
+            'pdp-accordion-row__grid',
+            { 'pdp-accordion-row__grid--split': productDetailBlocks.length > 0 && faqItems.length > 0 },
+          ]}
+        >
+          {productDetailBlocks.length > 0 && (
+            <div class="pdp-accordion-row__col">
+              <h2 class="section__title" id="pdp-product-details-title">{t(lang, 'pdp', 'product_details_title')}</h2>
+              <div class="pdp-faq__list">
+                {productDetailBlocks.map((b) => (
+                  <details class="pdp-faq__item">
+                    <summary>{b.title}</summary>
+                    <p class="pdp-faq__a">{b.body}</p>
+                  </details>
+                ))}
+              </div>
+            </div>
+          )}
+          {faqItems.length > 0 && (
+            <div class="pdp-accordion-row__col">
+              <h2 class="section__title" id="pdp-faq-title">{t(lang, 'pdp', 'faq_title')}</h2>
+              <div class="pdp-faq__list">
+                {faqItems.map((item) => (
+                  <details class="pdp-faq__item">
+                    <summary>{item.q}</summary>
+                    <p class="pdp-faq__a">{item.a}</p>
+                  </details>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-    </section>
+      </section>
+    )}
+
+    {imgUrl(1) && (
+      <section class="pdp-split pdp-split--text-left container">
+        <div class="pdp-split__text">
+          <p class="section-label">01 — {t(lang, 'product', 'inspiration')}</p>
+          <h2 class="pdp-split__title">{t(lang, 'product', 'inspiration')}</h2>
+          <p class="pdp-split__body">{storyA}</p>
+        </div>
+        <div class="pdp-split__img">
+          <img src={imgUrl(1)!} alt="" width="640" height="800" loading="lazy" decoding="async" />
+        </div>
+      </section>
+    )}
+
+    {imgUrl(2) && (
+      <section class="pdp-split pdp-split--img-left container">
+        <div class="pdp-split__img">
+          <img src={imgUrl(2)!} alt="" width="640" height="800" loading="lazy" decoding="async" />
+        </div>
+        <div class="pdp-split__text">
+          <p class="section-label">02 — {t(lang, 'product', 'features')}</p>
+          <h2 class="pdp-split__title">{t(lang, 'product', 'features')}</h2>
+          <p class="pdp-split__body">{storyB}</p>
+        </div>
+      </section>
+    )}
+
+    {imgUrl(3) && (
+      <section class="pdp-fullbleed" aria-hidden="false">
+        <img src={imgUrl(3)!} alt="" class="pdp-fullbleed__img" width="1440" height="720" loading="lazy" decoding="async" />
+        <div class="pdp-fullbleed__cap container">
+          <h2 class="pdp-fullbleed__title">03 — {t(lang, 'product', 'street')}</h2>
+        </div>
+      </section>
+    )}
+
+  </div>
+
+  {CustomDropComponent && (
+    <CustomDropComponent product={product!} lang={lang} related={related} newest={newest} />
   )}
+
   {newest.length > 0 && (
     <section class="pdp-related section" aria-labelledby="newest-title">
       <div class="container">
-        <h2 class="section__title" id="newest-title">Mais novos</h2>
-        <div class="pdp-carousel" id="pdp-newest-carousel" role="list">
-          {newest.map(p => <ProductCard product={p} lang={lang} role="listitem" />)}
+        <h2 class="section__title" id="newest-title">{t(lang, 'shop', 'section_novos')}</h2>
+        <div class="pdp-product-rail pdp-carousel" id="pdp-newest-carousel" role="list">
+          {newest.map((p) => (
+            <ProductCard product={p} lang={lang} role="listitem" />
+          ))}
         </div>
+      </div>
+    </section>
+  )}
+
+  {sizeGuideUrl && (
+    <dialog class="pdp-dialog" id="pdp-modal-size-guide" aria-label={t(lang, 'pdp', 'size_guide')}>
+      <button type="button" class="pdp-dialog__close" data-close-modal>&times;</button>
+      <img src={sizeGuideUrl} alt="" class="pdp-dialog__img" />
+    </dialog>
+  )}
+  {modelSizeUrl && (
+    <dialog class="pdp-dialog" id="pdp-modal-model" aria-label={t(lang, 'pdp', 'model_measures')}>
+      <button type="button" class="pdp-dialog__close" data-close-modal>&times;</button>
+      <img src={modelSizeUrl} alt="" class="pdp-dialog__img" />
+    </dialog>
+  )}
+    <dialog class="pdp-lightbox" id="pdp-lightbox" aria-modal="true" aria-label={t(lang, 'pdp', 'gallery_fullscreen')}>
+      <button
+        type="button"
+        class="pdp-lightbox__backdrop"
+        data-close-modal
+        tabindex="-1"
+        aria-label={t(lang, 'pdp', 'lightbox_close')}
+      />
+      <button type="button" class="pdp-lightbox__close" data-close-modal aria-label={t(lang, 'pdp', 'lightbox_close')}>
+        &times;
+      </button>
+      <div class="pdp-lightbox__row">
+        <button
+          type="button"
+          class="pdp-lightbox__nav pdp-lightbox__nav--prev"
+          id="pdp-lightbox-prev"
+          aria-label={t(lang, 'pdp', 'lightbox_prev')}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            ><path d="m15 18-6-6 6-6" /></svg
+          >
+        </button>
+        <div class="pdp-lightbox__inner">
+          <img id="pdp-lightbox-img" src="" alt="" class="pdp-lightbox__img" width="1200" height="1500" />
+          <p class="pdp-lightbox__counter" id="pdp-lightbox-counter" aria-live="polite"></p>
+        </div>
+        <button
+          type="button"
+          class="pdp-lightbox__nav pdp-lightbox__nav--next"
+          id="pdp-lightbox-next"
+          aria-label={t(lang, 'pdp', 'lightbox_next')}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            ><path d="m9 18 6-6-6-6" /></svg
+          >
+        </button>
+      </div>
+    </dialog>
+    </>
+  ) : (
+    <section class="nf">
+      <p class="nf__code">404</p>
+      <h1 class="nf__title">{t(lang, 'pdp', 'product_not_found_title')}</h1>
+      <p class="nf__sub">{t(lang, 'pdp', 'product_not_found_sub')}</p>
+      <div class="nf__actions">
+        <a href={getPathForLang('/', lang)} class="btn btn-primary">{t(lang, 'pdp', 'product_not_found_home')}</a>
+        <a href={getPathForLang('/shop', lang)} class="btn btn-outline">{t(lang, 'pdp', 'product_not_found_shop')}</a>
       </div>
     </section>
   )}
 </Layout>
 
 <style>
-/* Hero */
-.pdp-hero { display: grid; grid-template-columns: 1fr 480px; min-height: calc(100svh - var(--header-h)); }
-@media (max-width: 1024px) { .pdp-hero { grid-template-columns: 1fr; } }
+  .pdp-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: clamp(16px, 3vw, 40px);
+    align-items: start;
+    min-height: 75vh;
+    min-height: 75svh;
+    padding: 24px clamp(16px, 3vw, 40px) 40px;
+    max-width: 1600px;
+    margin-inline: auto;
+  }
+  @media (max-width: 1024px) {
+    .pdp-hero {
+      grid-template-columns: 1fr;
+    }
+  }
 
-.pdp-hero__gallery { position: relative; overflow: hidden; background: var(--c-surface); }
-.pdp-hero__img-wrap { position: absolute; inset: 0; opacity: 0; transition: opacity 0.5s ease; }
-.pdp-hero__img-wrap[data-index="0"] { opacity: 1; position: relative; height: 100%; }
-.pdp-hero__img-wrap.is-active { opacity: 1; position: relative; height: 100%; }
-.pdp-hero__img { width: 100%; height: 100%; object-fit: cover; }
+  .pdp-hero__media {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(14px, 2vw, 22px);
+    min-height: min(75svh, 820px);
+    align-items: stretch;
+  }
 
-.pdp-hero__thumbs { position: absolute; bottom: 24px; left: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 10; }
-.pdp-hero__thumb { width: 56px; height: 72px; overflow: hidden; border-radius: var(--r); border: 2px solid transparent; opacity: 0.6; transition: all var(--ease); }
-.pdp-hero__thumb.is-active, .pdp-hero__thumb:hover { border-color: var(--c-accent); opacity: 1; }
-.pdp-hero__thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .pdp-hero__media-carousel-block {
+    display: flex;
+    gap: 12px;
+    flex: 1;
+    min-height: min(70svh, 780px);
+    align-items: stretch;
+  }
+  @media (max-width: 1024px) {
+    .pdp-hero__media {
+      min-height: 0;
+    }
+    .pdp-hero__media-carousel-block {
+      flex-direction: column-reverse;
+      min-height: 0;
+    }
+  }
 
-.pdp-hero__info {
-  display: flex; flex-direction: column; padding: 48px 40px;
-  background: var(--c-bg); overflow-y: auto; gap: 16px;
-}
-@media (max-width: 1024px) { .pdp-hero__info { padding: 32px 24px; } }
+  .pdp-hero__drop-rail {
+    padding: 0;
+    margin: 0;
+    border-top: 1px solid var(--c-border);
+    padding-top: clamp(12px, 2vw, 20px);
+  }
+  .pdp-hero__drop-rail-inner {
+    width: 100%;
+  }
+  .pdp-hero__drop-rail-title {
+    font-family: var(--font-title);
+    font-size: clamp(14px, 1.4vw, 18px);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0 0 12px;
+    color: var(--c-text);
+  }
+  .pdp-hero__drop-rail-sub {
+    font-weight: 500;
+    color: var(--c-muted);
+    text-transform: none;
+  }
 
-.pdp-breadcrumb__list { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--c-muted); flex-wrap: wrap; }
-.pdp-breadcrumb__list a:hover { color: var(--c-text); }
-.pdp-badge { display: inline-block; background: var(--c-accent); color: var(--c-black); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 10px; border-radius: var(--r); }
-.pdp-title { font-family: var(--font-title); font-size: clamp(36px, 4vw, 56px); text-transform: uppercase; line-height: 0.95; }
-.pdp-price { font-size: 28px; font-weight: 700; color: var(--c-accent); }
-.pdp-desc { font-size: 14px; line-height: 1.7; color: var(--c-muted); }
-.pdp-label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--c-muted); margin-bottom: 8px; }
-.pdp-sizes { display: flex; flex-wrap: wrap; gap: 8px; }
-.pdp-size-btn { padding: 10px 16px; border: 1.5px solid var(--c-border); border-radius: var(--r); font-size: 13px; font-weight: 600; color: var(--c-muted); transition: all var(--ease); }
-.pdp-size-btn:hover, .pdp-size-btn.is-active { border-color: var(--c-accent); color: var(--c-accent); }
-.pdp-atc { padding: 16px; width: 100%; font-size: 14px; margin-top: auto; }
-.pdp-qty-wrap {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid var(--c-border);
-  border-radius: var(--r);
-  overflow: hidden;
-}
-.pdp-qty-btn {
-  width: 40px;
-  height: 40px;
-  border: 0;
-  background: var(--c-surface);
-  color: var(--c-text);
-  font-size: 18px;
-  line-height: 1;
-}
-.pdp-qty-input {
-  width: 56px;
-  height: 40px;
-  text-align: center;
-  border: 0;
-  border-left: 1px solid var(--c-border);
-  border-right: 1px solid var(--c-border);
-  background: #0d0d0d;
-  color: var(--c-text);
-}
-.pdp-qty-input::-webkit-outer-spin-button,
-.pdp-qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.pdp-qty-input[type='number'] { -moz-appearance: textfield; }
+  /** Trilhos de ProductCard: altura fixa + colunas estreitas (drop + “mais novos”). */
+  .pdp-product-rail {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 10px;
+    height: 300px;
+    max-height: 300px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+  }
+  .pdp-product-rail > * {
+    flex: 0 0 168px;
+    width: 168px;
+    max-width: 168px;
+    min-width: 168px;
+    scroll-snap-align: start;
+    align-self: stretch;
+  }
+  .pdp-product-rail :global(.pc) {
+    height: 100%;
+    max-height: 300px;
+  }
+  .pdp-product-rail :global(.pc__link) {
+    flex-shrink: 0;
+  }
+  .pdp-product-rail :global(.pc__img-wrap) {
+    aspect-ratio: 1;
+    max-height: 150px;
+    margin-bottom: 8px;
+  }
+  .pdp-product-rail :global(.pc__img) {
+    max-height: 150px;
+  }
+  .pdp-product-rail :global(.pc__body) {
+    flex: 1;
+    min-height: 0;
+  }
+  .pdp-product-rail :global(.pc__name) {
+    font-size: 11px;
+    min-height: 0;
+    -webkit-line-clamp: 2;
+  }
+  .pdp-product-rail :global(.pc__bottom) {
+    margin-top: 6px;
+    padding-bottom: 0;
+  }
+  .pdp-product-rail :global(.pc__price-current) {
+    font-size: 13px;
+  }
+  .pdp-product-rail :global(.pc__price-striked) {
+    font-size: 10px;
+  }
+  .pdp-product-rail :global(.pc__quick-add) {
+    width: 30px;
+    height: 30px;
+  }
+  .pdp-product-rail :global(.pc__variants) {
+    margin-top: 6px;
+    margin-bottom: 4px;
+    gap: 4px;
+  }
+  .pdp-product-rail :global(.pc__variant-btn) {
+    height: 24px;
+    min-width: 28px;
+    font-size: 9px;
+    padding: 0 6px;
+  }
 
-/* Sections */
-.pdp-section { padding-block: 96px; }
-.pdp-section-title { font-family: var(--font-title); font-size: clamp(36px, 4vw, 56px); text-transform: uppercase; margin: 12px 0 24px; }
+  .pdp-hero__thumbs-rail-wrap {
+    flex: 0 0 72px;
+    min-height: 0;
+    max-height: min(75svh, 820px);
+  }
+  @media (max-width: 1024px) {
+    .pdp-hero__thumbs-rail-wrap {
+      flex: none;
+      max-height: 88px;
+      width: 100%;
+    }
+  }
 
-.pdp-inspiration__inner { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
-@media (max-width: 768px) { .pdp-inspiration__inner { grid-template-columns: 1fr; } }
-.pdp-inspiration__body { font-size: 16px; line-height: 1.8; color: var(--c-muted); }
-.pdp-inspiration__img { overflow: hidden; border-radius: var(--r-md); }
-.pdp-inspiration__img img { width: 100%; }
+  .pdp-hero__thumbs-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: min(75svh, 820px);
+    padding: 4px 2px;
+    scrollbar-width: thin;
+  }
+  @media (max-width: 1024px) {
+    .pdp-hero__thumbs-rail {
+      flex-direction: row;
+      overflow-x: auto;
+      overflow-y: hidden;
+      max-height: none;
+      padding: 4px 0;
+    }
+  }
 
-.pdp-features__grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 2px; margin-top: 40px; }
-@media (max-width: 600px) { .pdp-features__grid { grid-template-columns: 1fr; } }
-.pdp-feature { background: var(--c-surface); padding: 32px; }
-.pdp-feature__num { font-family: var(--font-title); font-size: 48px; color: var(--c-border); display: block; }
-.pdp-feature__text { font-size: 15px; line-height: 1.7; color: var(--c-muted); margin-top: 8px; }
+  .pdp-hero__thumb {
+    flex-shrink: 0;
+    width: 64px;
+    height: 80px;
+    padding: 0;
+    border: 2px solid var(--c-border);
+    border-radius: var(--r);
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--c-surface);
+    opacity: 0.65;
+    transition: opacity var(--ease), border-color var(--ease);
+  }
+  .pdp-hero__thumb.is-active,
+  .pdp-hero__thumb:hover {
+    opacity: 1;
+    border-color: var(--c-accent);
+  }
+  .pdp-hero__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
 
-.pdp-street { position: relative; height: 60vh; overflow: hidden; }
-.pdp-street__img { width: 100%; height: 100%; object-fit: cover; }
-.pdp-street__content { position: absolute; bottom: 40px; left: 0; right: 0; }
-.pdp-street__title { font-family: var(--font-title); font-size: clamp(32px, 5vw, 72px); text-transform: uppercase; color: var(--c-white); text-shadow: 0 2px 20px rgba(0,0,0,.5); }
+  .pdp-hero__stage {
+    flex: 1;
+    position: relative;
+    min-width: 0;
+    background: var(--c-surface);
+    border-radius: var(--r-md);
+    overflow: hidden;
+  }
 
-.pdp-carousel {
-  margin-top: 24px;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(220px, 1fr);
-  gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 6px;
-  scroll-snap-type: x mandatory;
-}
-.pdp-carousel > * { scroll-snap-align: start; min-width: 220px; }
+  .pdp-hero__main {
+    flex: 1;
+    min-width: 0;
+    height: min(75svh, 820px);
+    min-height: 320px;
+    display: flex;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+  @media (max-width: 1024px) {
+    .pdp-hero__main {
+      height: min(60svh, 520px);
+    }
+  }
+
+  .pdp-hero__main-carousel {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+  .pdp-main-discount {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 2;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    background: #16a34a;
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: var(--r);
+    pointer-events: none;
+  }
+
+  .pdp-hero__main-img-wrap {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: var(--c-bg);
+    border: none;
+    margin: 0;
+    padding: 0;
+    cursor: zoom-in;
+    font: inherit;
+    color: inherit;
+    text-align: inherit;
+  }
+  .pdp-hero__main-img-wrap:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+  }
+  .pdp-hero__main-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    opacity: 1;
+    transition: opacity 0.32s ease;
+  }
+
+  .pdp-hero__nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--c-border);
+    background: rgba(0, 0, 0, 0.55);
+    color: var(--c-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background var(--ease);
+  }
+  .pdp-hero__nav:hover {
+    background: rgba(0, 0, 0, 0.75);
+  }
+  .pdp-hero__nav--prev {
+    left: 12px;
+  }
+  .pdp-hero__nav--next {
+    right: 12px;
+  }
+
+  .pdp-hero__buy-col {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    padding-top: 8px;
+    min-width: 0;
+  }
+  @media (max-width: 1024px) {
+    .pdp-hero__buy-col {
+      align-items: center;
+    }
+  }
+
+  .pdp-hero__sidebar-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    max-width: 500px;
+    max-height: min(calc(100svh - 40px), 920px);
+    overflow-y: auto;
+    padding-right: 4px;
+    scrollbar-width: thin;
+  }
+  @media (max-width: 1024px) {
+    .pdp-hero__sidebar-stack {
+      max-height: none;
+      overflow-y: visible;
+    }
+  }
+
+  .pdp-buy-card {
+    width: 100%;
+    padding: 22px 22px 20px;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-md);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .pdp-characteristics {
+    width: 100%;
+    padding: 16px 18px;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-md);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .pdp-characteristics .pdp-details {
+    margin: 0;
+  }
+
+  .pdp-stock {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--c-muted);
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  .pdp-breadcrumb__list {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--c-muted);
+    flex-wrap: wrap;
+  }
+  .pdp-breadcrumb__list a:hover {
+    color: var(--c-text);
+  }
+
+  .pdp-badge {
+    display: inline-block;
+    background: var(--c-accent);
+    color: var(--c-black);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: var(--r);
+  }
+
+  .pdp-title {
+    font-family: var(--font-title);
+    font-size: clamp(26px, 3.2vw, 40px);
+    text-transform: uppercase;
+    line-height: 1;
+    margin: 0;
+  }
+
+  .pdp-variation-heading {
+    font-size: 12px;
+    line-height: 1.4;
+    margin: 0 0 2px;
+    color: var(--c-muted);
+  }
+  .pdp-variation-heading__label {
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--c-muted);
+  }
+  .pdp-variation-heading__value {
+    color: var(--c-text);
+    font-weight: 600;
+  }
+
+  .pdp-variant-row {
+    margin-top: 4px;
+  }
+  .pdp-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--c-muted);
+    margin-bottom: 6px;
+  }
+  .pdp-variant-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .pdp-variant-btn {
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: var(--c-bg);
+    color: var(--c-text);
+    font-size: 11px;
+    min-height: 32px;
+    padding: 0 12px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .pdp-variant-btn.is-selected {
+    border-color: var(--c-accent);
+    background: var(--c-accent);
+    color: var(--c-white);
+  }
+  .pdp-variant-btn.is-unavailable {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .pdp-variant-x {
+    display: none;
+  }
+  .pdp-variant-btn.is-unavailable .pdp-variant-x {
+    display: flex;
+    position: absolute;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.4);
+    font-size: 16px;
+  }
+  .pdp-variant-btn--color {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pdp-variant-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    flex-shrink: 0;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  }
+
+  .pdp-size-chart-row {
+    margin: 8px 0 0;
+  }
+  .pdp-size-chart-link {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--c-accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .pdp-size-chart-link:hover {
+    color: var(--c-text);
+  }
+
+  .pdp-measure-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 2px;
+  }
+  .pdp-pill-btn {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--c-text);
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: border-color var(--ease), background var(--ease);
+  }
+  .pdp-pill-btn:hover {
+    border-color: var(--c-accent);
+    color: var(--c-accent);
+  }
+  .pdp-pill-btn--ghost {
+    background: transparent;
+  }
+
+  .pdp-price-qty-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .pdp-price-block {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+  }
+  .pdp-price-striked {
+    font-size: 15px;
+    text-decoration: line-through;
+    color: var(--c-muted);
+  }
+  .pdp-price-current {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--c-accent);
+  }
+
+  .pdp-qty-wrap {
+    flex: 0 0 auto;
+    min-width: 120px;
+    max-width: 160px;
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+
+  .pdp-buy-actions {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .pdp-buy-now {
+    flex: 3;
+    min-width: 0;
+    padding: 14px 18px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .pdp-atc-icon {
+    flex: 1;
+    max-width: 56px;
+    min-width: 48px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--c-surface2);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r);
+    color: var(--c-text);
+    transition: background var(--ease), border-color var(--ease);
+  }
+  .pdp-atc-icon:hover:not(:disabled) {
+    background: var(--c-accent);
+    border-color: var(--c-accent);
+    color: var(--c-black);
+  }
+  .pdp-atc-icon:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .pdp-atc-icon img {
+    display: block;
+    filter: none;
+  }
+  .pdp-atc-icon:hover:not(:disabled) img {
+    filter: brightness(0);
+  }
+  .pdp-qty-btn {
+    width: 36px;
+    height: 40px;
+    border: 0;
+    background: var(--c-bg);
+    color: var(--c-text);
+    font-size: 18px;
+  }
+  .pdp-qty-input {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    text-align: center;
+    border: 0;
+    border-left: 1px solid var(--c-border);
+    border-right: 1px solid var(--c-border);
+    background: #0d0d0d;
+    color: var(--c-text);
+  }
+  .pdp-qty-input::-webkit-outer-spin-button,
+  .pdp-qty-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .pdp-shipping {
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--c-border);
+  }
+  .pdp-cep-row {
+    display: flex;
+    gap: 8px;
+  }
+  .pdp-cep-input {
+    width: 100%;
+    max-width: 200px;
+    padding: 10px 12px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r);
+    background: var(--c-bg);
+    color: var(--c-text);
+    font-size: 14px;
+  }
+  .pdp-cep-hint {
+    font-size: 12px;
+    color: #f87171;
+    margin-top: 6px;
+    min-height: 1.2em;
+  }
+  .pdp-cep-static {
+    font-size: 12px;
+    color: var(--c-muted);
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+
+  .pdp-details {
+    border: 1px solid var(--c-border);
+    border-radius: var(--r);
+    padding: 0 12px;
+    background: var(--c-bg);
+  }
+  .pdp-details summary {
+    cursor: pointer;
+    padding: 12px 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .pdp-details__body {
+    padding-bottom: 12px;
+  }
+  .pdp-composition {
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--c-muted);
+  }
+  .pdp-tech-dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 16px;
+    font-size: 13px;
+    padding-bottom: 12px;
+  }
+  .pdp-tech-dl dt {
+    color: var(--c-muted);
+    font-weight: 600;
+  }
+  .pdp-tech-dl dd {
+    margin: 0;
+    color: var(--c-text);
+  }
+
+  .pdp-collection-sub {
+    font-weight: 500;
+    color: var(--c-muted);
+    text-transform: none;
+  }
+
+  .pdp-carousel {
+    margin-top: 24px;
+  }
+
+  .pdp-below-fold {
+    padding-bottom: 48px;
+  }
+
+  .pdp-accordion-row__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 40px 48px;
+    align-items: start;
+  }
+  .pdp-accordion-row__grid--split {
+    grid-template-columns: 1fr 1fr;
+  }
+  @media (max-width: 900px) {
+    .pdp-accordion-row__grid--split {
+      grid-template-columns: 1fr;
+    }
+  }
+  .pdp-accordion-row__col .pdp-faq__list {
+    max-width: none;
+    width: 100%;
+  }
+  .pdp-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(32px, 5vw, 80px);
+    align-items: center;
+    padding-block: clamp(48px, 8vw, 96px);
+  }
+  .pdp-split--img-left .pdp-split__img {
+    order: -1;
+  }
+  @media (max-width: 768px) {
+    .pdp-split {
+      grid-template-columns: 1fr;
+    }
+    .pdp-split--img-left .pdp-split__img {
+      order: 0;
+    }
+  }
+  .pdp-split__title {
+    font-family: var(--font-title);
+    font-size: clamp(28px, 4vw, 48px);
+    text-transform: uppercase;
+    margin: 8px 0 16px;
+  }
+  .pdp-split__body {
+    font-size: 15px;
+    line-height: 1.75;
+    color: var(--c-muted);
+  }
+  .pdp-split__img {
+    border-radius: var(--r-md);
+    overflow: hidden;
+  }
+  .pdp-split__img img {
+    width: 100%;
+    display: block;
+  }
+
+  .pdp-fullbleed {
+    position: relative;
+    margin-block: clamp(40px, 6vw, 80px);
+    min-height: 45vh;
+  }
+  .pdp-fullbleed__img {
+    width: 100%;
+    height: 50vh;
+    object-fit: cover;
+    display: block;
+  }
+  .pdp-fullbleed__cap {
+    position: absolute;
+    bottom: 24px;
+    left: 0;
+    right: 0;
+  }
+  .pdp-fullbleed__title {
+    font-family: var(--font-title);
+    font-size: clamp(28px, 5vw, 56px);
+    text-transform: uppercase;
+    color: #fff;
+    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.6);
+  }
+
+  .pdp-faq__list {
+    max-width: 720px;
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .pdp-faq__item {
+    border: 1px solid var(--c-border);
+    border-radius: var(--r);
+    padding: 0 16px;
+    background: var(--c-surface);
+  }
+  .pdp-faq__item summary {
+    cursor: pointer;
+    padding: 14px 0;
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .pdp-faq__a {
+    padding-bottom: 16px;
+    font-size: 14px;
+    color: var(--c-muted);
+    line-height: 1.65;
+  }
+
+  .pdp-dialog {
+    max-width: min(96vw, 920px);
+    max-height: 90vh;
+    padding: 0;
+    border: 1px solid var(--c-border);
+    background: var(--c-surface);
+    color: var(--c-text);
+  }
+  .pdp-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.75);
+  }
+  .pdp-dialog__close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--r);
+    border: 1px solid var(--c-border);
+    background: var(--c-bg);
+    color: var(--c-text);
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .pdp-dialog__img {
+    width: 100%;
+    max-height: 85vh;
+    object-fit: contain;
+    display: block;
+  }
+
+  .pdp-lightbox {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #fff;
+    overflow: hidden;
+  }
+  .pdp-lightbox::backdrop {
+    background: #000;
+  }
+  .pdp-lightbox__backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border: none;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    cursor: zoom-out;
+  }
+  .pdp-lightbox__close {
+    position: absolute;
+    top: max(12px, env(safe-area-inset-top, 0px));
+    right: max(12px, env(safe-area-inset-right, 0px));
+    z-index: 3;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--r);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pdp-lightbox__row {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: max(52px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
+      max(24px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+    box-sizing: border-box;
+    pointer-events: none;
+  }
+  .pdp-lightbox__nav,
+  .pdp-lightbox__inner {
+    pointer-events: auto;
+  }
+  .pdp-lightbox__inner {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 0;
+    gap: 12px;
+  }
+  .pdp-lightbox__img {
+    max-width: 100%;
+    max-height: calc(100dvh - 120px);
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  .pdp-lightbox__counter {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.75);
+  }
+  .pdp-lightbox__nav {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+  .pdp-lightbox__nav:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+  .pdp-lightbox__nav.is-hidden {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  @media (max-width: 640px) {
+    .pdp-lightbox__nav--prev {
+      position: absolute;
+      left: max(8px, env(safe-area-inset-left, 0px));
+      bottom: max(24px, env(safe-area-inset-bottom, 0px));
+      top: auto;
+      transform: none;
+    }
+    .pdp-lightbox__nav--next {
+      position: absolute;
+      right: max(8px, env(safe-area-inset-right, 0px));
+      bottom: max(24px, env(safe-area-inset-bottom, 0px));
+      top: auto;
+      transform: none;
+    }
+    .pdp-lightbox__row {
+      padding-bottom: 88px;
+    }
+  }
+
+  .nf {
+    min-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    text-align: center;
+    padding: 40px 20px;
+  }
+  .nf__code {
+    font-family: var(--font-title);
+    font-size: clamp(80px, 15vw, 180px);
+    color: var(--c-accent);
+    line-height: 1;
+    letter-spacing: 0.05em;
+  }
+  .nf__title {
+    font-family: var(--font-title);
+    font-size: clamp(28px, 5vw, 56px);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .nf__sub {
+    font-size: 15px;
+    color: var(--c-muted);
+    max-width: 420px;
+    line-height: 1.55;
+  }
+  .nf__actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 8px;
+  }
 </style>
 
 <script>
-  // Gallery
-  const wraps = document.querySelectorAll<HTMLElement>('.pdp-hero__img-wrap');
-  const thumbs = document.querySelectorAll<HTMLButtonElement>('.pdp-hero__thumb');
+  type OptionRow = { id: string; title: string; values: string[] };
 
-  function showImg(idx: number) {
-    wraps.forEach((w, i) => {
-      w.classList.toggle('is-active', i === idx);
-      w.setAttribute('aria-hidden', i !== idx ? 'true' : 'false');
-    });
-    thumbs.forEach((t, i) => {
-      t.classList.toggle('is-active', i === idx);
-      t.setAttribute('aria-pressed', i === idx ? 'true' : 'false');
-    });
-  }
-  thumbs.forEach((t, i) => t.addEventListener('click', () => showImg(i)));
+  type VariantMap = {
+    id: string;
+    title: string;
+    price: number;
+    soldOut: boolean;
+    maxQty?: number | null;
+    options: Record<string, string>;
+    images?: string[];
+    slideUrls?: string[];
+    priceDisplay?: string;
+    originalDisplay?: string | null;
+    discountPercent?: number;
+    allowBackorder?: boolean;
+  };
 
-  // Size selection
-  const sizeBtns = document.querySelectorAll<HTMLButtonElement>('.pdp-size-btn');
-  const atcBtn   = document.getElementById('pdp-atc') as HTMLButtonElement | null;
-  const qtyInput = document.getElementById('pdp-qty-input') as HTMLInputElement | null;
-  const qtyDec = document.getElementById('pdp-qty-dec') as HTMLButtonElement | null;
-  const qtyInc = document.getElementById('pdp-qty-inc') as HTMLButtonElement | null;
-  function resolveMaxQty() {
-    if (!atcBtn) return null;
-    const raw = Number(atcBtn.dataset.maxQty || '');
-    return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : null;
-  }
-  function clampQty(v: number) {
-    const max = resolveMaxQty();
-    if (!Number.isFinite(v) || v < 1) return 1;
-    if (max && v > max) return max;
-    return Math.floor(v);
-  }
-  function syncQty(next: number) {
-    const safe = clampQty(next);
-    if (qtyInput) qtyInput.value = String(safe);
-    if (atcBtn) atcBtn.dataset.qty = String(safe);
-  }
-  syncQty(Number(qtyInput?.value || 1));
-  qtyDec?.addEventListener('click', () => syncQty(Number(qtyInput?.value || 1) - 1));
-  qtyInc?.addEventListener('click', () => syncQty(Number(qtyInput?.value || 1) + 1));
-  qtyInput?.addEventListener('input', () => syncQty(Number(qtyInput.value || 1)));
-  sizeBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      sizeBtns.forEach(b => { b.classList.remove('is-active'); b.setAttribute('aria-checked', 'false'); });
-      btn.classList.add('is-active'); btn.setAttribute('aria-checked', 'true');
-      if (atcBtn) {
-        atcBtn.dataset.variantId = btn.dataset.variantId ?? '';
-        atcBtn.dataset.price = btn.dataset.price ?? '';
-        atcBtn.dataset.variantTitle = btn.dataset.variantTitle ?? '';
-        atcBtn.dataset.maxQty = btn.dataset.maxQty ?? '';
-        syncQty(Number(qtyInput?.value || 1));
+  type StockMsgs = {
+    out: string;
+    backorder: string;
+    unverified: string;
+    available: string;
+    units: string;
+  };
+
+  const root = document.querySelector('[data-pdp-root]') as HTMLElement | null;
+  if (root) {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function decodeJson<T>(value: string): T | null {
+      try {
+        return JSON.parse(decodeURIComponent(value)) as T;
+      } catch {
+        return null;
+      }
+    }
+
+    const variants = decodeJson<VariantMap[]>(root.dataset.variants || '') || [];
+    const optionRows = decodeJson<OptionRow[]>(root.dataset.optionRows || '') || [];
+    let stockMsgs: StockMsgs = {
+      out: '',
+      backorder: '',
+      unverified: '',
+      available: '',
+      units: '',
+    };
+    try {
+      stockMsgs = { ...stockMsgs, ...JSON.parse(root.dataset.stockMsgs || '{}') };
+    } catch {
+      /* ignore */
+    }
+    const stockReliableFlag = root.dataset.stockReliable === 'true';
+
+    const rail = document.getElementById('pdp-thumbs-rail');
+    const mainImg = document.getElementById('pdp-main-img') as HTMLImageElement | null;
+    const mainImgWrap = document.getElementById('pdp-main-img-wrap');
+    const lightbox = document.getElementById('pdp-lightbox') as HTMLDialogElement | null;
+    const lightboxImg = document.getElementById('pdp-lightbox-img') as HTMLImageElement | null;
+    const lightboxCounter = document.getElementById('pdp-lightbox-counter');
+    const lbPrev = document.getElementById('pdp-lightbox-prev');
+    const lbNext = document.getElementById('pdp-lightbox-next');
+    const prevBtn = document.getElementById('pdp-carousel-prev');
+    const nextBtn = document.getElementById('pdp-carousel-next');
+    const atcBtn = document.getElementById('pdp-atc') as HTMLButtonElement | null;
+    const buyNowBtn = document.getElementById('pdp-buy-now') as HTMLButtonElement | null;
+    const qtyInput = document.getElementById('pdp-qty-input') as HTMLInputElement | null;
+    const qtyDec = document.getElementById('pdp-qty-dec');
+    const qtyInc = document.getElementById('pdp-qty-inc');
+    const priceCurrent = document.getElementById('pdp-price-current');
+    const priceOriginal = document.getElementById('pdp-price-original');
+    const mainDiscount = document.getElementById('pdp-main-discount');
+    const variationValueEl = document.getElementById('pdp-variation-value');
+    const stockLine = document.getElementById('pdp-stock-line');
+    const cepInput = document.getElementById('pdp-cep-input') as HTMLInputElement | null;
+    const cepHint = document.getElementById('pdp-cep-hint');
+
+    let slides: string[] = [];
+    let slideIndex = 0;
+    let autoplayTimer: ReturnType<typeof setInterval> | null = null;
+    let autoplayPaused = false;
+    let pdpSlidesReady = false;
+
+    const variantMatches = (variant: VariantMap, selected: Record<string, string>) =>
+      Object.entries(selected).every(([k, v]) => !v || variant.options?.[k] === v);
+
+    const getFirstAvailable = (selected: Record<string, string>) =>
+      variants.find((v) => variantMatches(v, selected) && !v.soldOut) || null;
+
+    const allowedOptionIds = new Set(optionRows.map((r) => r.id));
+    const selected: Record<string, string> = {};
+    const currentId = atcBtn?.dataset.variantId || '';
+    const current = variants.find((v) => v.id === currentId) || getFirstAvailable({}) || variants[0];
+    if (current?.options) {
+      Object.entries(current.options).forEach(([k, v]) => {
+        if (allowedOptionIds.has(k)) selected[k] = String(v || '');
+      });
+    }
+
+    function scrollThumbToTop(idx: number) {
+      if (!rail) return;
+      const btn = rail.children[idx] as HTMLElement | undefined;
+      if (!btn) return;
+      const isMobile = window.matchMedia('(max-width: 1024px)').matches;
+      if (isMobile) {
+        btn.scrollIntoView({ block: 'nearest', inline: 'start', behavior: reducedMotion ? 'auto' : 'smooth' });
+      } else {
+        rail.scrollTo({ top: btn.offsetTop, behavior: reducedMotion ? 'auto' : 'smooth' });
+      }
+    }
+
+    function renderThumbs(urls: string[]) {
+      if (!rail) return;
+      rail.innerHTML = '';
+      urls.forEach((url, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'pdp-hero__thumb' + (i === slideIndex ? ' is-active' : '');
+        b.dataset.slideIdx = String(i);
+        b.setAttribute('role', 'tab');
+        b.setAttribute('aria-selected', i === slideIndex ? 'true' : 'false');
+        b.setAttribute('aria-label', `Slide ${i + 1}`);
+        const im = document.createElement('img');
+        im.src = url;
+        im.alt = '';
+        im.width = 64;
+        im.height = 80;
+        im.loading = i === 0 ? 'eager' : 'lazy';
+        b.appendChild(im);
+        b.addEventListener('click', () => goToSlide(i));
+        rail.appendChild(b);
+      });
+    }
+
+    function updateMainImage(animate = true) {
+      if (!mainImg || !slides.length) return;
+      const u = slides[Math.min(slideIndex, slides.length - 1)] || '/logo.webp';
+      if (reducedMotion || !animate) {
+        mainImg.src = u;
+        mainImg.style.opacity = '1';
+        return;
+      }
+      mainImg.style.opacity = '0';
+      window.setTimeout(() => {
+        mainImg.src = u;
+        const show = () => {
+          mainImg.style.opacity = '1';
+        };
+        const dec = (mainImg as HTMLImageElement & { decode?: () => Promise<void> }).decode;
+        if (typeof dec === 'function') dec.call(mainImg).then(show).catch(show);
+        else if (mainImg.complete) requestAnimationFrame(show);
+        else mainImg.addEventListener('load', show, { once: true });
+      }, 140);
+    }
+
+    function syncThumbActive() {
+      if (!rail) return;
+      Array.from(rail.querySelectorAll('.pdp-hero__thumb')).forEach((el, i) => {
+        el.classList.toggle('is-active', i === slideIndex);
+        el.setAttribute('aria-selected', i === slideIndex ? 'true' : 'false');
+      });
+      scrollThumbToTop(slideIndex);
+    }
+
+    function fillLightboxImage() {
+      if (!lightboxImg) return;
+      const u = slides[Math.min(slideIndex, slides.length - 1)] || '/logo.webp';
+      lightboxImg.src = u;
+      lightboxImg.alt = mainImg?.alt || '';
+      if (lightboxCounter) lightboxCounter.textContent = `${slideIndex + 1} / ${slides.length}`;
+    }
+
+    function syncLightboxIfOpen() {
+      if (!lightbox?.open) return;
+      fillLightboxImage();
+    }
+
+    function refreshLightboxNavVisibility() {
+      const hide = slides.length <= 1;
+      lbPrev?.classList.toggle('is-hidden', hide);
+      lbNext?.classList.toggle('is-hidden', hide);
+    }
+
+    function goToSlide(idx: number) {
+      if (!slides.length) return;
+      slideIndex = ((idx % slides.length) + slides.length) % slides.length;
+      updateMainImage();
+      syncThumbActive();
+      syncLightboxIfOpen();
+    }
+
+    function nextSlide() {
+      goToSlide(slideIndex + 1);
+    }
+
+    function prevSlide() {
+      goToSlide(slideIndex - 1);
+    }
+
+    function startAutoplay() {
+      if (reducedMotion || slides.length <= 1) return;
+      stopAutoplay();
+      autoplayTimer = setInterval(() => {
+        if (!autoplayPaused) nextSlide();
+      }, 3000);
+    }
+
+    function stopAutoplay() {
+      if (autoplayTimer) {
+        clearInterval(autoplayTimer);
+        autoplayTimer = null;
+      }
+    }
+
+    function applySlides(urls: string[]) {
+      const list = urls.length ? urls : ['/logo.webp'];
+      slides = list;
+      slideIndex = 0;
+      renderThumbs(slides);
+      updateMainImage(pdpSlidesReady);
+      pdpSlidesReady = true;
+      syncThumbActive();
+      stopAutoplay();
+      startAutoplay();
+      refreshLightboxNavVisibility();
+    }
+
+    function updatePrice(variant: VariantMap) {
+      if (priceCurrent) priceCurrent.textContent = variant.priceDisplay || '';
+      if (priceOriginal) {
+        if (variant.originalDisplay) {
+          priceOriginal.textContent = variant.originalDisplay;
+          priceOriginal.hidden = false;
+        } else {
+          priceOriginal.textContent = '';
+          priceOriginal.hidden = true;
+        }
+      }
+      if (mainDiscount) {
+        const p = variant.discountPercent ?? 0;
+        if (p > 0) {
+          mainDiscount.textContent = `−${p}%`;
+          mainDiscount.hidden = false;
+        } else {
+          mainDiscount.hidden = true;
+        }
+      }
+    }
+
+    function updateVariationLabel(variant: VariantMap) {
+      if (!variationValueEl) return;
+      const parts = optionRows
+        .map((row) => String(selected[row.id] ?? variant.options?.[row.id] ?? '').trim())
+        .filter(Boolean);
+      variationValueEl.textContent = parts.join(' · ') || variant.title || '';
+    }
+
+    function updateStockLine(variant: VariantMap) {
+      if (!stockLine) return;
+      if (variant.soldOut) {
+        stockLine.textContent = stockMsgs.out;
+        return;
+      }
+      if (variant.allowBackorder) {
+        stockLine.textContent = stockMsgs.backorder;
+        return;
+      }
+      if (!stockReliableFlag) {
+        stockLine.textContent = stockMsgs.unverified;
+        return;
+      }
+      const n = variant.maxQty;
+      if (n != null && Number(n) > 0) {
+        stockLine.textContent = stockMsgs.units.replace('{count}', String(Math.floor(Number(n))));
+        return;
+      }
+      stockLine.textContent = stockMsgs.available;
+    }
+
+    function setFromVariant(variant: VariantMap | null) {
+      if (!variant || !atcBtn) return;
+      atcBtn.dataset.variantId = variant.id || '';
+      atcBtn.dataset.price = String(variant.price || 0);
+      atcBtn.dataset.maxQty =
+        variant.maxQty != null && Number.isFinite(Number(variant.maxQty)) && Number(variant.maxQty) >= 0
+          ? String(Math.floor(Number(variant.maxQty)))
+          : '';
+      const optionTitle = optionRows
+        .map((row) => {
+          const val = String(selected[row.id] ?? variant.options?.[row.id] ?? '').trim();
+          if (!val) return '';
+          return `${row.title}: ${val}`;
+        })
+        .filter((s) => s.length > 0)
+        .join(' | ');
+      atcBtn.dataset.variantTitle = optionTitle || variant.title || '';
+      const urls = variant.slideUrls?.length ? variant.slideUrls : variant.images || [];
+      applySlides(urls);
+      atcBtn.dataset.thumbnail = urls[0] || '';
+      updatePrice(variant);
+      updateVariationLabel(variant);
+      updateStockLine(variant);
+      atcBtn.disabled = !!variant.soldOut;
+      if (buyNowBtn) buyNowBtn.disabled = !!variant.soldOut;
+    }
+
+    function update() {
+      optionRows.forEach((row) => {
+        const rowBtns = root!.querySelectorAll(`.pdp-variant-btn[data-option-id="${row.id}"]`);
+        rowBtns.forEach((btn) => {
+          const el = btn as HTMLButtonElement;
+          const value = el.getAttribute('data-option-value') || '';
+          const selectedForCheck = { ...selected, [row.id]: value };
+          const hasAvailable = variants.some((v) => variantMatches(v, selectedForCheck) && !v.soldOut);
+          el.classList.toggle('is-selected', selected[row.id] === value);
+          el.classList.toggle('is-unavailable', !hasAvailable);
+          el.setAttribute('aria-checked', selected[row.id] === value ? 'true' : 'false');
+        });
+      });
+      const matchedAvailable = getFirstAvailable(selected);
+      if (!matchedAvailable) {
+        optionRows.forEach((row) => {
+          const chosenValue = selected[row.id];
+          if (!chosenValue) return;
+          const hasAvailableForChosen = variants.some(
+            (v) => !v.soldOut && String(v.options?.[row.id] ?? '') === chosenValue
+          );
+          if (!hasAvailableForChosen) selected[row.id] = '';
+        });
+      }
+      const chosen =
+        getFirstAvailable(selected) ||
+        variants.find((v) => !v.soldOut) ||
+        variants.find((v) => variantMatches(v, selected)) ||
+        variants[0];
+      if (chosen) setFromVariant(chosen);
+    }
+
+    root.addEventListener('click', (ev) => {
+      const t = ev.target;
+      if (!(t instanceof Element)) return;
+      const btn = t.closest('.pdp-variant-btn') as HTMLButtonElement | null;
+      if (btn && root.contains(btn)) {
+        if (btn.classList.contains('is-unavailable')) return;
+        const optionId = btn.dataset.optionId || '';
+        const optionValue = btn.dataset.optionValue || '';
+        if (!optionId || !optionValue) return;
+        selected[optionId] = optionValue;
+        update();
+        return;
       }
     });
-  });
 
-  // ATC
-  atcBtn?.addEventListener('click', () => {
-    const { variantId, title, price, thumbnail, variantTitle, maxQty, qty } = atcBtn.dataset;
-    if (!variantId) return;
-    const parsedMax = Number(maxQty || '');
-    const maxQuantity = Number.isFinite(parsedMax) && parsedMax > 0 ? Math.floor(parsedMax) : undefined;
-    const selectedQty = Math.max(1, Number(qty || qtyInput?.value || 1));
-    import('../../lib/cart').then(({ addItem }) => {
-      addItem({
-        variantId,
-        title: title ?? '',
-        variantTitle: variantTitle ?? '',
-        price: Number(price ?? 0),
-        thumbnail: thumbnail ?? '',
-        quantity: selectedQty,
-        maxQuantity,
-      });
-      document.getElementById('side-cart')?.classList.add('is-open');
-      document.getElementById('side-cart-backdrop')?.classList.add('is-active');
-      document.body.style.overflow = 'hidden';
+    prevBtn?.addEventListener('click', () => {
+      autoplayPaused = true;
+      prevSlide();
     });
-  });
+    nextBtn?.addEventListener('click', () => {
+      autoplayPaused = true;
+      nextSlide();
+    });
+
+    root.addEventListener('mouseenter', () => {
+      autoplayPaused = true;
+    });
+    root.addEventListener('mouseleave', () => {
+      autoplayPaused = false;
+    });
+    root.addEventListener('focusin', () => {
+      autoplayPaused = true;
+    });
+    root.addEventListener('focusout', (e) => {
+      if (!root.contains(e.relatedTarget as Node)) autoplayPaused = false;
+    });
+
+    function resolveMaxQty(): number | null {
+      const raw = Number(atcBtn?.dataset.maxQty || '');
+      return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : null;
+    }
+    function clampQty(v: number) {
+      const max = resolveMaxQty();
+      if (!Number.isFinite(v) || v < 1) return 1;
+      if (max && v > max) return max;
+      return Math.floor(v);
+    }
+    function syncQty(next: number) {
+      const safe = clampQty(next);
+      if (qtyInput) qtyInput.value = String(safe);
+      if (atcBtn) atcBtn.dataset.qty = String(safe);
+    }
+    syncQty(Number(qtyInput?.value || 1));
+    qtyDec?.addEventListener('click', () => syncQty(Number(qtyInput?.value || 1) - 1));
+    qtyInc?.addEventListener('click', () => syncQty(Number(qtyInput?.value || 1) + 1));
+    qtyInput?.addEventListener('input', () => syncQty(Number(qtyInput.value || 1)));
+
+    function addCurrentToCart(options?: { openSideCart?: boolean }) {
+      const openSide = options?.openSideCart !== false;
+      if (!atcBtn) return Promise.resolve();
+      const { variantId, title, price, thumbnail, variantTitle, maxQty, qty } = atcBtn.dataset;
+      if (!variantId || atcBtn.disabled) return Promise.resolve();
+      const parsedMax = Number(maxQty || '');
+      const maxQuantity = Number.isFinite(parsedMax) && parsedMax > 0 ? Math.floor(parsedMax) : undefined;
+      const selectedQty = Math.max(1, Number(qty || qtyInput?.value || 1));
+      return import('../../lib/cart').then(({ addItem }) => {
+        addItem({
+          variantId,
+          title: title ?? '',
+          variantTitle: variantTitle ?? '',
+          price: Number(price ?? 0),
+          thumbnail: thumbnail ?? '',
+          quantity: selectedQty,
+          maxQuantity,
+        });
+        if (openSide) {
+          document.getElementById('side-cart')?.classList.add('is-open');
+          document.getElementById('side-cart-backdrop')?.classList.add('is-active');
+          document.body.style.overflow = 'hidden';
+        }
+      });
+    }
+
+    atcBtn?.addEventListener('click', () => {
+      void addCurrentToCart({ openSideCart: true });
+    });
+
+    buyNowBtn?.addEventListener('click', async () => {
+      if (!atcBtn || atcBtn.disabled) return;
+      await addCurrentToCart({ openSideCart: false });
+      const { getCart, hasOutOfStockItems } = await import('../../lib/cart');
+      const items = getCart();
+      if (!items.length) return;
+      if (hasOutOfStockItems(items)) return;
+      const apiUrl = (window as unknown as { __API_URL__?: string }).__API_URL__ || '/api/create-checkout';
+      const btn = buyNowBtn;
+      const orig = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items }),
+        });
+        const data = await res.json();
+        if (data.init_point) window.location.href = data.init_point;
+        else throw new Error('No init_point');
+      } catch {
+        btn.disabled = false;
+        btn.textContent = orig ?? '';
+      }
+    });
+
+    function formatCep(v: string) {
+      const d = v.replace(/\D/g, '').slice(0, 8);
+      if (d.length <= 5) return d;
+      return `${d.slice(0, 5)}-${d.slice(5)}`;
+    }
+    cepInput?.addEventListener('input', () => {
+      const cur = cepInput.value;
+      const next = formatCep(cur);
+      if (cur !== next) cepInput.value = next;
+      if (cepHint) {
+        const ok = next.replace(/\D/g, '').length === 8;
+        cepHint.textContent = ok || next.length === 0 ? '' : 'CEP inválido';
+      }
+    });
+
+    document.querySelectorAll('[data-modal-target]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const id = el.getAttribute('data-modal-target');
+        const dlg = id ? (document.getElementById(id) as HTMLDialogElement | null) : null;
+        autoplayPaused = true;
+        dlg?.showModal();
+      });
+    });
+    document.querySelectorAll('[data-close-modal]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const dlg = el.closest('dialog');
+        dlg?.close();
+        autoplayPaused = false;
+      });
+    });
+    document.querySelectorAll('.pdp-dialog, .pdp-lightbox').forEach((dlg) => {
+      dlg.addEventListener('close', () => {
+        autoplayPaused = false;
+      });
+    });
+
+    mainImgWrap?.addEventListener('click', () => {
+      if (!lightbox || !slides.length) return;
+      refreshLightboxNavVisibility();
+      fillLightboxImage();
+      autoplayPaused = true;
+      lightbox.showModal();
+    });
+
+    lbPrev?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      autoplayPaused = true;
+      prevSlide();
+    });
+    lbNext?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      autoplayPaused = true;
+      nextSlide();
+    });
+
+    lightbox?.addEventListener('keydown', (e) => {
+      if (!lightbox.open) return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        autoplayPaused = true;
+        prevSlide();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        autoplayPaused = true;
+        nextSlide();
+      }
+    });
+
+    update();
+  }
 </script>

@@ -4,6 +4,31 @@ import Footer from '../components/Footer.astro';
 import SideCart from '../components/SideCart.astro';
 import { getLangFromUrl, hreflangMap, type Lang } from '../i18n/utils';
 
+const medusaInternal =
+  import.meta.env.MEDUSA_INTERNAL_URL ||
+  import.meta.env.MEDUSA_URL ||
+  'http://localhost:9003';
+const storePk =
+  'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
+const storeHeaders = { 'x-publishable-api-key': storePk };
+let navDrops: { handle: string; name: string; num: string; img: string }[] = [];
+try {
+  const cRes = await fetch(`${medusaInternal}/store/collections?limit=50`, {
+    headers: storeHeaders,
+    signal: AbortSignal.timeout(3000),
+  });
+  if (cRes.ok) {
+    const data = await cRes.json();
+    navDrops = (data.collections || []).map((c: { handle: string; title: string }, i: number) => ({
+      handle: c.handle,
+      name: c.title,
+      num: String(i + 1).padStart(2, '0'),
+      img: `/collections/${c.handle}.webp`,
+    }));
+  }
+} catch {}
+const showCollectionsInNav = navDrops.length > 0;
+
 interface Props {
   title: string;
   description?: string;
@@ -74,12 +99,12 @@ const schemas: object[] = [
   </head>
   <body class={bodyClass} data-lang={lang}>
     <a class="skip-link" href="#main-content">Skip to content</a>
-    {!bare && <Header lang={lang} />}
+    {!bare && <Header lang={lang} drops={navDrops} />}
     {!bare && <SideCart lang={lang} />}
     <main id="main-content" tabindex="-1">
       <slot />
     </main>
-    {!bare && <Footer lang={lang} />}
+    {!bare && <Footer lang={lang} showCollectionsLink={showCollectionsInNav} />}
   </body>
 </html>
 
@@ -131,6 +156,17 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 .container { max-width: none; width: 100%; margin-inline: auto; padding-inline: 40px; }
 @media (max-width: 768px) { .container { padding-inline: 20px; } }
+
+/** Grelha de produtos (loja, coleções, etc.) — reutilizável em qualquer página. */
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.shop-grid > * {
+  min-width: 0;
+}
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;

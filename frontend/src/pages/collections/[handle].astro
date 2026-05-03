@@ -1,0 +1,227 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ProductCard from '../../components/ProductCard.astro';
+import { getLangFromUrl, t, getPathForLang } from '../../i18n/utils';
+import type { Lang } from '../../i18n/utils';
+import { getMedusaStoreUrl } from '../../lib/medusa-env';
+import { getProductListQueryString, resolveDefaultRegionId } from '../../lib/medusa-pricing';
+
+export const prerender = false;
+
+const lang: Lang = getLangFromUrl(Astro.url);
+const { handle } = Astro.params;
+const h = String(handle ?? '').trim();
+
+const pk = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
+const headers = { 'x-publishable-api-key': pk };
+const base = getMedusaStoreUrl();
+
+let collection: { id: string; title: string; handle: string; metadata?: Record<string, unknown> } | null = null;
+let products: any[] = [];
+
+try {
+  const regionId = await resolveDefaultRegionId(base, headers);
+  const q = getProductListQueryString(regionId);
+
+  const listRes = await fetch(`${base}/store/collections?limit=100`, {
+    headers,
+    signal: AbortSignal.timeout(8000),
+  });
+  if (listRes.ok) {
+    const list = ((await listRes.json()).collections ?? []) as any[];
+    collection = list.find((c) => String(c?.handle ?? '') === h) ?? null;
+  }
+
+  if (collection?.id) {
+    const pRes = await fetch(
+      `${base}/store/products?${q}&collection_id[]=${encodeURIComponent(collection.id)}&limit=60`,
+      { headers, signal: AbortSignal.timeout(8000) }
+    );
+    if (pRes.ok) {
+      const d = await pRes.json();
+      products = d.products ?? [];
+    }
+  }
+} catch {
+  /* Medusa indisponível */
+}
+
+const found = !!collection;
+if (!found && h) {
+  Astro.response.status = 404;
+}
+
+const colTitle = collection?.title ?? h;
+const metaDesc =
+  typeof collection?.metadata?.description === 'string' && String(collection.metadata.description).trim()
+    ? String(collection.metadata.description).trim()
+    : t(lang, 'collections', 'meta_description').replace('{title}', colTitle);
+---
+
+<Layout
+  title={found ? `${colTitle} — Tyer` : t(lang, 'collections', 'not_found_title')}
+  description={found ? metaDesc : t(lang, 'collections', 'not_found_desc')}
+  lang={lang}
+  ogImage={found ? `/collections/${collection!.handle}.webp` : '/logo.webp'}
+  noindex={!found}
+>
+  {
+    found ? (
+      <main class="collection-page container">
+        <nav class="collection-breadcrumb" aria-label="Breadcrumb">
+          <ol class="collection-breadcrumb__list">
+            <li>
+              <a href={getPathForLang('/', lang)}>{t(lang, 'collections', 'breadcrumb_home')}</a>
+            </li>
+            <li aria-hidden="true">/</li>
+            <li>
+              <a href={`${getPathForLang('/', lang)}#collection`}>{t(lang, 'nav', 'collections')}</a>
+            </li>
+            <li aria-hidden="true">/</li>
+            <li aria-current="page">{colTitle}</li>
+          </ol>
+        </nav>
+
+        <header class="collection-header">
+          <h1 class="collection-header__title">{colTitle}</h1>
+          <p class="collection-header__count">
+            {products.length}{' '}
+            {products.length === 1 ? t(lang, 'collections', 'piece_one') : t(lang, 'collections', 'pieces')}
+          </p>
+        </header>
+
+        {products.length > 0 ? (
+          <div class="shop-grid collection-grid" role="list" aria-label={colTitle}>
+            {products.map((p) => (
+              <ProductCard product={p} lang={lang} role="listitem" />
+            ))}
+          </div>
+        ) : (
+          <p class="collection-empty">{t(lang, 'collections', 'empty')}</p>
+        )}
+
+        <p class="collection-footer">
+          <a href={getPathForLang('/shop', lang)} class="btn btn-outline">
+            {t(lang, 'collections', 'back_shop')}
+          </a>
+        </p>
+      </main>
+    ) : (
+      <div class="collection-nf container">
+        <p class="collection-nf__code">404</p>
+        <h1 class="collection-nf__title">{t(lang, 'collections', 'not_found_title')}</h1>
+        <p class="collection-nf__sub">{t(lang, 'collections', 'not_found_desc')}</p>
+        <div class="collection-nf__actions">
+          <a class="btn btn-primary" href={getPathForLang('/', lang)}>
+            {t(lang, 'pdp', 'product_not_found_home')}
+          </a>
+          <a class="btn btn-outline" href={getPathForLang('/shop', lang)}>
+            {t(lang, 'pdp', 'product_not_found_shop')}
+          </a>
+        </div>
+      </div>
+    )
+  }
+</Layout>
+
+<style>
+  .collection-page {
+    padding-block: calc(var(--header-h) + 32px) 64px;
+    max-width: var(--max-w, 1200px);
+    margin-inline: auto;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .collection-breadcrumb {
+    margin-bottom: 24px;
+  }
+  .collection-breadcrumb__list {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 12px;
+    color: var(--c-muted);
+  }
+  .collection-breadcrumb a {
+    color: var(--c-muted);
+    text-decoration: none;
+  }
+  .collection-breadcrumb a:hover {
+    color: var(--c-accent);
+  }
+  .collection-header {
+    margin-bottom: 40px;
+  }
+  .collection-header__title {
+    font-family: var(--font-title);
+    font-size: clamp(32px, 5vw, 56px);
+    text-transform: uppercase;
+    margin: 0 0 8px;
+    line-height: 1.05;
+  }
+  .collection-header__count {
+    margin: 0;
+    font-size: 14px;
+    color: var(--c-muted);
+  }
+  .collection-grid {
+    margin-bottom: 48px;
+  }
+  .collection-empty {
+    font-size: 15px;
+    color: var(--c-muted);
+    margin: 0 0 32px;
+  }
+  .collection-footer {
+    display: flex;
+    justify-content: center;
+  }
+  .collection-nf {
+    min-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 12px;
+    padding: 48px 20px;
+  }
+  .collection-nf__code {
+    font-family: var(--font-title);
+    font-size: clamp(64px, 12vw, 120px);
+    color: var(--c-accent);
+    margin: 0;
+    line-height: 1;
+  }
+  .collection-nf__title {
+    font-family: var(--font-title);
+    font-size: clamp(22px, 4vw, 40px);
+    text-transform: uppercase;
+    margin: 0;
+  }
+  .collection-nf__sub {
+    max-width: 420px;
+    color: var(--c-muted);
+    font-size: 15px;
+    line-height: 1.55;
+    margin: 0;
+  }
+  .collection-nf__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 16px;
+  }
+</style>
+
+<style is:global>
+  .collection-grid .pc__img-wrap {
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+  }
+</style>

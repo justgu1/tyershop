@@ -8,13 +8,13 @@ interface Props {
   lang?: Lang;
   toc?: { id: string; label: string }[];
 }
-const { title, description, lang = 'en', toc = [] } = Astro.props;
+const { title, description, lang = 'pt', toc = [] } = Astro.props;
 ---
 <Layout title={title} description={description} lang={lang} bodyClass="legal-body">
   <div class="legal-wrap container">
     {toc.length > 0 && (
-      <aside class="legal-toc" aria-label="Table of contents">
-        <p class="legal-toc__title">Contents</p>
+      <aside class="legal-toc" aria-label={t(lang, 'legal', 'toc_aria')}>
+        <p class="legal-toc__title">{t(lang, 'legal', 'toc_title')}</p>
         <nav>
           <ul role="list">
             {toc.map(item => (

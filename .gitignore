@@ -6,6 +6,5 @@ build/
 .cache/
 .medusa/
 .env
-.env.*
 coverage/
 *.log

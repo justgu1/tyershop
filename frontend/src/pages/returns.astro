@@ -3,29 +3,45 @@ import LegalLayout from '../layouts/LegalLayout.astro';
 import { getLangFromUrl } from '../i18n/utils';
 const lang = getLangFromUrl(Astro.url);
 const toc = [
-  { id: 'policy', label: 'Return Policy' },
-  { id: 'process', label: 'Process' },
-  { id: 'refunds', label: 'Refunds' },
-  { id: 'exceptions', label: 'Exceptions' },
+  { id: 'politica', label: 'Política de devolução' },
+  { id: 'como-devolver', label: 'Como devolver' },
+  { id: 'reembolsos', label: 'Reembolsos' },
+  { id: 'excecoes', label: 'Exceções' },
 ];
 ---
-<LegalLayout title="Returns & Exchanges" lang={lang} toc={toc} description="Tyer return and exchange policy.">
-  <p><strong>Last updated:</strong> January 2025</p>
+<LegalLayout
+  title="Trocas e devoluções"
+  lang={lang}
+  toc={toc}
+  description="Política de trocas, devoluções e reembolsos da Tyer."
+>
+  <p><strong>Última atualização:</strong> janeiro de 2025</p>
 
-  <h2 id="policy">Return Policy</h2>
-  <p>You may return items within <strong>7 days</strong> of receiving your order, as per the Brazilian Consumer Defense Code (CDC). Items must be unused, unwashed, and in original packaging with all tags attached.</p>
+  <h2 id="politica">Política de devolução</h2>
+  <p>
+    Você pode solicitar a devolução em até <strong>7 dias corridos</strong> a partir do recebimento do produto, nos
+    termos do Código de Defesa do Consumidor (CDC), desde que a peça esteja sem uso, sem lavagem, com etiquetas e na
+    embalagem original, quando couber.
+  </p>
 
-  <h2 id="process">How to Return</h2>
+  <h2 id="como-devolver">Como devolver</h2>
   <ol>
-    <li>Email <a href="mailto:trocas@tyer.com.br">trocas@tyer.com.br</a> with your order number and reason for return</li>
-    <li>We will send you a return authorization within 2 business days</li>
-    <li>Ship the item back using the provided label</li>
-    <li>Once received and inspected, we will process your refund or exchange</li>
+    <li>Envie um e-mail para <a href="mailto:suporte@tyershop.com">suporte@tyershop.com</a> com o número do pedido e o motivo da devolução ou troca.</li>
+    <li>Responderemos em até 2 dias úteis com as instruções e, se aplicável, autorização de postagem.</li>
+    <li>Poste o item conforme orientado, com embalagem segura.</li>
+    <li>Após análise e conferência, processamos troca ou reembolso conforme o caso.</li>
   </ol>
 
-  <h2 id="refunds">Refunds</h2>
-  <p>Approved refunds are processed within 5–10 business days to your original payment method. Shipping costs are non-refundable unless the return is due to our error.</p>
+  <h2 id="reembolsos">Reembolsos</h2>
+  <p>
+    Reembolsos aprovados são processados em até 5 a 10 dias úteis no mesmo meio de pagamento utilizado na compra,
+    conforme prazos da operadora. O frete da ida pode não ser reembolsável, salvo em caso de defeito ou erro nosso na
+    entrega.
+  </p>
 
-  <h2 id="exceptions">Exceptions</h2>
-  <p>Sale items, customized products, and limited drops marked "final sale" are not eligible for returns unless they arrive damaged or defective.</p>
+  <h2 id="excecoes">Exceções</h2>
+  <p>
+    Itens em promoção final, personalizados ou drops marcados como “venda final” podem não aceitar troca ou devolução,
+    exceto por vício ou defeito, nos termos da lei.
+  </p>
 </LegalLayout>

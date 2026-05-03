@@ -3,8 +3,11 @@ import { t, getPathForLang, type Lang } from '../i18n/utils';
 
 interface Props {
   lang?: Lang;
+  /** Exibir link “Coleções” para #collection; só se existirem drops no Medusa. */
+  showCollectionsLink?: boolean;
 }
 const lang: Lang = Astro.props.lang ?? 'pt';
+const showCollectionsLink = Astro.props.showCollectionsLink !== false;
 const year = new Date().getFullYear();
 const copyrightFull = t(lang, 'footer', 'copyright_full').replace('{year}', String(year));
 const publicApiUrl = (import.meta.env.PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '');
@@ -28,9 +31,11 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
           <li>
             <a href={getPathForLang('/', lang)} class="footer__col-link">{t(lang, 'footer', 'inicio')}</a>
           </li>
-          <li>
-            <a href={`${getPathForLang('/', lang)}#collection`} class="footer__col-link">{t(lang, 'nav', 'collections')}</a>
-          </li>
+          {showCollectionsLink && (
+            <li>
+              <a href={`${getPathForLang('/', lang)}#collection`} class="footer__col-link">{t(lang, 'nav', 'collections')}</a>
+            </li>
+          )}
           <li>
             <a href={getPathForLang('/shop', lang)} class="footer__col-link">{t(lang, 'nav', 'shop')}</a>
           </li>

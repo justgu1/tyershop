@@ -3,28 +3,51 @@ import LegalLayout from '../layouts/LegalLayout.astro';
 import { getLangFromUrl } from '../i18n/utils';
 const lang = getLangFromUrl(Astro.url);
 const toc = [
-  { id: 'acceptance', label: 'Acceptance' },
-  { id: 'products', label: 'Products' },
-  { id: 'payments', label: 'Payments' },
-  { id: 'ip', label: 'Intellectual Property' },
-  { id: 'liability', label: 'Liability' },
+  { id: 'aceitacao', label: 'Aceitação' },
+  { id: 'produtos', label: 'Produtos e disponibilidade' },
+  { id: 'pagamentos', label: 'Pagamentos' },
+  { id: 'propriedade', label: 'Propriedade intelectual' },
+  { id: 'responsabilidade', label: 'Responsabilidade' },
 ];
 ---
-<LegalLayout title="Terms of Use" lang={lang} toc={toc} description="Tyer terms of use and conditions of sale.">
-  <p><strong>Last updated:</strong> January 2025</p>
+<LegalLayout
+  title="Termos de uso"
+  lang={lang}
+  toc={toc}
+  description="Termos de uso e condições gerais de compra no site tyer.com.br."
+>
+  <p><strong>Última atualização:</strong> janeiro de 2025</p>
 
-  <h2 id="acceptance">Acceptance of Terms</h2>
-  <p>By accessing and using tyer.com.br, you accept and agree to be bound by these Terms of Use. If you do not agree, please do not use our website.</p>
+  <h2 id="aceitacao">Aceitação dos termos</h2>
+  <p>
+    Ao acessar e usar o site tyer.com.br, você declara que leu e concorda com estes Termos de uso. Se não concordar,
+    interrompa o uso do site.
+  </p>
 
-  <h2 id="products">Products & Availability</h2>
-  <p>All products are subject to availability. Prices are in BRL and include applicable taxes. We reserve the right to modify prices at any time. Orders are confirmed via email.</p>
+  <h2 id="produtos">Produtos e disponibilidade</h2>
+  <p>
+    Todos os produtos estão sujeitos à disponibilidade em estoque. Os preços são exibidos em reais (BRL) e podem incluir
+    tributos conforme a legislação aplicável. Reservamo-nos o direito de corrigir erros de preço e de recusar ou
+    cancelar pedidos, com reembolso quando o pagamento já tiver sido efetuado.
+  </p>
 
-  <h2 id="payments">Payments</h2>
-  <p>Payments are processed by Mercado Pago. By completing a purchase, you authorize the charge to your payment method. In case of payment failure, your order will not be processed.</p>
+  <h2 id="pagamentos">Pagamentos</h2>
+  <p>
+    Os pagamentos são processados pelo Mercado Pago (ou outro provedor indicado no checkout). Ao concluir a compra,
+    você autoriza a cobrança no meio de pagamento escolhido. Em caso de falha no pagamento, o pedido pode não ser
+    confirmado.
+  </p>
 
-  <h2 id="ip">Intellectual Property</h2>
-  <p>All content on this website — including images, logos, text, and designs — is owned by Tyer and protected by copyright law. Unauthorized use is strictly prohibited.</p>
+  <h2 id="propriedade">Propriedade intelectual</h2>
+  <p>
+    Todo o conteúdo do site — marcas, logotipos, textos, imagens, layouts e designs — é de titularidade da Tyer ou de
+    licenciantes, sendo vedada a reprodução ou uso não autorizado para fins comerciais.
+  </p>
 
-  <h2 id="liability">Limitation of Liability</h2>
-  <p>Tyer is not liable for indirect, incidental, or consequential damages arising from your use of our products or website. Our liability is limited to the purchase price of the relevant product.</p>
+  <h2 id="responsabilidade">Limitação de responsabilidade</h2>
+  <p>
+    Na medida permitida pela lei aplicável, a Tyer não se responsabiliza por danos indiretos, lucros cessantes ou
+    prejuízos decorrentes do uso do site ou dos produtos. Em hipóteses em que a lei imponha limite mínimo de
+    responsabilidade, prevalecerá o disposto na legislação consumerista brasileira.
+  </p>
 </LegalLayout>

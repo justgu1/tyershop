@@ -13,9 +13,11 @@ const DEFAULT_FIELDS =
     '*options',
     '*options.values',
     '*images',
+    '*images.variants',
     '*variants',
     '*variants.options',
     '*variants.options.option',
+    '*variants.thumbnail',
     '+variants.inventory_items.inventory.location_levels.stocked_quantity',
     '*variants.prices',
     '*variants.calculated_price',
@@ -23,6 +25,7 @@ const DEFAULT_FIELDS =
     '*variants.manage_inventory',
     '*variants.allow_backorder',
     '*variants.metadata',
+    '*collection',
   ].join(',');
 
 export function getProductListQueryString(regionId: string | null): string {

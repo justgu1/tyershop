@@ -1,37 +1,59 @@
 ---
 import LegalLayout from '../layouts/LegalLayout.astro';
-import { getLangFromUrl, t } from '../i18n/utils';
+import { getLangFromUrl } from '../i18n/utils';
 const lang = getLangFromUrl(Astro.url);
 const toc = [
-  { id: 'data-collection', label: 'Data Collection' },
-  { id: 'use', label: 'How We Use Data' },
-  { id: 'sharing', label: 'Data Sharing' },
-  { id: 'rights', label: 'Your Rights' },
-  { id: 'contact', label: 'Contact' },
+  { id: 'coleta-dados', label: 'Coleta de dados' },
+  { id: 'uso', label: 'Como usamos os dados' },
+  { id: 'compartilhamento', label: 'Compartilhamento' },
+  { id: 'direitos', label: 'Seus direitos' },
+  { id: 'contato', label: 'Contato' },
 ];
 ---
-<LegalLayout title="Privacy Policy" lang={lang} toc={toc} description="Tyer privacy policy — how we collect and use your data.">
-  <p><strong>Last updated:</strong> January 2025</p>
+<LegalLayout
+  title="Política de privacidade"
+  lang={lang}
+  toc={toc}
+  description="Política de privacidade da Tyer — como coletamos, usamos e protegemos seus dados pessoais."
+>
+  <p><strong>Última atualização:</strong> janeiro de 2025</p>
 
-  <h2 id="data-collection">Data Collection</h2>
-  <p>We collect information you provide directly: name, email, shipping address, and payment information (processed securely by Mercado Pago — we never store card details).</p>
-  <p>We automatically collect: IP address, browser type, pages visited, and purchase history to improve our service.</p>
+  <h2 id="coleta-dados">Coleta de dados</h2>
+  <p>
+    Coletamos informações que você nos fornece diretamente: nome, e-mail, endereço de entrega e dados necessários ao
+    pagamento (processados com segurança pelo Mercado Pago — não armazenamos dados completos de cartão).
+  </p>
+  <p>
+    Coletamos automaticamente: endereço IP, tipo de navegador, páginas visitadas e histórico de compras, para melhorar
+    o site, prevenir fraudes e cumprir obrigações legais.
+  </p>
 
-  <h2 id="use">How We Use Data</h2>
+  <h2 id="uso">Como usamos os dados</h2>
   <ul>
-    <li>Process and fulfill your orders</li>
-    <li>Send order confirmations and shipping updates</li>
-    <li>Send marketing emails (only with your consent)</li>
-    <li>Improve our website and products</li>
-    <li>Comply with legal obligations</li>
+    <li>Processar e entregar seus pedidos</li>
+    <li>Enviar confirmações de pedido e atualizações de envio</li>
+    <li>Enviar comunicações de marketing (somente com seu consentimento, quando aplicável)</li>
+    <li>Melhorar o site, produtos e atendimento</li>
+    <li>Cumprir obrigações legais e regulatórias</li>
   </ul>
 
-  <h2 id="sharing">Data Sharing</h2>
-  <p>We do not sell your personal data. We share data only with service providers necessary to operate our business: payment processors (Mercado Pago), shipping carriers, and analytics services.</p>
+  <h2 id="compartilhamento">Compartilhamento</h2>
+  <p>
+    Não vendemos seus dados pessoais. Compartilhamos apenas o necessário com prestadores de serviço: processamento de
+    pagamentos (Mercado Pago), transportadoras, hospedagem e ferramentas de análise, sempre com base legal adequada.
+  </p>
 
-  <h2 id="rights">Your Rights</h2>
-  <p>Under LGPD (Lei Geral de Proteção de Dados), you have the right to access, correct, delete, or port your personal data. To exercise these rights, contact us at <a href="mailto:privacidade@tyer.com.br">privacidade@tyer.com.br</a>.</p>
+  <h2 id="direitos">Seus direitos (LGPD)</h2>
+  <p>
+    Nos termos da Lei Geral de Proteção de Dados (LGPD), você pode solicitar confirmação de tratamento, acesso,
+    correção, anonimização, portabilidade, eliminação de dados desnecessários ou revogação de consentimento, quando
+    cabível. Para exercer seus direitos ou falar com o encarregado de dados (DPO), escreva para
+    <a href="mailto:suporte@tyershop.com">suporte@tyershop.com</a>.
+  </p>
 
-  <h2 id="contact">Contact</h2>
-  <p>Data Protection Officer: <a href="mailto:dpo@tyer.com.br">dpo@tyer.com.br</a></p>
+  <h2 id="contato">Contato</h2>
+  <p>
+    E-mail único de atendimento (incluindo privacidade e LGPD):
+    <a href="mailto:suporte@tyershop.com">suporte@tyershop.com</a>
+  </p>
 </LegalLayout>

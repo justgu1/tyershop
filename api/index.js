@@ -6,7 +6,23 @@ const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 const app = express();
-app.use(cors());
+app.set('trust proxy', 1);
+
+const corsOrigins = String(process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+app.use(
+  corsOrigins.length > 0
+    ? cors({
+        origin(origin, cb) {
+          if (!origin || corsOrigins.includes(origin)) return cb(null, true);
+          return cb(new Error('Not allowed by CORS'));
+        },
+        credentials: true,
+      })
+    : cors()
+);
 app.use(express.json());
 
 const client = new mercadopago.MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN });
