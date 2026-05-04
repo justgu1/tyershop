@@ -231,7 +231,7 @@ const modelSize = String(product?.metadata?.model_size || 'M');
   }
 </style>
 
-<script>
+<script lang="ts">
   const mainImage = document.getElementById('main-image') as HTMLImageElement | null;
   const switchBtns = Array.from(document.querySelectorAll<HTMLButtonElement>('.fashion-hero__switch button'));
   switchBtns.forEach((btn) => {
@@ -273,15 +273,14 @@ const modelSize = String(product?.metadata?.model_size || 'M');
   });
   async function buyNow() {
     const variantId = buyBtn?.dataset.variantId || '';
-    const price = Number(buyBtn?.dataset.cents || 0);
     const qty = Math.max(1, Number(qtyInput?.value || 1));
     if (!variantId) return;
-    const title = String(document.querySelector('.fashion-buy h1')?.textContent || 'Produto');
-    const payload = { items: [{ title, quantity: qty, unit_price: Math.max(1, price / 100) }] };
+    const { createMedusaCartWithLines } = await import('../../../lib/medusa-checkout-cart');
+    const cartId = await createMedusaCartWithLines([{ variantId, quantity: qty }]);
     const res = await fetch('/api/create-checkout', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ cart_id: cartId }),
     });
     const data = await res.json();
     if (data?.init_point) window.location.href = data.init_point;

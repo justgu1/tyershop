@@ -7,7 +7,8 @@ import { getMedusaStoreUrl } from '../../lib/medusa-env';
 import { getProductListQueryString, getVariantPriceInfo, resolveDefaultRegionId } from '../../lib/medusa-pricing';
 import { getVariantSlideUrls } from '../../lib/product-variant-gallery';
 import { formatVariationValuesOnly, getProductVariantData } from '../../lib/product-variants';
-import { cssColorForOptionValue, isColorOptionRow } from '../../lib/variant-color-swatches';
+import { isColorOptionRow } from '../../lib/variant-color-swatches';
+import { optionRowKind, swatchFillForValue } from '../../lib/variant-option-ui';
 import {
   compositionText,
   metaString,
@@ -111,6 +112,36 @@ const variantById = productFound
   ? new Map<string, any>((product!.variants ?? []).map((v: any) => [String(v.id ?? ''), v]))
   : new Map<string, any>();
 
+function optionRowRank(title: string): number {
+  const k = optionRowKind(title);
+  if (k === 'color') return 0;
+  if (k === 'size') return 1;
+  return 2;
+}
+const optionRowsDisplay = productFound
+  ? [...optionRows].sort((a, b) => {
+      const d = optionRowRank(a.title) - optionRowRank(b.title);
+      return d !== 0 ? d : a.title.localeCompare(b.title);
+    })
+  : [];
+
+function pdpSwatchInnerStyle(val: string) {
+  const { fill, isGradient } = swatchFillForValue(val);
+  const out: { background?: string; backgroundColor?: string } = {};
+  if (isGradient && fill) out.background = fill;
+  else if (fill) out.backgroundColor = fill;
+  return out;
+}
+
+function pdpSwatchIsLight(val: string) {
+  const { fill, isGradient } = swatchFillForValue(val);
+  return (
+    !!fill &&
+    !isGradient &&
+    ['#f5f5f5', '#ffffff', '#fff', '#f0f0f0', '#faf5eb'].includes(fill.toLowerCase())
+  );
+}
+
 const defaultPriceInfo = productFound ? getVariantPriceInfo(defaultVariant) : null;
 const defaultNorm =
   normalizedVariantsRaw.find((n) => n.id === defaultVariant?.id) ?? normalizedVariantsRaw[0];
@@ -134,7 +165,7 @@ const pdpVariantsPayload = normalizedVariantsRaw.map((v) => ({
   priceDisplay: v.priceDisplay,
   originalDisplay: v.originalDisplay,
   discountPercent: v.discountPercent,
-  allowBackorder: variantById.get(v.id)?.allow_backorder === true,
+  allowBackorder: v.allowBackorder === true,
 }));
 
 const stockMsgs = {
@@ -226,12 +257,20 @@ const jsonLd = productFound
   <section
     class="pdp-hero"
     data-pdp-root
+    data-product-id={product!.id}
+    data-product-handle={product!.handle}
+    data-product-title={product!.title ?? ''}
     data-stock-reliable={stockReliable ? 'true' : 'false'}
     data-stock-msgs={JSON.stringify(stockMsgs)}
+    data-stock-notify-msgs={JSON.stringify({
+      ok: t(lang, 'pdp', 'stock_notify_ok'),
+      err: t(lang, 'pdp', 'stock_notify_err'),
+    })}
     data-variants={encodeURIComponent(JSON.stringify(pdpVariantsPayload))}
     data-option-rows={encodeURIComponent(JSON.stringify(optionRows))}
     aria-labelledby="pdp-title"
   >
+    <div class="pdp-hero__fold">
     <div class="pdp-hero__media">
       <div class="pdp-hero__media-carousel-block">
         <div class="pdp-hero__thumbs-rail-wrap">
@@ -245,7 +284,7 @@ const jsonLd = productFound
                 aria-selected={i === 0 ? 'true' : 'false'}
                 aria-label={`${t(lang, 'pdp', 'slide')} ${i + 1}`}
               >
-                <img src={url} alt="" width="64" height="80" loading={i === 0 ? 'eager' : 'lazy'} decoding="async" />
+                <img src={url} alt="" width="72" height="72" loading={i === 0 ? 'eager' : 'lazy'} decoding="async" />
               </button>
             ))}
           </div>
@@ -288,24 +327,6 @@ const jsonLd = productFound
           </button>
         </div>
       </div>
-
-      {related.length > 0 && (
-        <section class="pdp-hero__drop-rail" aria-labelledby="pdp-drop-rail-title">
-          <div class="pdp-hero__drop-rail-inner">
-            <h2 class="pdp-hero__drop-rail-title" id="pdp-drop-rail-title">
-              {t(lang, 'pdp', 'drop_section_title')}
-              {product.collection?.title && (
-                <span class="pdp-hero__drop-rail-sub"> — {product.collection.title}</span>
-              )}
-            </h2>
-            <div class="pdp-product-rail pdp-hero__drop-carousel" role="list">
-              {related.map((p) => (
-                <ProductCard product={p} lang={lang} role="listitem" />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
     </div>
 
     <div class="pdp-hero__buy-col">
@@ -349,43 +370,73 @@ const jsonLd = productFound
               </span>
             </p>
             <div class="pdp-variants" role="group" aria-label={t(lang, 'product', 'select_size')}>
-              {optionRows.map((row: { id: string; title: string; values: string[] }) => {
+              {optionRowsDisplay.map((row: { id: string; title: string; values: string[] }, idx: number) => {
+                const prev = optionRowsDisplay[idx - 1];
+                const showDivider =
+                  idx > 0 &&
+                  prev &&
+                  optionRowKind(prev.title) === 'color' &&
+                  optionRowKind(row.title) === 'size';
                 const colorRow = isColorOptionRow(row.title);
                 return (
-                  <div class="pdp-variant-row">
-                    <p class="pdp-label">{row.title}</p>
-                    <div class="pdp-variant-values" role="radiogroup" aria-label={row.title}>
-                      {row.values.map((val: string) => {
-                        const sel = (defaultVariant?.options ?? []).find(
-                          (o: any) => String(o.option_id ?? o.id) === row.id
-                        );
-                        const isSel = String(sel?.value ?? '') === val;
-                        const swatchHex = colorRow ? cssColorForOptionValue(val) : null;
-                        return (
-                          <button
-                            type="button"
-                            class:list={[
-                              'pdp-variant-btn',
-                              { 'is-selected': isSel, 'is-unavailable': false, 'pdp-variant-btn--color': colorRow },
-                            ]}
-                            data-option-id={row.id}
-                            data-option-value={val}
-                            aria-checked={isSel ? 'true' : 'false'}
-                          >
-                            {swatchHex && (
-                              <span
-                                class="pdp-variant-swatch"
-                                style={`background-color: ${swatchHex}`}
-                                aria-hidden="true"
-                              />
-                            )}
-                            <span class="pdp-variant-btn-text">{val}</span>
-                            <span class="pdp-variant-x" aria-hidden="true">×</span>
-                          </button>
-                        );
-                      })}
+                  <>
+                    {showDivider && <div class="pdp-variants-divider" role="presentation" aria-hidden="true" />}
+                    <div class="pdp-variant-row">
+                      <p class="pdp-label">{row.title}</p>
+                      <div
+                        class:list={['pdp-variant-values', { 'pdp-variant-values--swatch': colorRow }]}
+                        role="radiogroup"
+                        aria-label={row.title}
+                      >
+                        {row.values.map((val: string) => {
+                          const sel = (defaultVariant?.options ?? []).find(
+                            (o: any) => String(o.option_id ?? o.id) === row.id
+                          );
+                          const isSel = String(sel?.value ?? '') === val;
+                          if (colorRow) {
+                            const { fill } = swatchFillForValue(val);
+                            return (
+                              <button
+                                type="button"
+                                class:list={[
+                                  'pdp-variant-btn',
+                                  'pdp-variant-btn--swatch',
+                                  'pdp-variant-btn--color',
+                                  {
+                                    'is-selected': isSel,
+                                    'is-unavailable': false,
+                                    'pdp-variant-btn--swatch-neutral': !fill,
+                                    'pdp-variant-btn--swatch-light': pdpSwatchIsLight(val),
+                                  },
+                                ]}
+                                data-option-id={row.id}
+                                data-option-value={val}
+                                title={val}
+                                aria-label={`${row.title}: ${val}`}
+                                aria-checked={isSel ? 'true' : 'false'}
+                              >
+                                <span class="pdp-variant-swatch-inner" style={pdpSwatchInnerStyle(val)} />
+                                <span class="pdp-variant-btn-text pdp-variant-btn-text--sr">{val}</span>
+                                <span class="pdp-variant-x" aria-hidden="true">×</span>
+                              </button>
+                            );
+                          }
+                          return (
+                            <button
+                              type="button"
+                              class:list={['pdp-variant-btn', { 'is-selected': isSel, 'is-unavailable': false }]}
+                              data-option-id={row.id}
+                              data-option-value={val}
+                              aria-checked={isSel ? 'true' : 'false'}
+                            >
+                              <span class="pdp-variant-btn-text">{val}</span>
+                              <span class="pdp-variant-x" aria-hidden="true">×</span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
+                  </>
                 );
               })}
             </div>
@@ -412,7 +463,7 @@ const jsonLd = productFound
           )}
         </div>
 
-        <div class="pdp-price-qty-row">
+        <div class="pdp-price-qty-row" id="pdp-price-qty-row">
           <div class="pdp-price-block" id="pdp-price-block">
             <span
               class="pdp-price-striked"
@@ -442,6 +493,25 @@ const jsonLd = productFound
 
         <p class="pdp-stock" id="pdp-stock-line" role="status">{initialStockLine()}</p>
 
+        <div class="pdp-stock-notify" id="pdp-stock-notify" hidden>
+          <p class="pdp-stock-notify__intro">{t(lang, 'pdp', 'stock_notify_intro')}</p>
+          <div class="pdp-stock-notify__row">
+            <input
+              type="email"
+              class="pdp-stock-notify__input"
+              id="pdp-stock-notify-email"
+              autocomplete="email"
+              inputmode="email"
+              placeholder="email@exemplo.com"
+              aria-label={t(lang, 'pdp', 'stock_notify_email_aria')}
+            />
+            <button type="button" class="btn btn-outline pdp-stock-notify__btn" id="pdp-stock-notify-submit">
+              {t(lang, 'pdp', 'stock_notify_cta')}
+            </button>
+          </div>
+          <p class="pdp-stock-notify__feedback" id="pdp-stock-notify-feedback" hidden role="status"></p>
+        </div>
+
         <div class="pdp-buy-actions">
           <button type="button" class="btn btn-primary pdp-buy-now" id="pdp-buy-now">
             {t(lang, 'pdp', 'buy_now')}
@@ -463,7 +533,7 @@ const jsonLd = productFound
           </button>
         </div>
 
-        <div class="pdp-shipping">
+        <div class="pdp-shipping" id="pdp-shipping-block">
           <label class="pdp-label" for="pdp-cep-input">{t(lang, 'pdp', 'shipping_cep')}</label>
           <div class="pdp-cep-row">
             <input
@@ -510,6 +580,130 @@ const jsonLd = productFound
         )}
       </div>
     </div>
+    </div>
+
+    {related.length > 0 && (
+      <section class="pdp-hero__drop-rail" aria-labelledby="pdp-drop-rail-title">
+        <div class="pdp-hero__drop-rail-inner">
+          <h2 class="pdp-hero__drop-rail-title" id="pdp-drop-rail-title">
+            {t(lang, 'pdp', 'drop_section_title')}
+            {product.collection?.title && (
+              <span class="pdp-hero__drop-rail-sub"> — {product.collection.title}</span>
+            )}
+          </h2>
+          <div class="shop-col-carousel-wrap pdp-shop-carousel-wrap">
+            <button
+              type="button"
+              class="shop-col-carousel__nav shop-col-carousel__nav--prev"
+              data-col-nav="prev"
+              data-target="pdp-hero-drop-carousel"
+              aria-label={t(lang, 'pdp', 'prev_slide')}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+            </button>
+            <div class="shop-col-carousel pdp-shop-carousel" id="pdp-hero-drop-carousel" role="region" tabindex="0">
+              <div class="shop-col-carousel__track" role="list">
+                {related.map((p) => (
+                  <div class="shop-col-carousel__cell" role="listitem">
+                    <ProductCard product={p} lang={lang} />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <button
+              type="button"
+              class="shop-col-carousel__nav shop-col-carousel__nav--next"
+              data-col-nav="next"
+              data-target="pdp-hero-drop-carousel"
+              aria-label={t(lang, 'pdp', 'next_slide')}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </section>
+    )}
+
+    <div class="pdp-sticky-bar pdp-sticky-bar--offscreen" id="pdp-sticky-bar" aria-hidden="true">
+      <button type="button" class="pdp-sticky-bar__fab" id="pdp-sticky-back-top" aria-label={t(lang, 'pdp', 'sticky_back_top')}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          ><path d="m18 15-6-6-6-6" /></svg
+        >
+      </button>
+      <div class="pdp-sticky-bar__sheet">
+        <div class="pdp-sticky-bar__head">
+          <button
+            type="button"
+            class="pdp-sticky-bar__menu"
+            id="pdp-sticky-menu"
+            aria-expanded="false"
+            aria-controls="pdp-sticky-drawer"
+            aria-label={t(lang, 'pdp', 'sticky_more_options')}
+            data-label-open={t(lang, 'pdp', 'sticky_more_options')}
+            data-label-close={t(lang, 'pdp', 'sticky_close_options')}
+          >
+            <span class="pdp-sticky-bar__menu-bars" aria-hidden="true" />
+          </button>
+          <div class="pdp-sticky-bar__head-price" id="pdp-sticky-price-block">
+            <span class="pdp-sticky-bar__price-striked" id="pdp-sticky-price-original" hidden />
+            <span class="pdp-sticky-bar__price-current" id="pdp-sticky-price-current" />
+          </div>
+          <div class="pdp-sticky-bar__head-actions">
+            <button type="button" class="btn btn-primary pdp-sticky-bar__buy" id="pdp-sticky-buy-now">
+              {t(lang, 'pdp', 'buy_now')}
+            </button>
+            <button
+              type="button"
+              class="btn pdp-atc-icon pdp-sticky-bar__atc"
+              id="pdp-sticky-atc"
+              aria-label={t(lang, 'product', 'add_to_cart')}
+            >
+              <img src="/icons/quick-cart.svg" alt="" width="22" height="22" />
+            </button>
+          </div>
+        </div>
+        <div class="pdp-sticky-bar__drawer" id="pdp-sticky-drawer" hidden>
+          <div class="pdp-sticky-bar__variants" id="pdp-sticky-variants-mount" />
+          <div class="pdp-sticky-bar__ship">
+            <label class="pdp-sticky-bar__cep-label" for="pdp-cep-input-sticky">{t(lang, 'pdp', 'shipping_cep')}</label>
+            <input
+              id="pdp-cep-input-sticky"
+              class="pdp-cep-input pdp-cep-input--sticky"
+              type="text"
+              inputmode="numeric"
+              autocomplete="postal-code"
+              maxlength="9"
+              placeholder="00000-000"
+              aria-describedby="pdp-cep-hint"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <div class="pdp-below-fold">
@@ -531,7 +725,7 @@ const jsonLd = productFound
                 {productDetailBlocks.map((b) => (
                   <details class="pdp-faq__item">
                     <summary>{b.title}</summary>
-                    <p class="pdp-faq__a">{b.body}</p>
+                    <div class="pdp-faq__a pdp-faq__a--rich" set:html={b.body} />
                   </details>
                 ))}
               </div>
@@ -544,7 +738,7 @@ const jsonLd = productFound
                 {faqItems.map((item) => (
                   <details class="pdp-faq__item">
                     <summary>{item.q}</summary>
-                    <p class="pdp-faq__a">{item.a}</p>
+                    <div class="pdp-faq__a pdp-faq__a--rich" set:html={item.a} />
                   </details>
                 ))}
               </div>
@@ -559,7 +753,7 @@ const jsonLd = productFound
         <div class="pdp-split__text">
           <p class="section-label">01 — {t(lang, 'product', 'inspiration')}</p>
           <h2 class="pdp-split__title">{t(lang, 'product', 'inspiration')}</h2>
-          <p class="pdp-split__body">{storyA}</p>
+          <div class="pdp-split__body pdp-faq__a--rich" set:html={storyA} />
         </div>
         <div class="pdp-split__img">
           <img src={imgUrl(1)!} alt="" width="640" height="800" loading="lazy" decoding="async" />
@@ -575,7 +769,7 @@ const jsonLd = productFound
         <div class="pdp-split__text">
           <p class="section-label">02 — {t(lang, 'product', 'features')}</p>
           <h2 class="pdp-split__title">{t(lang, 'product', 'features')}</h2>
-          <p class="pdp-split__body">{storyB}</p>
+          <div class="pdp-split__body pdp-faq__a--rich" set:html={storyB} />
         </div>
       </section>
     )}
@@ -599,10 +793,34 @@ const jsonLd = productFound
     <section class="pdp-related" aria-labelledby="newest-title">
       <div class="container">
         <h2 class="section__title" id="newest-title">{t(lang, 'shop', 'section_novos')}</h2>
-        <div class="pdp-product-rail pdp-carousel" id="pdp-newest-carousel" role="list">
-          {newest.map((p) => (
-            <ProductCard product={p} lang={lang} role="listitem" />
-          ))}
+        <div class="products-showcase-wrap pdp-related__showcase-wrap">
+          <button
+            type="button"
+            class="products-showcase-nav products-showcase-nav--prev"
+            id="pdp-newest-nav-prev"
+            aria-label={t(lang, 'pdp', 'prev_slide')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"
+              ><path d="m15 18-6-6 6-6" /></svg
+            >
+          </button>
+          <div class="products-showcase-viewport" id="pdp-newest-viewport" role="region" aria-label={t(lang, 'shop', 'section_novos')}>
+            <div class="products-showcase" role="list">
+              {newest.map((p) => (
+                <ProductCard product={p} lang={lang} role="listitem" />
+              ))}
+            </div>
+          </div>
+          <button
+            type="button"
+            class="products-showcase-nav products-showcase-nav--next"
+            id="pdp-newest-nav-next"
+            aria-label={t(lang, 'pdp', 'next_slide')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"
+              ><path d="m9 18 6-6-6-6" /></svg
+            >
+          </button>
         </div>
       </div>
     </section>
@@ -631,31 +849,39 @@ const jsonLd = productFound
       <button type="button" class="pdp-lightbox__close" data-close-modal aria-label={t(lang, 'pdp', 'lightbox_close')}>
         &times;
       </button>
-      <div class="pdp-lightbox__row">
-        <button
-          type="button"
-          class="pdp-lightbox__nav pdp-lightbox__nav--prev"
-          id="pdp-lightbox-prev"
-          aria-label={t(lang, 'pdp', 'lightbox_prev')}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            ><path d="m15 18-6-6 6-6" /></svg
+      <div class="pdp-lightbox__shell">
+        <div class="pdp-lightbox__row">
+          <button
+            type="button"
+            class="pdp-lightbox__nav pdp-lightbox__nav--prev"
+            id="pdp-lightbox-prev"
+            aria-label={t(lang, 'pdp', 'lightbox_prev')}
           >
-        </button>
-        <div class="pdp-lightbox__inner">
-          <img id="pdp-lightbox-img" src="" alt="" class="pdp-lightbox__img" width="1200" height="1500" />
-          <p class="pdp-lightbox__counter" id="pdp-lightbox-counter" aria-live="polite"></p>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              ><path d="m15 18-6-6 6-6" /></svg
+            >
+          </button>
+          <div class="pdp-lightbox__inner">
+            <img id="pdp-lightbox-img" src="" alt="" class="pdp-lightbox__img" width="1200" height="1500" />
+            <p class="pdp-lightbox__counter" id="pdp-lightbox-counter" aria-live="polite"></p>
+          </div>
+          <button
+            type="button"
+            class="pdp-lightbox__nav pdp-lightbox__nav--next"
+            id="pdp-lightbox-next"
+            aria-label={t(lang, 'pdp', 'lightbox_next')}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              ><path d="m9 18 6-6-6-6" /></svg
+            >
+          </button>
         </div>
-        <button
-          type="button"
-          class="pdp-lightbox__nav pdp-lightbox__nav--next"
-          id="pdp-lightbox-next"
-          aria-label={t(lang, 'pdp', 'lightbox_next')}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            ><path d="m9 18 6-6-6-6" /></svg
-          >
-        </button>
+        <div
+          class="pdp-lightbox__thumbs"
+          id="pdp-lightbox-thumbs"
+          role="tablist"
+          aria-label={t(lang, 'pdp', 'gallery_thumbs')}
+        />
       </div>
     </dialog>
     </>
@@ -674,34 +900,54 @@ const jsonLd = productFound
 
 <style>
   .pdp-hero {
-    display: grid;
-    /* minmax(0, …) evita overflow horizontal; antes `auto` seguía min-content do card de compra */
-    grid-template-columns: minmax(0, 1fr) minmax(0, min(520px, 100%));
-    gap: clamp(16px, 3vw, 40px);
-    align-items: start;
-    min-height: 75vh;
-    min-height: 75svh;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-height: 0;
     padding: 24px clamp(12px, 4vw, 40px) 40px;
     margin-inline: auto;
     width: 100%;
     min-width: 0;
     max-width: min(1600px, 100%);
     overflow-x: clip;
+    gap: 0;
   }
   @media (max-width: 1024px) {
     .pdp-hero {
-      grid-template-columns: 1fr;
       padding-inline: clamp(12px, 4vw, 24px);
+    }
+  }
+
+  /** Primeira dobra: galeria + card de compra = 75svh (o rail “Colecione o drop” fica abaixo). */
+  .pdp-hero__fold {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, min(520px, 100%));
+    gap: clamp(16px, 3vw, 40px);
+    align-items: stretch;
+    box-sizing: border-box;
+    height: 75svh;
+    min-height: 0;
+    max-height: 75svh;
+    min-width: 0;
+    width: 100%;
+  }
+  @media (max-width: 1024px) {
+    .pdp-hero__fold {
+      grid-template-columns: 1fr;
+      grid-template-rows: minmax(0, 1fr) auto;
+      height: auto;
+      min-height: 75svh;
+      max-height: none;
     }
   }
 
   .pdp-hero__media {
     display: flex;
     flex-direction: column;
-    gap: clamp(14px, 2vw, 22px);
-    min-height: min(75svh, 820px);
+    gap: 0;
+    min-height: 0;
+    height: 100%;
     align-items: stretch;
-    /* filho com rail horizontal tem min-content enorme — sem isto rebenta a largura da página */
     min-width: 0;
     max-width: 100%;
   }
@@ -709,8 +955,10 @@ const jsonLd = productFound
   .pdp-hero__media-carousel-block {
     display: flex;
     gap: 12px;
-    flex: 1;
-    min-height: min(70svh, 780px);
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
     align-items: stretch;
     min-width: 0;
     max-width: 100%;
@@ -718,10 +966,13 @@ const jsonLd = productFound
   @media (max-width: 1024px) {
     .pdp-hero__media {
       min-height: 0;
+      max-height: min(52svh, 520px);
     }
     .pdp-hero__media-carousel-block {
       flex-direction: column-reverse;
+      flex: 1 1 auto;
       min-height: 0;
+      max-height: 100%;
     }
   }
 
@@ -732,7 +983,8 @@ const jsonLd = productFound
     padding-top: clamp(12px, 2vw, 20px);
     min-width: 0;
     max-width: 100%;
-    overflow-x: clip;
+    overflow-x: visible;
+    overflow-y: visible;
   }
   .pdp-hero__drop-rail-inner {
     width: 100%;
@@ -749,6 +1001,8 @@ const jsonLd = productFound
     overflow-wrap: anywhere;
     word-break: break-word;
     max-width: 100%;
+    line-height: 1.25;
+    padding-block: 2px;
   }
   .pdp-hero__drop-rail-sub {
     font-weight: 500;
@@ -756,93 +1010,264 @@ const jsonLd = productFound
     text-transform: none;
   }
 
-  /** Trilhos de ProductCard: altura fixa + colunas estreitas (drop + “mais novos”). */
-  .pdp-product-rail {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: stretch;
-    gap: 10px;
-    height: 300px;
-    max-height: 300px;
+  /**
+   * Carrosséis “Colecione o drop” e “Mais novos”: mesmo padrão da loja
+   * (`shop-col-carousel-wrap` + track + células + nav).
+   */
+  .pdp-shop-carousel-wrap.shop-col-carousel-wrap {
+    position: relative;
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .pdp-shop-carousel-wrap .shop-col-carousel {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     overflow-x: auto;
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
-    padding-bottom: 6px;
-    scrollbar-width: thin;
+    scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
+    padding: 0 44px 10px;
+    scrollbar-color: var(--c-border) transparent;
+    border-radius: 0;
   }
-  .pdp-product-rail > * {
-    flex: 0 0 168px;
-    width: 168px;
-    max-width: 168px;
-    min-width: 168px;
+  .pdp-shop-carousel-wrap .shop-col-carousel::-webkit-scrollbar {
+    height: 8px;
+  }
+  .pdp-shop-carousel-wrap .shop-col-carousel::-webkit-scrollbar-thumb {
+    background: #2a2a2a;
+    border-radius: 999px;
+  }
+  .pdp-shop-carousel-wrap .shop-col-carousel__track {
+    display: flex;
+    gap: 20px;
+    align-items: stretch;
+    width: max-content;
+    min-width: 100%;
+    min-height: 1px;
+    padding: 2px 2px 4px;
+  }
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell {
+    flex: 0 0 clamp(220px, 38vw, 400px);
+    min-width: 0;
     scroll-snap-align: start;
-    align-self: stretch;
   }
-  .pdp-product-rail :global(.pc) {
-    height: 100%;
-    max-height: 300px;
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc) {
+    min-height: 100%;
+    height: auto;
   }
-  .pdp-product-rail :global(.pc__link) {
-    flex-shrink: 0;
-  }
-  .pdp-product-rail :global(.pc__img-wrap) {
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__img-wrap) {
     aspect-ratio: 1;
-    max-height: 150px;
-    margin-bottom: 8px;
+    width: 100%;
+    margin-bottom: 10px;
+    border: none;
+    border-radius: var(--r, 8px);
   }
-  .pdp-product-rail :global(.pc__img) {
-    max-height: 150px;
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
-  .pdp-product-rail :global(.pc__body) {
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__body) {
     flex: 1;
     min-height: 0;
   }
-  .pdp-product-rail :global(.pc__name) {
-    font-size: 11px;
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__name) {
+    font-size: 13px;
     min-height: 0;
     -webkit-line-clamp: 2;
   }
-  .pdp-product-rail :global(.pc__bottom) {
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__bottom) {
     margin-top: 6px;
     padding-bottom: 0;
   }
-  .pdp-product-rail :global(.pc__price-current) {
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__price-current) {
     font-size: 13px;
   }
-  .pdp-product-rail :global(.pc__price-striked) {
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__price-striked) {
     font-size: 10px;
   }
-  .pdp-product-rail :global(.pc__quick-add) {
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__quick-add) {
     width: 30px;
     height: 30px;
   }
-  .pdp-product-rail :global(.pc__variants) {
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__variants) {
     margin-top: 6px;
     margin-bottom: 4px;
     gap: 4px;
   }
-  .pdp-product-rail :global(.pc__variant-btn) {
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__variant-hit--size) {
     height: 24px;
     min-width: 28px;
     font-size: 9px;
     padding: 0 6px;
+    border-radius: 6px;
+  }
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__variant-hit--swatch) {
+    width: 22px;
+    height: 22px;
+  }
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__variant-swatch-inner) {
+    width: 16px;
+    height: 16px;
+  }
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__variant-heading) {
+    font-size: 10px;
+  }
+  .pdp-shop-carousel-wrap .shop-col-carousel__nav {
+    position: absolute;
+    top: 46%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+    color: #fff;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--ease), border-color var(--ease), transform var(--ease);
+  }
+  .pdp-shop-carousel-wrap .shop-col-carousel__nav:hover {
+    background: rgba(0, 0, 0, 0.9);
+    border-color: rgba(255, 255, 255, 0.32);
+  }
+  .pdp-shop-carousel-wrap .shop-col-carousel__nav:active {
+    transform: translateY(-50%) scale(0.97);
+  }
+  .pdp-shop-carousel-wrap .shop-col-carousel__nav--prev {
+    left: 8px;
+  }
+  .pdp-shop-carousel-wrap .shop-col-carousel__nav--next {
+    right: 8px;
+  }
+
+  /** «Mais novos»: mesmo carrossel que “Mais vendidos” na home (`products-showcase-*`). */
+  .pdp-related .pdp-related__showcase-wrap {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+  }
+  .pdp-related .products-showcase-nav {
+    display: none;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 4;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+  @media (min-width: 561px) {
+    .pdp-related .products-showcase-nav {
+      display: flex;
+    }
+  }
+  .pdp-related .products-showcase-nav:hover {
+    background: rgba(0, 0, 0, 0.85);
+    border-color: var(--c-accent);
+  }
+  .pdp-related .products-showcase-nav--prev {
+    left: 4px;
+  }
+  .pdp-related .products-showcase-nav--next {
+    right: 4px;
+  }
+  .pdp-related .products-showcase-viewport {
+    width: 100%;
+    min-width: 0;
+  }
+  .pdp-related .products-showcase {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    align-items: stretch;
+  }
+  .pdp-related .products-showcase > :global(*) {
+    min-width: 0;
+  }
+  @media (max-width: 900px) {
+    .pdp-related .products-showcase {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (max-width: 560px) {
+    .pdp-related .products-showcase-nav {
+      display: flex;
+      position: relative;
+      top: auto;
+      transform: none;
+      align-self: center;
+      flex-shrink: 0;
+    }
+    .pdp-related .pdp-related__showcase-wrap {
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+      gap: 8px;
+      margin-inline: -20px;
+      padding-inline: 20px;
+      min-width: 0;
+    }
+    .pdp-related .products-showcase-viewport {
+      flex: 1;
+      min-width: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 10px;
+      scrollbar-width: thin;
+      container-type: inline-size;
+      container-name: pdp-newest;
+    }
+    .pdp-related .products-showcase {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      gap: 16px;
+      align-items: stretch;
+      width: max-content;
+      min-width: 100%;
+    }
+    .pdp-related .products-showcase > :global(*) {
+      flex: 0 0 100cqi;
+      max-width: 100cqi;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+      box-sizing: border-box;
+    }
+    @supports not (width: 1cqi) {
+      .pdp-related .products-showcase > :global(*) {
+        flex: 0 0 calc(100vw - 120px);
+        max-width: min(360px, calc(100vw - 120px));
+      }
+    }
   }
 
   .pdp-hero__thumbs-rail-wrap {
-    flex: 0 0 72px;
+    flex: 0 0 88px;
     min-height: 0;
-    max-height: min(75svh, 820px);
+    max-height: 100%;
+    align-self: stretch;
   }
   @media (max-width: 1024px) {
     .pdp-hero__thumbs-rail-wrap {
       flex: none;
-      max-height: 88px;
+      max-height: 96px;
       width: 100%;
     }
   }
@@ -853,7 +1278,8 @@ const jsonLd = productFound
     gap: 8px;
     overflow-y: auto;
     overflow-x: hidden;
-    max-height: min(75svh, 820px);
+    max-height: 100%;
+    height: 100%;
     padding: 4px 2px;
     scrollbar-width: thin;
   }
@@ -863,14 +1289,16 @@ const jsonLd = productFound
       overflow-x: auto;
       overflow-y: hidden;
       max-height: none;
+      height: auto;
       padding: 4px 0;
     }
   }
 
   .pdp-hero__thumb {
     flex-shrink: 0;
-    width: 64px;
-    height: 80px;
+    width: 72px;
+    height: 72px;
+    aspect-ratio: 1 / 1;
     padding: 0;
     border: 2px solid var(--c-border);
     border-radius: var(--r);
@@ -879,6 +1307,7 @@ const jsonLd = productFound
     background: var(--c-surface);
     opacity: 0.65;
     transition: opacity var(--ease), border-color var(--ease);
+    box-sizing: border-box;
   }
   .pdp-hero__thumb.is-active,
   .pdp-hero__thumb:hover {
@@ -895,31 +1324,46 @@ const jsonLd = productFound
     flex: 1;
     position: relative;
     min-width: 0;
+    min-height: 0;
+    height: 100%;
     background: var(--c-surface);
     border-radius: var(--r-md);
     overflow: hidden;
+    container-type: size;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .pdp-hero__main {
     flex: 1;
     min-width: 0;
-    height: min(75svh, 820px);
-    min-height: 320px;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
     display: flex;
-    align-items: stretch;
-    justify-content: stretch;
-  }
-  @media (max-width: 1024px) {
-    .pdp-hero__main {
-      height: min(60svh, 520px);
-    }
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    box-sizing: border-box;
   }
 
   .pdp-hero__main-carousel {
     position: relative;
-    width: 100%;
-    height: 100%;
+    flex-shrink: 0;
     min-height: 0;
+    min-width: 0;
+    aspect-ratio: 1 / 1;
+    max-width: 100%;
+    max-height: 100%;
+    width: min(100cqmin, 100%);
+    height: min(100cqmin, 100%);
+  }
+  @supports not (width: 1cqmin) {
+    .pdp-hero__main-carousel {
+      width: min(100%, 72vh);
+      height: min(100%, 72vh);
+    }
   }
   .pdp-main-discount {
     position: absolute;
@@ -1001,6 +1445,9 @@ const jsonLd = productFound
     min-width: 0;
     max-width: 100%;
     width: 100%;
+    min-height: 0;
+    height: 100%;
+    box-sizing: border-box;
   }
   /*
    * NUNCA `align-items: center` aqui no mobile: em column flex o eixo cruzado é a largura
@@ -1021,7 +1468,9 @@ const jsonLd = productFound
     width: 100%;
     max-width: min(500px, 100%);
     align-self: stretch;
-    max-height: min(calc(100svh - 40px), 920px);
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: 100%;
     overflow-y: auto;
     padding-right: 4px;
     scrollbar-width: thin;
@@ -1067,6 +1516,55 @@ const jsonLd = productFound
     margin: 0;
   }
 
+  .pdp-stock-notify {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: var(--r, 8px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.25);
+  }
+  .pdp-stock-notify__intro {
+    font-size: 13px;
+    color: var(--c-muted);
+    line-height: 1.45;
+    margin: 0 0 10px;
+  }
+  .pdp-stock-notify__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .pdp-stock-notify__input {
+    flex: 1 1 180px;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: var(--r, 8px);
+    border: 1px solid #2a2a2a;
+    background: #0d0d0d;
+    color: var(--c-text);
+    font-size: 14px;
+  }
+  .pdp-stock-notify__btn {
+    flex-shrink: 0;
+    padding: 0 16px;
+    min-height: 40px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .pdp-stock-notify__feedback {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: var(--c-muted);
+  }
+  .pdp-stock-notify__feedback.is-ok {
+    color: #4ade80;
+  }
+  .pdp-stock-notify__feedback.is-err {
+    color: #f87171;
+  }
   .pdp-stock {
     font-size: 12px;
     font-weight: 600;
@@ -1141,6 +1639,13 @@ const jsonLd = productFound
     overflow-wrap: anywhere;
   }
 
+  .pdp-variants-divider {
+    height: 0;
+    border: 0;
+    border-top: 1px solid var(--c-border);
+    margin: 6px 0 8px;
+  }
+
   .pdp-variant-row {
     margin-top: 4px;
   }
@@ -1160,19 +1665,23 @@ const jsonLd = productFound
     min-width: 0;
     justify-content: flex-start;
   }
+  .pdp-variant-values--swatch {
+    gap: 10px;
+  }
   .pdp-variant-btn {
     border: 1px solid var(--c-border);
-    border-radius: 999px;
+    border-radius: var(--r-md);
     background: var(--c-bg);
     color: var(--c-text);
-    font-size: 11px;
-    min-height: 32px;
-    padding: 0 12px;
+    font-size: 10px;
+    font-weight: 600;
+    min-height: 28px;
+    min-width: 30px;
+    padding: 0 8px;
     cursor: pointer;
     position: relative;
     overflow: hidden;
     flex: 0 1 auto;
-    min-width: 0;
     max-width: 100%;
   }
   @media (max-width: 420px) {
@@ -1185,10 +1694,14 @@ const jsonLd = productFound
       gap: 4px;
     }
   }
-  .pdp-variant-btn.is-selected {
+  .pdp-variant-btn.is-selected:not(.pdp-variant-btn--swatch) {
+    border-color: #0a0a0a;
+    background: #0a0a0a;
+    color: #fff;
+  }
+  .pdp-variant-btn--swatch.is-selected {
     border-color: var(--c-accent);
-    background: var(--c-accent);
-    color: var(--c-white);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
   }
   .pdp-variant-btn.is-unavailable {
     opacity: 0.35;
@@ -1206,18 +1719,50 @@ const jsonLd = productFound
     background: rgba(0, 0, 0, 0.4);
     font-size: 16px;
   }
-  .pdp-variant-btn--color {
+  .pdp-variant-btn--swatch {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.22);
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
+    box-sizing: border-box;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
   }
-  .pdp-variant-swatch {
-    width: 14px;
-    height: 14px;
+  .pdp-variant-btn--swatch:hover:not(:disabled):not(.is-unavailable) {
+    transform: scale(1.06);
+  }
+  .pdp-variant-btn--swatch-neutral .pdp-variant-swatch-inner {
+    background-color: #9ca3af !important;
+  }
+  .pdp-variant-btn--swatch-light {
+    border-color: rgba(0, 0, 0, 0.2);
+  }
+  .pdp-variant-btn--swatch-light.is-selected {
+    border-color: var(--c-accent);
+  }
+  .pdp-variant-swatch-inner {
+    display: block;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    flex-shrink: 0;
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+    box-sizing: border-box;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+  }
+  .pdp-variant-btn-text--sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .pdp-size-chart-row {
@@ -1319,6 +1864,22 @@ const jsonLd = productFound
   .pdp-buy-actions .btn {
     min-width: 0;
   }
+
+  /* Variante sem estoque: sem preço, qty, compra, quick add nem CEP (classe aplicada em pdp-client) */
+  [data-pdp-root].pdp-root--oos-variant #pdp-price-qty-row,
+  [data-pdp-root].pdp-root--oos-variant .pdp-buy-actions,
+  [data-pdp-root].pdp-root--oos-variant #pdp-shipping-block {
+    display: none !important;
+  }
+  [data-pdp-root].pdp-root--oos-variant #pdp-main-discount {
+    visibility: hidden;
+  }
+  #pdp-sticky-bar.pdp-sticky-bar--oos .pdp-sticky-bar__head-price,
+  #pdp-sticky-bar.pdp-sticky-bar--oos .pdp-sticky-bar__head-actions,
+  #pdp-sticky-bar.pdp-sticky-bar--oos .pdp-sticky-bar__ship {
+    display: none !important;
+  }
+
   .pdp-buy-now {
     flex: 1 1 0;
     min-width: 0;
@@ -1473,7 +2034,8 @@ const jsonLd = productFound
   .pdp-related {
     min-width: 0;
     max-width: 100%;
-    overflow-x: clip;
+    overflow-x: visible;
+    overflow-y: visible;
   }
   .pdp-related .container {
     min-width: 0;
@@ -1592,6 +2154,27 @@ const jsonLd = productFound
     color: var(--c-muted);
     line-height: 1.65;
   }
+  .pdp-faq__a--rich :global(p) {
+    margin: 0 0 0.75em;
+  }
+  .pdp-faq__a--rich :global(p:last-child) {
+    margin-bottom: 0;
+  }
+  .pdp-faq__a--rich :global(ul),
+  .pdp-faq__a--rich :global(ol) {
+    margin: 0 0 0.75em;
+    padding-left: 1.25em;
+  }
+  .pdp-faq__a--rich :global(a) {
+    color: var(--c-accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .pdp-faq__a--rich :global(img) {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--r);
+  }
 
   .pdp-dialog {
     max-width: min(96vw, 920px);
@@ -1640,6 +2223,18 @@ const jsonLd = productFound
     color: #fff;
     overflow: hidden;
   }
+  .pdp-lightbox__shell {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+    padding: max(52px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
+      max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+  }
   .pdp-lightbox::backdrop {
     background: #000;
   }
@@ -1680,10 +2275,8 @@ const jsonLd = productFound
     justify-content: center;
     gap: 4px;
     width: 100%;
-    height: 100%;
+    flex: 1;
     min-height: 0;
-    padding: max(52px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
-      max(24px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
     box-sizing: border-box;
     pointer-events: none;
   }
@@ -1703,12 +2296,34 @@ const jsonLd = productFound
   }
   .pdp-lightbox__img {
     max-width: 100%;
-    max-height: calc(100dvh - 120px);
+    max-height: calc(100dvh - 200px);
     width: auto;
     height: auto;
     object-fit: contain;
     user-select: none;
     -webkit-user-drag: none;
+  }
+  .pdp-lightbox__thumbs {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 10px 4px 4px;
+    max-height: 104px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    pointer-events: auto;
+  }
+  .pdp-lightbox__thumbs .pdp-hero__thumb {
+    width: 56px;
+    height: 70px;
+    opacity: 0.75;
+  }
+  .pdp-lightbox__thumbs .pdp-hero__thumb.is-active {
+    opacity: 1;
   }
   .pdp-lightbox__counter {
     margin: 0;
@@ -1768,6 +2383,223 @@ const jsonLd = productFound
     text-align: center;
     padding: 40px 20px;
   }
+  .pdp-sticky-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 480;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: center;
+    pointer-events: none;
+    padding: 0 max(12px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px))
+      max(12px, env(safe-area-inset-left, 0px));
+    transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+  .pdp-sticky-bar--offscreen {
+    transform: translate3d(0, 110%, 0);
+    pointer-events: none;
+  }
+  .pdp-sticky-bar--docked {
+    transform: translate3d(0, 0, 0);
+    pointer-events: none;
+  }
+  .pdp-sticky-bar__sheet {
+    pointer-events: auto;
+    width: min(720px, 100%);
+    background: rgba(14, 14, 14, 0.97);
+    border: 1px solid #2a2a2a;
+    border-radius: var(--r-md) var(--r-md) 0 0;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55);
+    overflow: hidden;
+  }
+  .pdp-sticky-bar__head {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    min-height: 52px;
+  }
+  .pdp-sticky-bar__menu {
+    flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--c-border);
+    background: var(--c-bg);
+    color: var(--c-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color var(--ease), background var(--ease);
+  }
+  .pdp-sticky-bar__menu:hover {
+    border-color: var(--c-accent);
+    background: var(--c-surface2);
+  }
+  .pdp-sticky-bar__menu-bars,
+  .pdp-sticky-bar__menu-bars::before,
+  .pdp-sticky-bar__menu-bars::after {
+    display: block;
+    width: 18px;
+    height: 2px;
+    background: currentColor;
+    border-radius: 1px;
+    position: relative;
+    transition: transform 0.25s ease, opacity 0.2s ease;
+  }
+  .pdp-sticky-bar__menu-bars::before,
+  .pdp-sticky-bar__menu-bars::after {
+    content: '';
+    position: absolute;
+    left: 0;
+  }
+  .pdp-sticky-bar__menu-bars::before {
+    top: -6px;
+  }
+  .pdp-sticky-bar__menu-bars::after {
+    top: 6px;
+  }
+  .pdp-sticky-bar__menu[aria-expanded='true'] .pdp-sticky-bar__menu-bars {
+    background: transparent;
+  }
+  .pdp-sticky-bar__menu[aria-expanded='true'] .pdp-sticky-bar__menu-bars::before {
+    top: 0;
+    transform: rotate(45deg);
+  }
+  .pdp-sticky-bar__menu[aria-expanded='true'] .pdp-sticky-bar__menu-bars::after {
+    top: 0;
+    transform: rotate(-45deg);
+  }
+  .pdp-sticky-bar__head-price {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .pdp-sticky-bar__price-striked {
+    font-size: 13px;
+    text-decoration: line-through;
+    color: var(--c-muted);
+  }
+  .pdp-sticky-bar__price-current {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--c-accent);
+    line-height: 1.1;
+  }
+  .pdp-sticky-bar__head-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .pdp-sticky-bar__buy {
+    padding-inline: 14px;
+    font-size: 12px;
+    min-height: 44px;
+    align-self: center;
+  }
+  /** Mesmo visual que `#pdp-atc` (`.pdp-atc-icon`); só ajuste de alinhamento na barra. */
+  .pdp-sticky-bar__head-actions .pdp-sticky-bar__atc.pdp-atc-icon {
+    flex-shrink: 0;
+    align-self: center;
+    width: 48px;
+    min-width: 48px;
+    max-width: 52px;
+    min-height: 44px;
+  }
+  .pdp-sticky-bar__drawer {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 10px 12px 14px;
+    max-height: min(52vh, 420px);
+    overflow-y: auto;
+  }
+  .pdp-sticky-bar__drawer[hidden] {
+    display: none;
+  }
+  .pdp-sticky-bar__variants {
+    margin-bottom: 10px;
+  }
+  .pdp-sticky-bar__variants .pdp-variants {
+    margin-top: 0;
+    margin-bottom: 0;
+    gap: 8px;
+  }
+  .pdp-sticky-bar__variants .pdp-variant-row {
+    margin-top: 0;
+  }
+  .pdp-sticky-bar__variants .pdp-variant-values {
+    gap: 4px;
+  }
+  .pdp-sticky-bar__variants .pdp-variant-btn:not(.pdp-variant-btn--swatch) {
+    min-height: 26px;
+    padding: 0 7px;
+    font-size: 9px;
+  }
+  .pdp-sticky-bar__variants .pdp-variant-btn--swatch {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    min-height: 26px;
+  }
+  .pdp-sticky-bar__variants .pdp-variant-swatch-inner {
+    width: 18px;
+    height: 18px;
+  }
+  .pdp-sticky-bar__ship {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .pdp-sticky-bar__cep-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--c-muted);
+  }
+  .pdp-cep-input--sticky {
+    max-width: 100%;
+    width: 100%;
+  }
+  .pdp-sticky-bar__fab {
+    pointer-events: auto;
+    position: absolute;
+    right: max(16px, env(safe-area-inset-right, 0px));
+    bottom: calc(100% + 10px);
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    border: 1px solid var(--c-border);
+    background: var(--c-surface);
+    color: var(--c-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  }
+  .pdp-sticky-bar__fab:hover {
+    border-color: var(--c-accent);
+  }
+  .pdp-sticky-bar--docked .pdp-sticky-bar__fab {
+    opacity: 1;
+  }
+  .pdp-sticky-bar--offscreen .pdp-sticky-bar__fab {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
   .nf__code {
     font-family: var(--font-title);
     font-size: clamp(80px, 15vw, 180px);
@@ -1796,532 +2628,15 @@ const jsonLd = productFound
   }
 </style>
 
-<script>
-  type OptionRow = { id: string; title: string; values: string[] };
-
-  type VariantMap = {
-    id: string;
-    title: string;
-    price: number;
-    soldOut: boolean;
-    maxQty?: number | null;
-    options: Record<string, string>;
-    images?: string[];
-    slideUrls?: string[];
-    priceDisplay?: string;
-    originalDisplay?: string | null;
-    discountPercent?: number;
-    allowBackorder?: boolean;
-  };
-
-  type StockMsgs = {
-    out: string;
-    backorder: string;
-    unverified: string;
-    available: string;
-    units: string;
-  };
-
-  const root = document.querySelector('[data-pdp-root]') as HTMLElement | null;
-  if (root) {
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    function decodeJson<T>(value: string): T | null {
-      try {
-        return JSON.parse(decodeURIComponent(value)) as T;
-      } catch {
-        return null;
-      }
-    }
-
-    const variants = decodeJson<VariantMap[]>(root.dataset.variants || '') || [];
-    const optionRows = decodeJson<OptionRow[]>(root.dataset.optionRows || '') || [];
-    let stockMsgs: StockMsgs = {
-      out: '',
-      backorder: '',
-      unverified: '',
-      available: '',
-      units: '',
-    };
-    try {
-      stockMsgs = { ...stockMsgs, ...JSON.parse(root.dataset.stockMsgs || '{}') };
-    } catch {
-      /* ignore */
-    }
-    const stockReliableFlag = root.dataset.stockReliable === 'true';
-
-    const rail = document.getElementById('pdp-thumbs-rail');
-    const mainImg = document.getElementById('pdp-main-img') as HTMLImageElement | null;
-    const mainImgWrap = document.getElementById('pdp-main-img-wrap');
-    const lightbox = document.getElementById('pdp-lightbox') as HTMLDialogElement | null;
-    const lightboxImg = document.getElementById('pdp-lightbox-img') as HTMLImageElement | null;
-    const lightboxCounter = document.getElementById('pdp-lightbox-counter');
-    const lbPrev = document.getElementById('pdp-lightbox-prev');
-    const lbNext = document.getElementById('pdp-lightbox-next');
-    const prevBtn = document.getElementById('pdp-carousel-prev');
-    const nextBtn = document.getElementById('pdp-carousel-next');
-    const atcBtn = document.getElementById('pdp-atc') as HTMLButtonElement | null;
-    const buyNowBtn = document.getElementById('pdp-buy-now') as HTMLButtonElement | null;
-    const qtyInput = document.getElementById('pdp-qty-input') as HTMLInputElement | null;
-    const qtyDec = document.getElementById('pdp-qty-dec');
-    const qtyInc = document.getElementById('pdp-qty-inc');
-    const priceCurrent = document.getElementById('pdp-price-current');
-    const priceOriginal = document.getElementById('pdp-price-original');
-    const mainDiscount = document.getElementById('pdp-main-discount');
-    const variationValueEl = document.getElementById('pdp-variation-value');
-    const stockLine = document.getElementById('pdp-stock-line');
-    const cepInput = document.getElementById('pdp-cep-input') as HTMLInputElement | null;
-    const cepHint = document.getElementById('pdp-cep-hint');
-
-    let slides: string[] = [];
-    let slideIndex = 0;
-    let autoplayTimer: ReturnType<typeof setInterval> | null = null;
-    let autoplayPaused = false;
-    let pdpSlidesReady = false;
-
-    const variantMatches = (variant: VariantMap, selected: Record<string, string>) =>
-      Object.entries(selected).every(([k, v]) => !v || variant.options?.[k] === v);
-
-    const getFirstAvailable = (selected: Record<string, string>) =>
-      variants.find((v) => variantMatches(v, selected) && !v.soldOut) || null;
-
-    const allowedOptionIds = new Set(optionRows.map((r) => r.id));
-    const selected: Record<string, string> = {};
-    const currentId = atcBtn?.dataset.variantId || '';
-    const current = variants.find((v) => v.id === currentId) || getFirstAvailable({}) || variants[0];
-    if (current?.options) {
-      Object.entries(current.options).forEach(([k, v]) => {
-        if (allowedOptionIds.has(k)) selected[k] = String(v || '');
-      });
-    }
-
-    function scrollThumbToTop(idx: number) {
-      if (!rail) return;
-      const btn = rail.children[idx] as HTMLElement | undefined;
-      if (!btn) return;
-      const isMobile = window.matchMedia('(max-width: 1024px)').matches;
-      const behavior = reducedMotion ? 'auto' : 'smooth';
-      if (isMobile) {
-        /* Não usar scrollIntoView: o browser rola o documento inteiro e “puxa” a vista para a galeria / “Neste drop”. */
-        const maxL = Math.max(0, rail.scrollWidth - rail.clientWidth);
-        const targetL = btn.offsetLeft - (rail.clientWidth - btn.offsetWidth) / 2;
-        rail.scrollTo({ left: Math.max(0, Math.min(targetL, maxL)), top: 0, behavior });
-      } else {
-        const maxT = Math.max(0, rail.scrollHeight - rail.clientHeight);
-        const targetT = btn.offsetTop - (rail.clientHeight - btn.offsetHeight) / 2;
-        rail.scrollTo({ top: Math.max(0, Math.min(targetT, maxT)), left: 0, behavior });
-      }
-    }
-
-    function renderThumbs(urls: string[]) {
-      if (!rail) return;
-      rail.innerHTML = '';
-      urls.forEach((url, i) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'pdp-hero__thumb' + (i === slideIndex ? ' is-active' : '');
-        b.dataset.slideIdx = String(i);
-        b.setAttribute('role', 'tab');
-        b.setAttribute('aria-selected', i === slideIndex ? 'true' : 'false');
-        b.setAttribute('aria-label', `Slide ${i + 1}`);
-        const im = document.createElement('img');
-        im.src = url;
-        im.alt = '';
-        im.width = 64;
-        im.height = 80;
-        im.loading = i === 0 ? 'eager' : 'lazy';
-        b.appendChild(im);
-        b.addEventListener('click', () => goToSlide(i));
-        rail.appendChild(b);
-      });
-    }
-
-    function updateMainImage(animate = true) {
-      if (!mainImg || !slides.length) return;
-      const u = slides[Math.min(slideIndex, slides.length - 1)] || '/logo.webp';
-      if (reducedMotion || !animate) {
-        mainImg.src = u;
-        mainImg.style.opacity = '1';
-        return;
-      }
-      mainImg.style.opacity = '0';
-      window.setTimeout(() => {
-        mainImg.src = u;
-        const show = () => {
-          mainImg.style.opacity = '1';
-        };
-        const dec = (mainImg as HTMLImageElement & { decode?: () => Promise<void> }).decode;
-        if (typeof dec === 'function') dec.call(mainImg).then(show).catch(show);
-        else if (mainImg.complete) requestAnimationFrame(show);
-        else mainImg.addEventListener('load', show, { once: true });
-      }, 140);
-    }
-
-    function syncThumbActive() {
-      if (!rail) return;
-      Array.from(rail.querySelectorAll('.pdp-hero__thumb')).forEach((el, i) => {
-        el.classList.toggle('is-active', i === slideIndex);
-        el.setAttribute('aria-selected', i === slideIndex ? 'true' : 'false');
-      });
-      scrollThumbToTop(slideIndex);
-    }
-
-    function fillLightboxImage() {
-      if (!lightboxImg) return;
-      const u = slides[Math.min(slideIndex, slides.length - 1)] || '/logo.webp';
-      lightboxImg.src = u;
-      lightboxImg.alt = mainImg?.alt || '';
-      if (lightboxCounter) lightboxCounter.textContent = `${slideIndex + 1} / ${slides.length}`;
-    }
-
-    function syncLightboxIfOpen() {
-      if (!lightbox?.open) return;
-      fillLightboxImage();
-    }
-
-    function refreshLightboxNavVisibility() {
-      const hide = slides.length <= 1;
-      lbPrev?.classList.toggle('is-hidden', hide);
-      lbNext?.classList.toggle('is-hidden', hide);
-    }
-
-    function goToSlide(idx: number) {
-      if (!slides.length) return;
-      slideIndex = ((idx % slides.length) + slides.length) % slides.length;
-      updateMainImage();
-      syncThumbActive();
-      syncLightboxIfOpen();
-    }
-
-    function nextSlide() {
-      goToSlide(slideIndex + 1);
-    }
-
-    function prevSlide() {
-      goToSlide(slideIndex - 1);
-    }
-
-    function startAutoplay() {
-      if (reducedMotion || slides.length <= 1) return;
-      stopAutoplay();
-      autoplayTimer = setInterval(() => {
-        if (!autoplayPaused) nextSlide();
-      }, 3000);
-    }
-
-    function stopAutoplay() {
-      if (autoplayTimer) {
-        clearInterval(autoplayTimer);
-        autoplayTimer = null;
-      }
-    }
-
-    function applySlides(urls: string[]) {
-      const list = urls.length ? urls : ['/logo.webp'];
-      slides = list;
-      slideIndex = 0;
-      renderThumbs(slides);
-      updateMainImage(pdpSlidesReady);
-      pdpSlidesReady = true;
-      syncThumbActive();
-      stopAutoplay();
-      startAutoplay();
-      refreshLightboxNavVisibility();
-    }
-
-    function updatePrice(variant: VariantMap) {
-      if (priceCurrent) priceCurrent.textContent = variant.priceDisplay || '';
-      if (priceOriginal) {
-        if (variant.originalDisplay) {
-          priceOriginal.textContent = variant.originalDisplay;
-          priceOriginal.hidden = false;
-        } else {
-          priceOriginal.textContent = '';
-          priceOriginal.hidden = true;
-        }
-      }
-      if (mainDiscount) {
-        const p = variant.discountPercent ?? 0;
-        if (p > 0) {
-          mainDiscount.textContent = `−${p}%`;
-          mainDiscount.hidden = false;
-        } else {
-          mainDiscount.hidden = true;
-        }
-      }
-    }
-
-    function updateVariationLabel(variant: VariantMap) {
-      if (!variationValueEl) return;
-      const parts = optionRows
-        .map((row) => String(selected[row.id] ?? variant.options?.[row.id] ?? '').trim())
-        .filter(Boolean);
-      variationValueEl.textContent = parts.join(' · ') || variant.title || '';
-    }
-
-    function updateStockLine(variant: VariantMap) {
-      if (!stockLine) return;
-      if (variant.soldOut) {
-        stockLine.textContent = stockMsgs.out;
-        return;
-      }
-      if (variant.allowBackorder) {
-        stockLine.textContent = stockMsgs.backorder;
-        return;
-      }
-      if (!stockReliableFlag) {
-        stockLine.textContent = stockMsgs.unverified;
-        return;
-      }
-      const n = variant.maxQty;
-      if (n != null && Number(n) > 0) {
-        stockLine.textContent = stockMsgs.units.replace('{count}', String(Math.floor(Number(n))));
-        return;
-      }
-      stockLine.textContent = stockMsgs.available;
-    }
-
-    function setFromVariant(variant: VariantMap | null) {
-      if (!variant || !atcBtn) return;
-      atcBtn.dataset.variantId = variant.id || '';
-      atcBtn.dataset.price = String(variant.price || 0);
-      atcBtn.dataset.maxQty =
-        variant.maxQty != null && Number.isFinite(Number(variant.maxQty)) && Number(variant.maxQty) >= 0
-          ? String(Math.floor(Number(variant.maxQty)))
-          : '';
-      const optionTitle = optionRows
-        .map((row) => {
-          const val = String(selected[row.id] ?? variant.options?.[row.id] ?? '').trim();
-          if (!val) return '';
-          return `${row.title}: ${val}`;
-        })
-        .filter((s) => s.length > 0)
-        .join(' | ');
-      atcBtn.dataset.variantTitle = optionTitle || variant.title || '';
-      const urls = variant.slideUrls?.length ? variant.slideUrls : variant.images || [];
-      applySlides(urls);
-      atcBtn.dataset.thumbnail = urls[0] || '';
-      updatePrice(variant);
-      updateVariationLabel(variant);
-      updateStockLine(variant);
-      atcBtn.disabled = !!variant.soldOut;
-      if (buyNowBtn) buyNowBtn.disabled = !!variant.soldOut;
-    }
-
-    function update() {
-      optionRows.forEach((row) => {
-        const rowBtns = root!.querySelectorAll(`.pdp-variant-btn[data-option-id="${row.id}"]`);
-        rowBtns.forEach((btn) => {
-          const el = btn as HTMLButtonElement;
-          const value = el.getAttribute('data-option-value') || '';
-          const selectedForCheck = { ...selected, [row.id]: value };
-          const hasAvailable = variants.some((v) => variantMatches(v, selectedForCheck) && !v.soldOut);
-          el.classList.toggle('is-selected', selected[row.id] === value);
-          el.classList.toggle('is-unavailable', !hasAvailable);
-          el.setAttribute('aria-checked', selected[row.id] === value ? 'true' : 'false');
-        });
-      });
-      const matchedAvailable = getFirstAvailable(selected);
-      if (!matchedAvailable) {
-        optionRows.forEach((row) => {
-          const chosenValue = selected[row.id];
-          if (!chosenValue) return;
-          const hasAvailableForChosen = variants.some(
-            (v) => !v.soldOut && String(v.options?.[row.id] ?? '') === chosenValue
-          );
-          if (!hasAvailableForChosen) selected[row.id] = '';
-        });
-      }
-      const chosen =
-        getFirstAvailable(selected) ||
-        variants.find((v) => !v.soldOut) ||
-        variants.find((v) => variantMatches(v, selected)) ||
-        variants[0];
-      if (chosen) setFromVariant(chosen);
-    }
-
-    root.addEventListener('click', (ev) => {
-      const t = ev.target;
-      if (!(t instanceof Element)) return;
-      const btn = t.closest('.pdp-variant-btn') as HTMLButtonElement | null;
-      if (btn && root.contains(btn)) {
-        if (btn.classList.contains('is-unavailable')) return;
-        const optionId = btn.dataset.optionId || '';
-        const optionValue = btn.dataset.optionValue || '';
-        if (!optionId || !optionValue) return;
-        selected[optionId] = optionValue;
-        update();
-        return;
-      }
-    });
-
-    prevBtn?.addEventListener('click', () => {
-      autoplayPaused = true;
-      prevSlide();
-    });
-    nextBtn?.addEventListener('click', () => {
-      autoplayPaused = true;
-      nextSlide();
-    });
-
-    root.addEventListener('mouseenter', () => {
-      autoplayPaused = true;
-    });
-    root.addEventListener('mouseleave', () => {
-      autoplayPaused = false;
-    });
-    root.addEventListener('focusin', () => {
-      autoplayPaused = true;
-    });
-    root.addEventListener('focusout', (e) => {
-      if (!root.contains(e.relatedTarget as Node)) autoplayPaused = false;
-    });
-
-    function resolveMaxQty(): number | null {
-      const raw = Number(atcBtn?.dataset.maxQty || '');
-      return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : null;
-    }
-    function clampQty(v: number) {
-      const max = resolveMaxQty();
-      if (!Number.isFinite(v) || v < 1) return 1;
-      if (max && v > max) return max;
-      return Math.floor(v);
-    }
-    function syncQty(next: number) {
-      const safe = clampQty(next);
-      if (qtyInput) qtyInput.value = String(safe);
-      if (atcBtn) atcBtn.dataset.qty = String(safe);
-    }
-    syncQty(Number(qtyInput?.value || 1));
-    qtyDec?.addEventListener('click', () => syncQty(Number(qtyInput?.value || 1) - 1));
-    qtyInc?.addEventListener('click', () => syncQty(Number(qtyInput?.value || 1) + 1));
-    qtyInput?.addEventListener('input', () => syncQty(Number(qtyInput.value || 1)));
-
-    function addCurrentToCart(options?: { openSideCart?: boolean }) {
-      const openSide = options?.openSideCart !== false;
-      if (!atcBtn) return Promise.resolve();
-      const { variantId, title, price, thumbnail, variantTitle, maxQty, qty } = atcBtn.dataset;
-      if (!variantId || atcBtn.disabled) return Promise.resolve();
-      const parsedMax = Number(maxQty || '');
-      const maxQuantity = Number.isFinite(parsedMax) && parsedMax > 0 ? Math.floor(parsedMax) : undefined;
-      const selectedQty = Math.max(1, Number(qty || qtyInput?.value || 1));
-      return import('../../lib/cart').then(({ addItem }) => {
-        addItem({
-          variantId,
-          title: title ?? '',
-          variantTitle: variantTitle ?? '',
-          price: Number(price ?? 0),
-          thumbnail: thumbnail ?? '',
-          quantity: selectedQty,
-          maxQuantity,
-        });
-        if (openSide) {
-          document.getElementById('side-cart')?.classList.add('is-open');
-          document.getElementById('side-cart-backdrop')?.classList.add('is-active');
-          document.body.style.overflow = 'hidden';
-        }
-      });
-    }
-
-    atcBtn?.addEventListener('click', () => {
-      void addCurrentToCart({ openSideCart: true });
-    });
-
-    buyNowBtn?.addEventListener('click', async () => {
-      if (!atcBtn || atcBtn.disabled) return;
-      await addCurrentToCart({ openSideCart: false });
-      const { getCart, hasOutOfStockItems } = await import('../../lib/cart');
-      const items = getCart();
-      if (!items.length) return;
-      if (hasOutOfStockItems(items)) return;
-      const apiUrl = (window as unknown as { __API_URL__?: string }).__API_URL__ || '/api/create-checkout';
-      const btn = buyNowBtn;
-      const orig = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = '…';
-      try {
-        const res = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items }),
-        });
-        const data = await res.json();
-        if (data.init_point) window.location.href = data.init_point;
-        else throw new Error('No init_point');
-      } catch {
-        btn.disabled = false;
-        btn.textContent = orig ?? '';
-      }
-    });
-
-    function formatCep(v: string) {
-      const d = v.replace(/\D/g, '').slice(0, 8);
-      if (d.length <= 5) return d;
-      return `${d.slice(0, 5)}-${d.slice(5)}`;
-    }
-    cepInput?.addEventListener('input', () => {
-      const cur = cepInput.value;
-      const next = formatCep(cur);
-      if (cur !== next) cepInput.value = next;
-      if (cepHint) {
-        const ok = next.replace(/\D/g, '').length === 8;
-        cepHint.textContent = ok || next.length === 0 ? '' : 'CEP inválido';
-      }
-    });
-
-    document.querySelectorAll('[data-modal-target]').forEach((el) => {
-      el.addEventListener('click', () => {
-        const id = el.getAttribute('data-modal-target');
-        const dlg = id ? (document.getElementById(id) as HTMLDialogElement | null) : null;
-        autoplayPaused = true;
-        dlg?.showModal();
-      });
-    });
-    document.querySelectorAll('[data-close-modal]').forEach((el) => {
-      el.addEventListener('click', () => {
-        const dlg = el.closest('dialog');
-        dlg?.close();
-        autoplayPaused = false;
-      });
-    });
-    document.querySelectorAll('.pdp-dialog, .pdp-lightbox').forEach((dlg) => {
-      dlg.addEventListener('close', () => {
-        autoplayPaused = false;
-      });
-    });
-
-    mainImgWrap?.addEventListener('click', () => {
-      if (!lightbox || !slides.length) return;
-      refreshLightboxNavVisibility();
-      fillLightboxImage();
-      autoplayPaused = true;
-      lightbox.showModal();
-    });
-
-    lbPrev?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      autoplayPaused = true;
-      prevSlide();
-    });
-    lbNext?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      autoplayPaused = true;
-      nextSlide();
-    });
-
-    lightbox?.addEventListener('keydown', (e) => {
-      if (!lightbox.open) return;
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        autoplayPaused = true;
-        prevSlide();
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        autoplayPaused = true;
-        nextSlide();
-      }
-    });
-
-    update();
+<style is:global>
+  body.pdp-sticky-bar-visible {
+    padding-bottom: max(96px, env(safe-area-inset-bottom, 0px));
   }
+  body.pdp-sticky-bar-expanded {
+    padding-bottom: max(240px, env(safe-area-inset-bottom, 0px));
+  }
+</style>
+
+<script>
+  import '../../scripts/pdp-client';
 </script>

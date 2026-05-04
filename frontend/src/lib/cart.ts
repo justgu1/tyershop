@@ -1,6 +1,8 @@
 // Cart state managed in localStorage.
 // Emits "cart:update" CustomEvent whenever the cart changes.
 
+import { getVariantMaxQty as getVariantMaxQtyFromProduct, isVariantSoldOut as isVariantSoldOutFromProduct } from './product-variants';
+
 export interface CartItem {
   variantId: string;
   title: string;
@@ -14,6 +16,9 @@ export interface CartItem {
 
 const KEY = 'tyer_cart';
 const APPLIED_PROMO_KEY = 'tyer_applied_coupon_code';
+
+/** Quando o inventário ainda não devolveu `maxQuantity` (>0), limita quantidade no carrinho (evita pedidos absurdos). */
+export const CART_MAX_WHEN_UNKNOWN = 99;
 
 function read(): CartItem[] {
   if (typeof localStorage === 'undefined') return [];
@@ -53,10 +58,11 @@ function write(items: CartItem[]) {
 function clampQty(qty: number, maxQuantity?: number): number {
   const normalized = Number.isFinite(qty) ? Math.floor(qty) : 1;
   const minBound = Math.max(1, normalized);
-  const max =
+  const explicit =
     Number.isFinite(maxQuantity) && Number(maxQuantity) > 0
       ? Math.floor(Number(maxQuantity))
-      : Infinity;
+      : null;
+  const max = explicit ?? CART_MAX_WHEN_UNKNOWN;
   return Math.max(1, Math.min(minBound, max));
 }
 
@@ -64,6 +70,14 @@ function sanitizeMax(maxQuantity?: number): number | undefined {
   const n = Number(maxQuantity);
   if (!Number.isFinite(n) || n <= 0) return undefined;
   return Math.floor(n);
+}
+
+/** Limite máximo por linha para UI (stepper) e coerente com `clampQty`. */
+export function maxOrderableUnits(item: CartItem): number {
+  const s = sanitizeMax(item.maxQuantity);
+  if (s) return s;
+  if (item.stockState === 'out_of_stock') return 1;
+  return CART_MAX_WHEN_UNKNOWN;
 }
 
 export function getCart(): CartItem[] { return read(); }
@@ -123,9 +137,7 @@ export function getItemMaxQty(variantId: string): number | undefined {
 export function canIncrease(variantId: string): boolean {
   const item = read().find(i => i.variantId === variantId);
   if (!item) return false;
-  const max = sanitizeMax(item.maxQuantity);
-  if (!max) return true;
-  return item.quantity < max;
+  return item.quantity < maxOrderableUnits(item);
 }
 
 export function clearCart() { write([]); }
@@ -139,53 +151,6 @@ type VariantSnapshot = {
   thumbnail?: string;
   price?: number;
 };
-
-function isVariantSoldOut(variant: any): boolean {
-  if (!variant) return true;
-  const nestedStockQty = (variant.inventory_items ?? []).reduce((sum: number, item: any) => {
-    const levels = item?.inventory?.location_levels ?? [];
-    const levelSum = levels.reduce((inner: number, level: any) => {
-      const raw = Number(level?.stocked_quantity);
-      return Number.isFinite(raw) ? inner + raw : inner;
-    }, 0);
-    return sum + levelSum;
-  }, 0);
-  const qtyRaw =
-    nestedStockQty > 0 || nestedStockQty === 0
-      ? nestedStockQty
-      : variant.inventory_quantity ?? variant.calculated_inventory_quantity ?? variant.stocked_quantity;
-  const qty = Number(qtyRaw);
-  const hasQty = Number.isFinite(qty);
-  const allowBackorder = variant.allow_backorder === true;
-  const status = String(variant.inventory_status ?? variant.availability_status ?? '').toLowerCase();
-
-  if (status.includes('out') || status.includes('sold')) return true;
-  if (status.includes('in_stock') || status.includes('available')) return false;
-  if (variant.available_for_sale === true || variant.in_stock === true) return false;
-  if (variant.available_for_sale === false || variant.in_stock === false) return true;
-  if (hasQty && qty > 0) return false;
-  if (hasQty && qty <= 0 && !allowBackorder) return true;
-  return false;
-}
-
-function getVariantMaxQty(variant: any): number | undefined {
-  if (!variant || variant.allow_backorder === true) return undefined;
-  const nestedStockQty = (variant.inventory_items ?? []).reduce((sum: number, item: any) => {
-    const levels = item?.inventory?.location_levels ?? [];
-    const levelSum = levels.reduce((inner: number, level: any) => {
-      const raw = Number(level?.stocked_quantity);
-      return Number.isFinite(raw) ? inner + raw : inner;
-    }, 0);
-    return sum + levelSum;
-  }, 0);
-  const qtyRaw =
-    nestedStockQty > 0 || nestedStockQty === 0
-      ? nestedStockQty
-      : variant.inventory_quantity ?? variant.calculated_inventory_quantity ?? variant.stocked_quantity;
-  const qty = Number(qtyRaw);
-  if (!Number.isFinite(qty)) return undefined;
-  return Math.max(0, Math.floor(qty));
-}
 
 function getStoreConfig() {
   const key = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
@@ -215,10 +180,12 @@ async function fetchVariantSnapshot(variantId: string): Promise<VariantSnapshot>
     const title = product?.title || undefined;
     const optionTitle = String(variant?.title || '').trim() || undefined;
     const price = Number(variant?.calculated_price?.calculated_amount ?? variant?.prices?.[0]?.amount ?? 0);
-    const maxQuantity = getVariantMaxQty(variant);
+    const mq = getVariantMaxQtyFromProduct(variant);
+    const maxQuantity = mq == null ? undefined : mq;
     return {
       exists: true,
-      soldOut: isVariantSoldOut(variant),
+      /* Resposta explícita da Store API: tratar qty numérica como fiável. */
+      soldOut: isVariantSoldOutFromProduct(variant, true),
       maxQuantity,
       title,
       variantTitle: optionTitle,

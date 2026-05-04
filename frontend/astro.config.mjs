@@ -7,6 +7,10 @@ const MEDUSA_INTERNAL =
   process.env.MEDUSA_URL ||
   process.env.PUBLIC_MEDUSA_URL ||
   'http://localhost:9003';
+/** No Docker, o browser não usa isto; o dev server do Vite usa para proxy `/api` → serviço `api`. */
+const API_GATEWAY =
+  process.env.INTERNAL_API_URL || process.env.PUBLIC_API_URL || 'http://localhost:3000';
+
 const MEDUSA_PROXY = {
   '/store': {
     target: MEDUSA_INTERNAL,
@@ -18,6 +22,10 @@ const MEDUSA_PROXY = {
   },
   '/admin': {
     target: MEDUSA_INTERNAL,
+    changeOrigin: true,
+  },
+  '/api': {
+    target: API_GATEWAY.replace(/\/$/, ''),
     changeOrigin: true,
   },
 };

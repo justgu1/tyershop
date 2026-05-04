@@ -113,8 +113,9 @@ const lang: Lang = getLangFromUrl(Astro.url);
 .sc__view-cart:hover { color: var(--c-text); }
 </style>
 
-<script>
+<script lang="ts">
   import { getCart, removeItem, updateQty, setQty, clearCart, getTotal, getAppliedPromoCode, setAppliedPromoCode, validateCartItems } from '../lib/cart';
+  import { createMedusaCartFromLocalCart } from '../lib/medusa-checkout-cart';
   function fmt(cents: number) { return (Number(cents) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
   function escHtml(s: string) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function formatVariantLabel(raw: string) {
@@ -338,7 +339,16 @@ const lang: Lang = getLangFromUrl(Astro.url);
     const orig = btn.textContent;
     btn.textContent = '...';
     try {
-      const res = await fetch('/api/create-checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) });
+      if (import.meta.env.PUBLIC_MERCADOPAGO_PUBLIC_KEY) {
+        window.location.href = '/checkout';
+        return;
+      }
+      const cartId = await createMedusaCartFromLocalCart();
+      const res = await fetch('/api/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cart_id: cartId }),
+      });
       const data = await res.json();
       if (data.init_point) window.location.href = data.init_point;
       else throw new Error('No init_point');
@@ -352,4 +362,3 @@ const lang: Lang = getLangFromUrl(Astro.url);
   void rehydrateAppliedCoupon();
   window.addEventListener('cart:update', () => { render(); scheduleCouponResync(); });
 </script>
--->

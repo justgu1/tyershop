@@ -62,13 +62,15 @@ services:
     ports:
       - "4321:4321"
     environment:
-      # Menos ruído no log (avisos deprecated vêm de deps transitivas, ex. cadeias @oclif / Medusa)
       NPM_CONFIG_AUDIT: "false"
       NPM_CONFIG_FUND: "false"
       NPM_CONFIG_LOGLEVEL: "error"
       PUBLIC_MEDUSA_URL: ${PUBLIC_MEDUSA_URL}
       PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${PUBLIC_MEDUSA_PUBLISHABLE_KEY}
       MEDUSA_INTERNAL_URL: ${MEDUSA_INTERNAL_URL}
+      PUBLIC_MERCADOPAGO_PUBLIC_KEY: ${PUBLIC_MERCADOPAGO_PUBLIC_KEY:-}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:3000}
+      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api:3000}
     depends_on:
       - backend
     volumes:
@@ -89,6 +91,8 @@ services:
     environment:
       MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN}
       MEDUSA_URL: ${PUBLIC_MEDUSA_URL}
+      MEDUSA_INTERNAL_URL: ${MEDUSA_INTERNAL_URL:-http://backend:9000}
+      MEDUSA_PUBLISHABLE_KEY: ${PUBLIC_MEDUSA_PUBLISHABLE_KEY}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       NEWSLETTER_FROM: ${NEWSLETTER_FROM}

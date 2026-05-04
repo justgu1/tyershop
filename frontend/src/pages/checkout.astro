@@ -1,0 +1,170 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getLangFromUrl, t, getPathForLang } from '../i18n/utils';
+import type { Lang } from '../i18n/utils';
+
+const lang: Lang = getLangFromUrl(Astro.url);
+const mpPublicKey = import.meta.env.PUBLIC_MERCADOPAGO_PUBLIC_KEY || '';
+const apiBase = (import.meta.env.PUBLIC_API_URL || '').replace(/\/$/, '');
+---
+
+<Layout title={t(lang, 'cart', 'checkout')} lang={lang} noindex bodyClass="checkout-page">
+  <div class="checkout-page container">
+    <h1 class="checkout-page__title">{t(lang, 'cart', 'checkout')}</h1>
+    <p class="checkout-page__sub" id="checkout-summary"></p>
+    {!mpPublicKey && (
+      <p class="checkout-page__warn">
+        Configure <code>PUBLIC_MERCADOPAGO_PUBLIC_KEY</code> no ambiente do frontend e <code>MERCADOPAGO_ACCESS_TOKEN</code> no serviço da API.
+      </p>
+    )}
+    {mpPublicKey && <div id="paymentBrick_container" class="checkout-page__brick" />}
+    <p class="checkout-page__fallback">
+      <a href={getPathForLang('/cart', lang)} class="checkout-page__link">← {t(lang, 'cart', 'continue_shopping')}</a>
+    </p>
+  </div>
+</Layout>
+
+<script is:inline src="https://sdk.mercadopago.com/js/v2"></script>
+
+<script
+  define:vars={{
+    mpPublicKey,
+    apiBase: apiBase || '',
+  }}
+>
+  import { getCart, getAppliedPromoCode } from '../lib/cart';
+  import { createMedusaCartFromLocalCart } from '../lib/medusa-checkout-cart';
+
+  function fmtBrl(cents) {
+    return (Number(cents) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  const summaryEl = document.getElementById('checkout-summary');
+  const brickMount = document.getElementById('paymentBrick_container');
+
+  async function medusaTotalMajorFromCart(cartId) {
+    const pk = import.meta.env.PUBLIC_MEDUSA_PUBLISHABLE_KEY;
+    if (!pk || !cartId) return null;
+    const r = await fetch(`/store/carts/${encodeURIComponent(cartId)}`, {
+      headers: { 'x-publishable-api-key': String(pk) },
+    });
+    const j = await r.json();
+    const cents = Number(j?.cart?.total);
+    if (!Number.isFinite(cents) || cents < 0) return null;
+    return Math.round(cents) / 100;
+  }
+
+  function processPaymentUrl() {
+    const base = String(apiBase || '').replace(/\/$/, '');
+    if (base.startsWith('http')) return `${base}/api/process-payment`;
+    return '/api/process-payment';
+  }
+
+  async function init() {
+    const items = getCart();
+    if (!items.length) {
+      if (summaryEl) summaryEl.textContent = 'Carrinho vazio.';
+      return;
+    }
+    let medusaCartId = '';
+    try {
+      medusaCartId = await createMedusaCartFromLocalCart();
+    } catch (e) {
+      if (summaryEl) summaryEl.textContent = e instanceof Error ? e.message : 'Erro ao preparar carrinho.';
+      return;
+    }
+    const amount = await medusaTotalMajorFromCart(medusaCartId);
+    if (!(Number.isFinite(amount) && amount > 0)) {
+      if (summaryEl) summaryEl.textContent = 'Não foi possível obter o total no Medusa.';
+      return;
+    }
+    const totalCents = Math.round(amount * 100);
+    if (summaryEl) {
+      summaryEl.textContent = `Total (Medusa): ${fmtBrl(totalCents)}${getAppliedPromoCode() ? ` — cupom ${getAppliedPromoCode()}` : ''}`;
+    }
+    if (!mpPublicKey || !brickMount) return;
+    const MercadoPago = window.MercadoPago;
+    if (!MercadoPago) {
+      if (summaryEl) summaryEl.textContent += ' SDK do Mercado Pago não carregou.';
+      return;
+    }
+    const mp = new MercadoPago(mpPublicKey, { locale: 'pt-BR' });
+    const bricksBuilder = mp.bricks();
+    const payUrl = processPaymentUrl();
+    await bricksBuilder.create('payment', 'paymentBrick_container', {
+      initialization: {
+        amount,
+      },
+      customization: {
+        paymentMethods: {
+          ticket: 'all',
+          bankTransfer: 'all',
+          creditCard: 'all',
+          prepaidCard: 'all',
+          debitCard: 'all',
+          mercadoPago: 'all',
+        },
+      },
+      callbacks: {
+        onReady: () => {},
+        onSubmit: ({ formData }) =>
+          new Promise((resolve, reject) => {
+            fetch(payUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...formData, cart_id: medusaCartId }),
+            })
+              .then(async (r) => {
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(data.error || r.statusText);
+                const st = data.status;
+                if (st === 'approved' || st === 'pending' || st === 'in_process') resolve();
+                else reject(new Error('Pagamento não aprovado'));
+              })
+              .catch((e) => reject(e));
+          }),
+        onError: (err) => console.error(err),
+      },
+    });
+  }
+
+  void init();
+</script>
+
+<style>
+  .checkout-page {
+    padding-block: 40px 56px;
+    max-width: 720px;
+  }
+  .checkout-page__title {
+    font-family: var(--font-title);
+    font-size: clamp(32px, 4vw, 48px);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .checkout-page__sub {
+    color: var(--c-muted);
+    margin-bottom: 24px;
+    font-size: 15px;
+  }
+  .checkout-page__warn {
+    padding: 14px 16px;
+    border-radius: var(--r);
+    border: 1px solid rgba(248, 113, 113, 0.45);
+    background: rgba(127, 29, 29, 0.25);
+    color: #fecaca;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .checkout-page__brick {
+    min-height: 120px;
+    margin-bottom: 24px;
+  }
+  .checkout-page__fallback {
+    margin: 0;
+  }
+  .checkout-page__link {
+    color: var(--c-accent);
+    font-size: 13px;
+  }
+</style>

@@ -102,14 +102,13 @@ const productQuery = getProductListQueryString(regionId);
 const knownIdsUnique = [...new Set(knownIds)];
 const topNewIds = [...new Set(newProducts.map((p) => p?.id).filter(Boolean))].slice(0, 10);
 const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolean))].slice(0, 10);
-/** Offset inicial do scroll infinito: alinhado ao fetch SSR `limit=32` da listagem principal */
-const infiniteStartOffset = 32;
 ---
 
 <Layout
   title={t(lang, 'nav', 'shop')}
   description={t(lang, 'shop', 'meta_description')}
   lang={lang}
+  bodyClass="page-shop"
 >
   <div class="shop-layout" id="shop-top">
     <div
@@ -119,6 +118,7 @@ const infiniteStartOffset = 32;
       aria-hidden="true"
     />
     <aside class="shop-sidebar" id="shop-sidebar" aria-label={t(lang, 'shop', 'filters')}>
+      <div class="shop-sidebar__sticky">
       <div class="shop-sidebar__inner">
         <h2 class="shop-sidebar__title">{t(lang, 'shop', 'filters')}</h2>
 
@@ -155,6 +155,7 @@ const infiniteStartOffset = 32;
         </nav>
         <span class="shop-header__count" id="shop-count" aria-live="polite"
           >{totalCatalogCount} {t(lang, 'shop', 'count_items')}</span>
+      </div>
       </div>
     </aside>
 
@@ -286,27 +287,153 @@ const infiniteStartOffset = 32;
   </div>
 </Layout>
 
+<style is:global>
+  /** Tema claro só dentro da loja — não alterar :root (header, mega, footer mantêm o escuro). */
+  body.page-shop {
+    background: #f8f8f8;
+  }
+  body.page-shop main {
+    background: #f8f8f8;
+    /* `overflow-x: hidden` no main quebra `position: sticky` na sidebar (filho do mesmo grid). */
+    overflow-x: visible;
+    overflow-y: visible;
+  }
+  /* Sticky falha com `overflow-x: hidden` em html/body — na loja relaxamos só o eixo horizontal. */
+  html:has(body.page-shop) {
+    overflow-x: visible;
+    max-width: 100%;
+  }
+  body.page-shop {
+    overflow-x: visible;
+  }
+  body.page-shop .shop-layout {
+    max-width: 100%;
+    min-width: 0;
+    --c-bg: #f8f8f8;
+    --c-surface: #ffffff;
+    --c-surface2: #f0f0f0;
+    --c-border: #e8e8e8;
+    --c-text: #0a0a0a;
+    --c-muted: #5c5c5c;
+    --c-bg-mute: #ececec;
+    --pc-price-current: #0a0a0a;
+    --pc-price-striked: rgba(10, 10, 10, 0.45);
+    --pc-name-color: #0a0a0a;
+  }
+  body.page-shop .shop-main {
+    background: var(--c-bg);
+  }
+  body.page-shop .shop-block__title {
+    color: #0a0a0a;
+  }
+  body.page-shop .shop-layout .pc__quick-add img {
+    filter: brightness(0);
+    opacity: 0.88;
+  }
+  body.page-shop .shop-sidebar {
+    background: #141414;
+    border-right-color: #2a2a2a;
+  }
+  body.page-shop .shop-sidebar__title {
+    color: #f5f5f5;
+  }
+  body.page-shop .shop-toc__label {
+    color: rgba(255, 255, 255, 0.45);
+  }
+  body.page-shop .shop-toc__btn {
+    color: rgba(255, 255, 255, 0.72);
+  }
+  body.page-shop .shop-toc__btn:hover,
+  body.page-shop .shop-toc__btn:focus-visible {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  body.page-shop .shop-toc__btn.is-active {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 2px 0 0 var(--c-accent);
+  }
+  body.page-shop .shop-sidebar .shop-header__count {
+    color: rgba(255, 255, 255, 0.55);
+  }
+  body.page-shop .btn-outline {
+    color: var(--c-text);
+    border-color: #c8c8c8;
+  }
+  body.page-shop .btn-outline:hover {
+    background: var(--c-surface2);
+    border-color: #b0b0b0;
+  }
+  body.page-shop .shop-col-carousel__nav {
+    border-color: rgba(0, 0, 0, 0.12);
+    background: rgba(255, 255, 255, 0.94);
+    color: var(--c-text);
+  }
+  body.page-shop .shop-col-carousel__nav:hover {
+    background: #fff;
+    border-color: var(--c-accent);
+  }
+  body.page-shop .shop-col-carousel::-webkit-scrollbar-thumb {
+    background: #c4c4c4;
+  }
+  body.page-shop .pc__variants-divider {
+    border-top-color: rgba(0, 0, 0, 0.08);
+  }
+  body.page-shop .pc__variant-heading {
+    color: rgba(0, 0, 0, 0.5);
+  }
+  body.page-shop .pc__variant-heading-k {
+    color: rgba(0, 0, 0, 0.62);
+  }
+  body.page-shop .pc__variant-hit--swatch {
+    border-color: rgba(0, 0, 0, 0.22);
+  }
+  body.page-shop .pc__variant-hit--size {
+    border-color: rgba(0, 0, 0, 0.2);
+    color: var(--c-text);
+  }
+  body.page-shop .pc__variant-hit--size:hover:not(.is-unavailable) {
+    border-color: rgba(0, 0, 0, 0.38);
+  }
+</style>
+
 <style>
 .shop-layout {
   display: grid;
   grid-template-columns: 240px 1fr;
   min-height: calc(100svh - var(--header-h));
-  align-items: start;
+  align-items: stretch;
   width: 100%;
   max-width: 100%;
-  overflow-x: clip;
+  overflow-x: visible;
 }
 @media (max-width: 900px) {
   .shop-layout { grid-template-columns: 1fr; }
 }
 
 .shop-sidebar {
-  position: sticky; top: var(--header-h);
+  position: relative;
+  align-self: stretch;
+  min-height: 0;
   border-right: 1px solid var(--c-border);
-  padding: 32px 24px;
+  padding: 0;
   background: var(--c-surface);
-  height: calc(100svh - var(--header-h));
-  overflow-y: auto;
+}
+.shop-sidebar__sticky {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+@media (min-width: 901px) {
+  .shop-sidebar__sticky {
+    position: sticky;
+    top: var(--header-h);
+    max-height: calc(100svh - var(--header-h));
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 32px 24px;
+    box-sizing: border-box;
+  }
 }
 @media (max-width: 900px) {
   .shop-sidebar-backdrop {
@@ -320,8 +447,16 @@ const infiniteStartOffset = 32;
     width: 280px; transform: translateX(-100%);
     transition: transform 0.3s ease;
     height: 100dvh;
+    border-right: none;
   }
   .shop-sidebar.is-open { transform: translateX(0); }
+  .shop-sidebar__sticky {
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 32px 24px;
+    box-sizing: border-box;
+  }
 }
 .shop-sidebar__title { font-family: var(--font-title); font-size: 22px; text-transform: uppercase; margin-bottom: 20px; }
 .shop-sidebar__inner { min-height: 100%; display: flex; flex-direction: column; }
@@ -348,7 +483,7 @@ const infiniteStartOffset = 32;
   min-width: 0;
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 @media (max-width: 900px) { .shop-main { padding: 24px 16px; } }
 
@@ -484,53 +619,259 @@ const infiniteStartOffset = 32;
 
 <!-- Estilos para cards inseridos via JS (escopo do ProductCard não aplica) -->
 <style is:global>
-#shop-infinite-grid .pc { display: flex; flex-direction: column; position: relative; transition: transform 0.3s ease; }
+#shop-infinite-grid .pc {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  transition: transform 0.3s ease;
+}
 #shop-infinite-grid .pc:hover { transform: translateY(-4px); }
 #shop-infinite-grid .pc__link { display: block; }
 #shop-infinite-grid .pc__img-wrap {
-  position: relative; aspect-ratio: 1; overflow: hidden; background: var(--c-bg-mute, #1a1a1a);
-  border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; margin-bottom: 12px;
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--c-bg-mute, #1a1a1a);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  margin-bottom: 12px;
 }
-#shop-infinite-grid .pc__img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s cubic-bezier(0.4,0,0.2,1); }
+#shop-infinite-grid .pc__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
 #shop-infinite-grid .pc:hover .pc__img { transform: scale(1.06); }
-#shop-infinite-grid .pc__img--secondary { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity 0.35s ease, transform 0.6s cubic-bezier(0.4,0,0.2,1); }
+#shop-infinite-grid .pc__img--secondary {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease, transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
 #shop-infinite-grid .pc__img-wrap.is-hover-ready:hover .pc__img--secondary { opacity: 1; }
 #shop-infinite-grid .pc__img-wrap.is-hover-ready:hover .pc__img--primary { opacity: 0; }
 #shop-infinite-grid .pc__tags { position: absolute; left: 8px; display: flex; flex-direction: column; gap: 4px; }
 #shop-infinite-grid .pc__tags--priority { top: 8px; }
 #shop-infinite-grid .pc__tags--category { top: 8px; left: auto; right: 8px; align-items: flex-end; }
-#shop-infinite-grid .pc__tag { font-size: 10px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 10px; border-radius: var(--r); color: #fff; display: inline-flex; align-items: center; gap: 5px; }
+#shop-infinite-grid .pc__tag {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: var(--r);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
 #shop-infinite-grid .pc__tag--soldout { background: #000; }
 #shop-infinite-grid .pc__tag--discount { background: #16a34a; }
 #shop-infinite-grid .pc__tag--exclusive { background: #6d28d9; }
 #shop-infinite-grid .pc__tag--popular { background: #db2777; }
 #shop-infinite-grid .pc__tag--new { background: var(--c-accent); color: #fff; }
-#shop-infinite-grid .pc__body { text-align: center; display: flex; flex-direction: column; flex-grow: 1; }
-#shop-infinite-grid .pc__body-link { text-decoration: none; display: block; flex-grow: 1; }
-#shop-infinite-grid .pc__name { font-size: 14px; font-weight: 500; line-height: 1.3; color: var(--c-text);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 10px; min-height: 2.6em; }
-#shop-infinite-grid .pc__bottom { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: auto; padding-bottom: 8px; }
-#shop-infinite-grid .pc__price-box { display: inline-flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
-#shop-infinite-grid .pc__price-striked { font-size: 12px; text-decoration: line-through; color: rgba(255,255,255,0.58); line-height: 1; }
-#shop-infinite-grid .pc__price-current { font-size: 16px; font-weight: 800; color: #fff; line-height: 1; }
+#shop-infinite-grid .pc__body {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+#shop-infinite-grid .pc__body-link { text-decoration: none; display: block; }
+#shop-infinite-grid .pc__name {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--pc-name-color, var(--c-text));
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.6em;
+}
+#shop-infinite-grid .pc__bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding-bottom: 8px;
+}
+#shop-infinite-grid .pc__price-box {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+#shop-infinite-grid .pc__price-striked {
+  font-size: 12px;
+  text-decoration: line-through;
+  color: var(--pc-price-striked, rgba(255, 255, 255, 0.58));
+  line-height: 1;
+}
+#shop-infinite-grid .pc__price-current {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--pc-price-current, #fff);
+  line-height: 1;
+}
 #shop-infinite-grid .pc__price-box--discount .pc__price-current { color: var(--c-accent); }
 #shop-infinite-grid .pc__quick-add {
-  position: static; transform: none;
-  background: var(--c-surface2); border: 1px solid rgba(255,255,255,0.1); border-radius: 50%;
-  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; }
-#shop-infinite-grid .pc__quick-add:hover { background: var(--c-accent); border-color: var(--c-accent); }
-#shop-infinite-grid .pc__quick-add:disabled { opacity: 0.7; cursor: not-allowed; border-color: rgba(248, 113, 113, 0.45); }
-#shop-infinite-grid .pc__quick-add:disabled:hover { background: #991b1b; border-color: #ef4444; }
-#shop-infinite-grid .pc__variants { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; margin-bottom: 14px; }
-#shop-infinite-grid .pc__variant-row { display: flex; align-items: center; justify-content: center; }
-#shop-infinite-grid .pc__variant-values { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
-#shop-infinite-grid .pc__variant-btn { border: 1px solid #d1d5db; border-radius: 999px; background: #fff; color: #111827; font-size: 11px; height: 28px; min-width: 36px; padding: 0 9px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; position: relative; overflow: hidden; }
-#shop-infinite-grid .pc__variant-btn:hover, #shop-infinite-grid .pc__variant-btn.is-selected { border-color: var(--c-accent); background: var(--c-accent); color: #fff; }
-#shop-infinite-grid .pc__variant-btn.is-unavailable { border-color: #cbd5e1; }
-#shop-infinite-grid .pc__variant-btn-text { position: relative; z-index: 1; }
-#shop-infinite-grid .pc__variant-x { display: none; position: absolute; inset: 0; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.3); color: #fff; font-size: 13px; font-weight: 800; }
-#shop-infinite-grid .pc__variant-btn.is-unavailable .pc__variant-x { display: flex; }
-#shop-infinite-grid .pc__variant-btn.is-unavailable .pc__variant-btn-text { opacity: 0.18; }
+  position: static;
+  transform: none;
+  background: var(--c-surface2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+#shop-infinite-grid .pc__quick-add:hover {
+  background: var(--c-accent);
+  border-color: var(--c-accent);
+}
+#shop-infinite-grid .pc__quick-add:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+#shop-infinite-grid .pc__quick-add:disabled:hover {
+  background: #991b1b;
+  border-color: #ef4444;
+}
+#shop-infinite-grid .pc__bottom--oos .pc__price-box,
+#shop-infinite-grid .pc__bottom--oos .pc__quick-add {
+  display: none;
+}
+#shop-infinite-grid .pc__stock-notify {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+#shop-infinite-grid .pc__stock-notify__intro {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.72);
+}
+#shop-infinite-grid .pc__stock-notify__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: stretch;
+}
+#shop-infinite-grid .pc__stock-notify__input {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-size: 13px;
+}
+#shop-infinite-grid .pc__stock-notify__btn {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+#shop-infinite-grid .pc__stock-notify__feedback {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+#shop-infinite-grid .pc__stock-notify__feedback.is-ok {
+  color: #7dffb2;
+}
+#shop-infinite-grid .pc__stock-notify__feedback.is-err {
+  color: #ff8a8a;
+}
+#shop-infinite-grid .pc__variants {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+#shop-infinite-grid .pc__variants-divider {
+  height: 0;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 2px 0 4px;
+}
+#shop-infinite-grid .pc__variant-heading {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+}
+#shop-infinite-grid .pc__variant-heading-k {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+}
+#shop-infinite-grid .pc__variant-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+#shop-infinite-grid .pc__variant-values--swatch {
+  gap: 10px;
+}
+#shop-infinite-grid .pc__variant-hit--swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+}
+#shop-infinite-grid .pc__variant-hit--swatch.is-selected {
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+#shop-infinite-grid .pc__variant-swatch-inner {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+#shop-infinite-grid .pc__variant-hit--size {
+  min-width: 30px;
+  height: 28px;
+  padding: 0 7px;
+  border-radius: var(--r-md, 6px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: var(--c-text);
+  font-size: 10px;
+  font-weight: 600;
+}
+#shop-infinite-grid .pc__variant-hit--size.is-selected {
+  background: #0a0a0a;
+  border-color: #0a0a0a;
+  color: #fff;
+}
+#shop-infinite-grid .pc__variant-hit--size.is-unavailable {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+#shop-infinite-grid .pc__variant-hit--size.is-unavailable .pc__variant-size-text {
+  text-decoration: line-through;
+}
+#shop-infinite-grid .pc__variant-hit--swatch.is-unavailable {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
 
   body.shop-sidebar-open #nav-collections-wrap { pointer-events: none; }
   body.shop-sidebar-open .mega { display: none !important; opacity: 0 !important; visibility: hidden !important; }
@@ -543,11 +884,10 @@ const infiniteStartOffset = 32;
     productQuery,
     topNewIds,
     topPopularIds,
-    infiniteStartOffset,
   }}
 >
   (function () {
-    var offset = infiniteStartOffset;
+    var offset = 0;
     var loading = false;
     var done = false;
     var known = new Set(knownProductIds);
@@ -556,6 +896,7 @@ const infiniteStartOffset = 32;
     var endEl = document.getElementById("shop-end");
     var sentinel = document.getElementById("shop-sentinel");
     var scrollObserver = null;
+    var uncataloguedStall = 0;
     var topNew = new Set(topNewIds);
     var topPopular = new Set(topPopularIds);
     var prefetchedImages = new Set();
@@ -675,21 +1016,35 @@ const infiniteStartOffset = 32;
       }
     }
 
-    function isVariantSoldOut(v, enforceQtyWhenPresent) {
-      if (!v) return true;
-      var nestedStockQty = (v.inventory_items || []).reduce(function (sum, item) {
+    function sumNestedStockedQuantity(v) {
+      return (v.inventory_items || []).reduce(function (sum, item) {
         var levels = (item && item.inventory && item.inventory.location_levels) || [];
-        var levelSum = levels.reduce(function (inner, level) {
-          var raw = Number(level && level.stocked_quantity);
-          return isFinite(raw) ? inner + raw : inner;
-        }, 0);
-        return sum + levelSum;
+        return (
+          sum +
+          levels.reduce(function (inner, level) {
+            var raw = Number(level && level.stocked_quantity);
+            return isFinite(raw) ? inner + raw : inner;
+          }, 0)
+        );
       }, 0);
-      var qtyRaw = nestedStockQty > 0 || nestedStockQty === 0
-        ? nestedStockQty
-        : v.inventory_quantity;
+    }
+
+    function resolveVariantQtyRaw(v) {
+      var items = v.inventory_items || [];
+      if (items.length > 0) {
+        return { qtyRaw: sumNestedStockedQuantity(v), fromNested: true };
+      }
+      var qtyRaw = v.inventory_quantity;
       if (qtyRaw === undefined || qtyRaw === null) qtyRaw = v.calculated_inventory_quantity;
       if (qtyRaw === undefined || qtyRaw === null) qtyRaw = v.stocked_quantity;
+      return { qtyRaw: qtyRaw, fromNested: false };
+    }
+
+    function isVariantSoldOut(v, enforceQtyWhenPresent) {
+      if (!v) return true;
+      var r = resolveVariantQtyRaw(v);
+      var qtyRaw = r.qtyRaw;
+      var fromNested = r.fromNested;
       var qty = Number(qtyRaw);
       var hasQty = isFinite(qty);
       var allowBackorder = v.allow_backorder === true;
@@ -700,29 +1055,17 @@ const infiniteStartOffset = 32;
       if (v.available_for_sale === true || v.in_stock === true) return false;
       if (v.available_for_sale === false || v.in_stock === false) return true;
 
-      // Regra forte: quantidade explícita tem prioridade.
       if (hasQty && qty > 0) return false;
-      if (enforceQtyWhenPresent && hasQty && qty <= 0 && !allowBackorder) return true;
       if (hasQty && qty <= 0 && allowBackorder) return false;
-      // qty <= 0 sem status explícito não bloqueia: payload da Store API pode vir zerado mesmo com estoque.
+      if (hasQty && qty <= 0 && !allowBackorder && (fromNested || enforceQtyWhenPresent)) return true;
       return false;
     }
 
     function getVariantMaxQty(v) {
       if (!v) return null;
       if (v.allow_backorder === true) return null;
-      var nestedStockQty = (v.inventory_items || []).reduce(function (sum, item) {
-        var levels = (item && item.inventory && item.inventory.location_levels) || [];
-        var levelSum = levels.reduce(function (inner, level) {
-          var raw = Number(level && level.stocked_quantity);
-          return isFinite(raw) ? inner + raw : inner;
-        }, 0);
-        return sum + levelSum;
-      }, 0);
-      var qtyRaw = nestedStockQty > 0 || nestedStockQty === 0 ? nestedStockQty : v.inventory_quantity;
-      if (qtyRaw === undefined || qtyRaw === null) qtyRaw = v.calculated_inventory_quantity;
-      if (qtyRaw === undefined || qtyRaw === null) qtyRaw = v.stocked_quantity;
-      var qty = Number(qtyRaw);
+      var r = resolveVariantQtyRaw(v);
+      var qty = Number(r.qtyRaw);
       if (!isFinite(qty)) return null;
       return Math.max(0, Math.floor(qty));
     }
@@ -816,12 +1159,12 @@ const infiniteStartOffset = 32;
     function getVariantGalleryUrlsForProduct(variant, p) {
       if (!variant) {
         var s = productGallerySlice(p);
-        var p0 = s[0] || "/logo.webp";
+        var p0 = s[0] || "/no-data.webp";
         var p1 = s[1] && s[1] !== p0 ? s[1] : "";
         return [p0, p1];
       }
       var order = buildVariantImageOrder(variant, p);
-      var primary = order[0] || "/logo.webp";
+      var primary = order[0] || "/no-data.webp";
       for (var i = 1; i < order.length; i++) {
         if (order[i] !== primary) return [primary, order[i]];
       }
@@ -833,22 +1176,223 @@ const infiniteStartOffset = 32;
       return pr[1] ? [pr[0], pr[1]] : [pr[0]];
     }
 
+    function optionRowKindShop(title) {
+      var t = String(title || "").trim();
+      if (!t) return "other";
+      if (/\b(cor|color|colour|cores)\b/i.test(t)) return "color";
+      if (/\b(tamanho|size|tam\.?|medida)\b/i.test(t)) return "size";
+      return "other";
+    }
+    function shortLabelShop(title, kind) {
+      if (kind === "color") return "Cor";
+      if (kind === "size") return "Tamanho";
+      var t = String(title || "").trim();
+      if (!t) return "Opção";
+      return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+    }
+    function swatchFillShop(val) {
+      var raw = String(val || "").trim().toLowerCase();
+      var collapsed = raw.replace(/\s+/g, "");
+      var m = {
+        preto: "#1a1a1a",
+        preta: "#1a1a1a",
+        black: "#1a1a1a",
+        branco: "#f5f5f5",
+        branca: "#f5f5f5",
+        white: "#f5f5f5",
+        amarelo: "#eab308",
+        amarela: "#eab308",
+        yellow: "#eab308",
+        vermelho: "#dc2626",
+        vermelha: "#dc2626",
+        red: "#dc2626",
+        azul: "#2563eb",
+        blue: "#2563eb",
+        verde: "#16a34a",
+        green: "#16a34a",
+        cinza: "#9ca3af",
+        grey: "#9ca3af",
+        gray: "#9ca3af",
+        rosa: "#ec4899",
+        pink: "#ec4899",
+        roxo: "#7c3aed",
+        lilas: "#a855f7",
+        laranja: "#ea580c",
+        orange: "#ea580c",
+        bege: "#d6c4a8",
+        beige: "#d6c4a8",
+        marrom: "#78350f",
+        brown: "#78350f",
+        dourado: "#ca8a04",
+        dourada: "#ca8a04",
+        gold: "#ca8a04",
+        navy: "#1e3a8a",
+        azulmarinho: "#1e3a8a",
+        nude: "#e8d5c4",
+        creme: "#faf5eb",
+        cream: "#faf5eb",
+      };
+      if (/\b(multi|estampa|print|misto)\b/i.test(raw)) {
+        return { fill: "linear-gradient(135deg,#ef4444,#eab308,#22c55e,#3b82f6)", g: true };
+      }
+      if (m[collapsed]) return { fill: m[collapsed], g: false };
+      return { fill: null, g: false };
+    }
+    function sortSizesShop(values) {
+      if (!values || values.length < 2) return values.slice();
+      var ORDER = ["PP", "P", "M", "G", "GG", "XG", "XGG"];
+      function norm(s) {
+        return String(s || "")
+          .trim()
+          .toUpperCase()
+          .replace(/\./g, "")
+          .replace(/[\u0300-\u036f]/g, "");
+      }
+      function rank(v) {
+        var k = norm(v);
+        var idx = ORDER.indexOf(k);
+        if (idx >= 0) return idx;
+        if (k === "PE" || k === "XS" || k === "XP") return 0.25;
+        if (k === "G1") return 4.1;
+        if (k === "G2") return 4.9;
+        return 1000;
+      }
+      return values.slice().sort(function (a, b) {
+        var d = rank(a) - rank(b);
+        return d !== 0 ? d : norm(a).localeCompare(norm(b));
+      });
+    }
+    function buildVariantRowsHtml(optionRows, selectedDefault, handle) {
+      if (!optionRows || !optionRows.length) return "";
+      var colorRows = [];
+      var sizeRows = [];
+      var otherRows = [];
+      var i;
+      for (i = 0; i < optionRows.length; i++) {
+        var rw = optionRows[i];
+        var kk = optionRowKindShop(rw.title);
+        if (kk === "color") colorRows.push(rw);
+        else if (kk === "size") sizeRows.push(rw);
+        else otherRows.push(rw);
+      }
+      var showDiv = colorRows.length > 0 && sizeRows.length > 0;
+      var safeH = String(handle || "p").replace(/[^a-zA-Z0-9_-]/g, "");
+      function rowHtml(row) {
+        var kind = optionRowKindShop(row.title);
+        var shortL = shortLabelShop(row.title, kind);
+        var safeR = String(row.id || "").replace(/[^a-zA-Z0-9_-]/g, "");
+        var headingId = "pc-h-" + safeH + "-" + safeR;
+        var cur = String(selectedDefault[row.id] || "").trim();
+        var disp = cur || "—";
+        var isSw = kind === "color";
+        var vals = row.values;
+        if (!isSw && kind === "size") vals = sortSizesShop(row.values);
+        var values = vals
+          .map(function (value) {
+            var selected = selectedDefault[row.id] === value;
+            var selCls = selected ? " is-selected" : "";
+            if (isSw) {
+              var sf = swatchFillShop(value);
+              var neu = !sf.fill ? " pc__variant-hit--swatch-neutral" : "";
+              var lit = "";
+              if (sf.fill && !sf.g) {
+                var fl = sf.fill.toLowerCase();
+                if (fl === "#f5f5f5" || fl === "#ffffff" || fl === "#fff" || fl === "#f0f0f0" || fl === "#faf5eb") {
+                  lit = " pc__variant-hit--swatch-light";
+                }
+              }
+              var innerStyle = "";
+              if (sf.g && sf.fill) innerStyle = ' style="background:' + sf.fill + '"';
+              else if (sf.fill) innerStyle = ' style="background-color:' + sf.fill + '"';
+              return (
+                '<button type="button" class="pc__variant-hit pc__variant-hit--swatch' +
+                selCls +
+                neu +
+                lit +
+                '" data-option-id="' +
+                escapeHtml(row.id) +
+                '" data-option-value="' +
+                escapeHtml(value) +
+                '" title="' +
+                escapeHtml(value) +
+                '" aria-label="' +
+                escapeHtml(row.title + ": " + value) +
+                '" aria-checked="' +
+                (selected ? "true" : "false") +
+                '"><span class="pc__variant-swatch-inner"' +
+                innerStyle +
+                "></span></button>"
+              );
+            }
+            return (
+              '<button type="button" class="pc__variant-hit pc__variant-hit--size' +
+              selCls +
+              '" data-option-id="' +
+              escapeHtml(row.id) +
+              '" data-option-value="' +
+              escapeHtml(value) +
+              '" aria-label="' +
+              escapeHtml(row.title + ": " + value) +
+              '" aria-checked="' +
+              (selected ? "true" : "false") +
+              '"><span class="pc__variant-size-text">' +
+              escapeHtml(value) +
+              "</span></button>"
+            );
+          })
+          .join("");
+        var vclass = isSw ? "pc__variant-values pc__variant-values--swatch" : "pc__variant-values pc__variant-values--pill";
+        return (
+          '<div class="pc__variant-block" data-variant-block="' +
+          escapeHtml(row.id) +
+          '"><p class="pc__variant-heading" id="' +
+          escapeHtml(headingId) +
+          '"><span class="pc__variant-heading-k">' +
+          escapeHtml(shortL) +
+          ':</span> <span class="pc__variant-heading-value" data-heading-for="' +
+          escapeHtml(row.id) +
+          '">' +
+          escapeHtml(disp) +
+          '</span></p><div class="' +
+          vclass +
+          '" role="radiogroup" aria-labelledby="' +
+          escapeHtml(headingId) +
+          '">' +
+          values +
+          "</div></div>"
+        );
+      }
+      var parts = [];
+      for (i = 0; i < colorRows.length; i++) parts.push(rowHtml(colorRows[i]));
+      if (showDiv) parts.push('<div class="pc__variants-divider" role="presentation" aria-hidden="true"></div>');
+      for (i = 0; i < sizeRows.length; i++) parts.push(rowHtml(sizeRows[i]));
+      for (i = 0; i < otherRows.length; i++) parts.push(rowHtml(otherRows[i]));
+      return '<div class="pc__variants">' + parts.join("") + "</div>";
+    }
+
     function buildCard(p) {
       var variants = Array.isArray(p.variants) ? p.variants : [];
       var hasPositiveQtySignal = variants.some(function (variant) {
-        var nested = (variant && variant.inventory_items || []).reduce(function (sum, item) {
-          var levels = (item && item.inventory && item.inventory.location_levels) || [];
-          return sum + levels.reduce(function (inner, level) {
-            var n = Number(level && level.stocked_quantity);
-            return isFinite(n) ? inner + n : inner;
-          }, 0);
-        }, 0);
-        if (nested > 0) return true;
+        var items = (variant && variant.inventory_items) || [];
+        if (items.length > 0) {
+          var nested = sumNestedStockedQuantity(variant);
+          if (nested > 0) return true;
+        }
         var qtyCandidate = variant && variant.inventory_quantity;
         if (qtyCandidate === undefined || qtyCandidate === null) qtyCandidate = variant && variant.calculated_inventory_quantity;
         if (qtyCandidate === undefined || qtyCandidate === null) qtyCandidate = variant && variant.stocked_quantity;
         var q = Number(qtyCandidate);
         return isFinite(q) && q > 0;
+      });
+      var hasLinkedInventoryItems = variants.some(function (variant) {
+        return ((variant && variant.inventory_items) || []).length > 0;
+      });
+      var hasExplicitNumericQtyField = variants.some(function (variant) {
+        var raw = variant && variant.inventory_quantity;
+        if (raw === undefined || raw === null) raw = variant && variant.calculated_inventory_quantity;
+        if (raw === undefined || raw === null) raw = variant && variant.stocked_quantity;
+        if (raw == null || raw === "") return false;
+        return isFinite(Number(raw));
       });
       var hasBooleanStockSignal = variants.some(function (variant) {
         return (
@@ -860,7 +1404,12 @@ const infiniteStartOffset = 32;
         var status = String(variant && (variant.inventory_status || variant.availability_status) || "").toLowerCase();
         return status.indexOf("out") >= 0 || status.indexOf("sold") >= 0 || status.indexOf("in_stock") >= 0 || status.indexOf("available") >= 0;
       });
-      var stockSignalsAreReliable = hasPositiveQtySignal || hasBooleanStockSignal || hasStatusSignal;
+      var stockSignalsAreReliable =
+        hasPositiveQtySignal ||
+        hasLinkedInventoryItems ||
+        hasExplicitNumericQtyField ||
+        hasBooleanStockSignal ||
+        hasStatusSignal;
       var v = variants.find(function (variant) { return !isVariantSoldOut(variant, stockSignalsAreReliable); }) || variants[0];
       var pr = priceFromVariant(v);
       var title = p.title || "";
@@ -878,18 +1427,27 @@ const infiniteStartOffset = 32;
       var priceStr = pr.display;
       var origStr = pr.original;
       var normalizedVariants = variants.map(function (variant) {
+        var prV = priceFromVariant(variant);
+        var discV = 0;
+        if (prV.originalCents && prV.cents && prV.originalCents > prV.cents) {
+          discV = Math.round(((prV.originalCents - prV.cents) / prV.originalCents) * 100);
+        }
         return {
           id: variant && variant.id ? variant.id : "",
           title: variant && variant.title ? variant.title : "",
-          price: priceFromVariant(variant).cents || 0,
+          price: prV.cents || 0,
           soldOut: isVariantSoldOut(variant, stockSignalsAreReliable),
+          allowBackorder: variant && variant.allow_backorder === true,
           maxQty: getVariantMaxQty(variant),
           options: optionMapFromVariant(variant),
           images: getVariantImageArrayForJson(variant, p),
+          priceDisplay: prV.display || "",
+          originalDisplay: prV.original || null,
+          discountPercent: discV,
         };
       });
       var pair = getVariantGalleryUrlsForProduct(v, p);
-      var thumb = pair[0] || "/logo.webp";
+      var thumb = pair[0] || "/no-data.webp";
       var hover = pair[1] || "";
       var selectedDefault = optionMapFromVariant(v);
       var options = Array.isArray(p.options) ? p.options : [];
@@ -931,26 +1489,23 @@ const infiniteStartOffset = 32;
           return String(row.title || "").trim().toLowerCase() !== "title";
         });
       }
-      var variantRows = optionRows.map(function (row) {
-        var values = row.values.map(function (value) {
-          var selected = selectedDefault[row.id] === value;
-          return (
-            '<button type="button" class="pc__variant-btn' +
-            (selected ? " is-selected" : "") +
-            '" data-option-id="' + escapeHtml(row.id) +
-            '" data-option-value="' + escapeHtml(value) +
-            '" aria-checked="' + (selected ? "true" : "false") + '">' +
-            '<span class="pc__variant-btn-text">' + escapeHtml(value) + '</span><span class="pc__variant-x">X</span></button>'
-          );
-        }).join("");
-        return (
-          '<div class="pc__variant-row"><div class="pc__variant-values" role="radiogroup" aria-label="' +
-          escapeHtml(row.title) +
-          '">' +
-          values +
-          "</div></div>"
-        );
-      }).join("");
+      var snMsgsEnc = encodedJsonAttr({
+        ok: "Pedido registado. Entraremos em contacto quando houver stock.",
+        err: "Não foi possível registar. Tente de novo.",
+      });
+      var stockNotifyHtml =
+        '<div class="pc__stock-notify" hidden>' +
+        '<p class="pc__stock-notify__intro">' +
+        escapeHtml("Sem esta variação no momento. Deixe o e-mail e avisamos quando voltar.") +
+        "</p>" +
+        '<div class="pc__stock-notify__row">' +
+        '<input type="email" class="pc__stock-notify__input" autocomplete="email" inputmode="email" placeholder="email@exemplo.com" aria-label="' +
+        escapeHtml("E-mail para aviso de stock") +
+        '" />' +
+        '<button type="button" class="btn btn-outline pc__stock-notify__btn">' +
+        escapeHtml("Avisar-me") +
+        '</button></div><p class="pc__stock-notify__feedback" hidden role="status"></p></div>';
+      var variantRows = buildVariantRowsHtml(optionRows, selectedDefault, handle);
       var defaultVariantTitle = optionRows.map(function (row) {
         var value = String(selectedDefault[row.id] || "").trim();
         if (!value) return "";
@@ -975,10 +1530,20 @@ const infiniteStartOffset = 32;
         escapeHtml(hover || thumb) +
         '" alt="" class="pc__img pc__img--secondary" data-has-secondary="' +
         (hover ? "true" : "false") +
-        '" width="480" height="480" loading="lazy" decoding="async" aria-hidden="true" />';
+        '" width="480" height="480" loading="lazy" decoding="async" aria-hidden="true" onerror="this.onerror=null;this.src=\'/no-data.webp\'" />';
 
       return (
-        '<article class="pc" role="listitem" data-variants="' +
+        '<article class="pc" role="listitem" data-stock-reliable="' +
+        (stockSignalsAreReliable ? "true" : "false") +
+        '" data-product-id="' +
+        escapeHtml(p.id || "") +
+        '" data-product-handle="' +
+        escapeHtml(handle) +
+        '" data-product-title="' +
+        escapeHtml(title) +
+        '" data-stock-notify-msgs="' +
+        snMsgsEnc +
+        '" data-variants="' +
         encodedJsonAttr(normalizedVariants) +
         '" data-option-rows="' +
         encodedJsonAttr(optionRows) +
@@ -993,7 +1558,7 @@ const infiniteStartOffset = 32;
         escapeHtml(title) +
         '" class="pc__img' +
         ' pc__img--primary' +
-        '" width="480" height="480" loading="lazy" decoding="async" />' +
+        '" width="480" height="480" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=\'/no-data.webp\'" />' +
         secondaryImg +
         tagBlock +
         "</div></a>" +
@@ -1002,7 +1567,7 @@ const infiniteStartOffset = 32;
         '" class="pc__body-link"><h3 class="pc__name">' +
         escapeHtml(title) +
         "</h3></a>" +
-        (variantRows ? '<div class="pc__variants">' + variantRows + "</div>" : "") +
+        variantRows +
         '<div class="pc__bottom"><div class="pc__price-box' +
         (discountPct > 0 ? ' pc__price-box--discount' : '') +
         '">' +
@@ -1027,6 +1592,7 @@ const infiniteStartOffset = 32;
         (sold ? ' disabled="disabled"' : "") +
         '><img src="/icons/quick-cart.svg" alt="" width="20" height="20" />' +
         "</button></div>" +
+        stockNotifyHtml +
         "</div></article>"
       );
     }
@@ -1037,11 +1603,20 @@ const infiniteStartOffset = 32;
       loadEl.setAttribute("hidden", "");
     }
 
+    function productIsUncatalogued(p) {
+      if (!p) return false;
+      var cid = p.collection_id;
+      if (cid !== undefined && cid !== null && String(cid).trim() !== "") return false;
+      var c = p.collection;
+      if (c && (c.id || c.handle)) return false;
+      return true;
+    }
+
     function loadMore() {
       if (loading || done) return;
       loading = true;
       if (loadEl) { loadEl.hidden = false; loadEl.removeAttribute("hidden"); }
-      var url = "/store/products?" + productQuery + "&limit=12&offset=" + offset;
+      var url = "/store/products?" + productQuery + "&limit=24&offset=" + offset;
       fetch(url, { headers: fetchHeaders })
         .then(function (r) {
           if (!r.ok) throw new Error("bad");
@@ -1050,10 +1625,13 @@ const infiniteStartOffset = 32;
         .then(function (data) {
           var prods = data.products || [];
           var count = data.count;
+          var added = 0;
           for (var i = 0; i < prods.length; i++) {
             var p = prods[i];
+            if (!productIsUncatalogued(p)) continue;
             if (known.has(p.id)) continue;
             known.add(p.id);
+            added += 1;
             if (grid) {
               var el = document.createElement("div");
               el.innerHTML = buildCard(p);
@@ -1076,7 +1654,13 @@ const infiniteStartOffset = 32;
           } else if (typeof count === "number" && offset >= count) {
             done = true;
             if (endEl) endEl.hidden = false;
-          } else if (typeof count !== "number" && prods.length < 12) {
+          } else if (typeof count !== "number" && prods.length < 24) {
+            done = true;
+            if (endEl) endEl.hidden = false;
+          }
+          if (added === 0 && prods.length) uncataloguedStall += 1;
+          else uncataloguedStall = 0;
+          if (!done && uncataloguedStall > 15) {
             done = true;
             if (endEl) endEl.hidden = false;
           }

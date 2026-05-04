@@ -1,5 +1,6 @@
 import { getVariantPriceInfo } from './medusa-pricing';
 import { getVariantGalleryUrls, getVariantSlideUrls } from './product-variant-gallery';
+import { optionRowKind, sortSizeOptionValues } from './variant-option-ui';
 
 export type OptionRow = { id: string; title: string; values: string[] };
 
@@ -8,6 +9,7 @@ export type NormalizedVariantForClient = {
   title: string;
   price: number;
   soldOut: boolean;
+  allowBackorder?: boolean;
   maxQty: number | null;
   options: Record<string, string>;
   optionTitles: Record<string, string>;
@@ -18,20 +20,34 @@ export type NormalizedVariantForClient = {
   discountPercent: number;
 };
 
+function sumNestedStockedQuantity(v: any): number {
+  return (v?.inventory_items ?? []).reduce((sum: number, item: any) => {
+    const levels = item?.inventory?.location_levels ?? [];
+    return (
+      sum +
+      levels.reduce((inner: number, level: any) => {
+        const raw = Number(level?.stocked_quantity);
+        return Number.isFinite(raw) ? inner + raw : inner;
+      }, 0)
+    );
+  }, 0);
+}
+
+/** Só soma `inventory_items` quando existem linhas; lista vazia não é “0 em stock”, é “sem dados de inventário”. */
+function resolveVariantQtyRaw(v: any): { qtyRaw: unknown; fromNested: boolean } {
+  const items = v?.inventory_items ?? [];
+  if (items.length > 0) {
+    return { qtyRaw: sumNestedStockedQuantity(v), fromNested: true };
+  }
+  return {
+    qtyRaw: v?.inventory_quantity ?? v?.calculated_inventory_quantity ?? v?.stocked_quantity,
+    fromNested: false,
+  };
+}
+
 export function isVariantSoldOut(v: any, enforceQtyWhenPresent = false): boolean {
   if (!v) return true;
-  const nestedStockQty = (v.inventory_items ?? []).reduce((sum: number, item: any) => {
-    const levels = item?.inventory?.location_levels ?? [];
-    const levelSum = levels.reduce((inner: number, level: any) => {
-      const raw = Number(level?.stocked_quantity);
-      return Number.isFinite(raw) ? inner + raw : inner;
-    }, 0);
-    return sum + levelSum;
-  }, 0);
-  const qtyRaw =
-    nestedStockQty > 0 || nestedStockQty === 0
-      ? nestedStockQty
-      : v.inventory_quantity ?? v.calculated_inventory_quantity ?? v.stocked_quantity;
+  const { qtyRaw, fromNested } = resolveVariantQtyRaw(v);
   const qty = Number(qtyRaw);
   const hasQty = Number.isFinite(qty);
   const allowBackorder = v.allow_backorder === true;
@@ -43,26 +59,16 @@ export function isVariantSoldOut(v: any, enforceQtyWhenPresent = false): boolean
   if (v.available_for_sale === false || v.in_stock === false) return true;
 
   if (hasQty && qty > 0) return false;
-  if (enforceQtyWhenPresent && hasQty && qty <= 0 && !allowBackorder) return true;
   if (hasQty && qty <= 0 && allowBackorder) return false;
+  /* Stock 0 real vindo dos níveis Medusa, ou campos numéricos quando o produto foi marcado como “fiável”. */
+  if (hasQty && qty <= 0 && !allowBackorder && (fromNested || enforceQtyWhenPresent)) return true;
   return false;
 }
 
 export function getVariantMaxQty(v: any): number | null {
   if (!v) return null;
   if (v.allow_backorder === true) return null;
-  const nestedStockQty = (v.inventory_items ?? []).reduce((sum: number, item: any) => {
-    const levels = item?.inventory?.location_levels ?? [];
-    const levelSum = levels.reduce((inner: number, level: any) => {
-      const raw = Number(level?.stocked_quantity);
-      return Number.isFinite(raw) ? inner + raw : inner;
-    }, 0);
-    return sum + levelSum;
-  }, 0);
-  const qtyRaw =
-    nestedStockQty > 0 || nestedStockQty === 0
-      ? nestedStockQty
-      : v.inventory_quantity ?? v.calculated_inventory_quantity ?? v.stocked_quantity;
+  const { qtyRaw } = resolveVariantQtyRaw(v);
   const qty = Number(qtyRaw);
   if (!Number.isFinite(qty)) return null;
   return Math.max(0, Math.floor(qty));
@@ -71,16 +77,19 @@ export function getVariantMaxQty(v: any): number | null {
 export function stockSignalsAreReliableForProduct(product: any): boolean {
   const variants = product?.variants ?? [];
   const hasPositiveQtySignal = variants.some((v: any) => {
-    const nested = (v?.inventory_items ?? []).reduce((sum: number, item: any) => {
-      const levels = item?.inventory?.location_levels ?? [];
-      return sum + levels.reduce((inner: number, level: any) => {
-        const n = Number(level?.stocked_quantity);
-        return Number.isFinite(n) ? inner + n : inner;
-      }, 0);
-    }, 0);
-    if (nested > 0) return true;
+    const items = v?.inventory_items ?? [];
+    if (items.length > 0) {
+      const nested = sumNestedStockedQuantity(v);
+      if (nested > 0) return true;
+    }
     const n = Number(v?.inventory_quantity ?? v?.calculated_inventory_quantity ?? v?.stocked_quantity);
     return Number.isFinite(n) && n > 0;
+  });
+  const hasLinkedInventoryItems = variants.some((v: any) => (v?.inventory_items ?? []).length > 0);
+  const hasExplicitNumericQtyField = variants.some((v: any) => {
+    const raw = v?.inventory_quantity ?? v?.calculated_inventory_quantity ?? v?.stocked_quantity;
+    if (raw == null || raw === '') return false;
+    return Number.isFinite(Number(raw));
   });
   const hasBooleanStockSignal = variants.some(
     (v: any) =>
@@ -98,7 +107,13 @@ export function stockSignalsAreReliableForProduct(product: any): boolean {
       status.includes('available')
     );
   });
-  return hasPositiveQtySignal || hasBooleanStockSignal || hasStatusSignal;
+  return (
+    hasPositiveQtySignal ||
+    hasLinkedInventoryItems ||
+    hasExplicitNumericQtyField ||
+    hasBooleanStockSignal ||
+    hasStatusSignal
+  );
 }
 
 function variantImagesForJson(v: any, product: any): string[] {
@@ -129,12 +144,14 @@ export function buildNormalizedVariants(product: any, stockReliable: boolean): N
       }
     });
     const priceInfo = getVariantPriceInfo(v);
+    const maxQty = getVariantMaxQty(v);
     return {
       id: v.id,
       title: v.title ?? '',
       price: priceInfo?.amountCents ?? 0,
       soldOut: isVariantSoldOut(v, stockReliable),
-      maxQty: getVariantMaxQty(v),
+      allowBackorder: v.allow_backorder === true,
+      maxQty,
       options: mapped,
       optionTitles: titles,
       images: variantImagesForJson(v, product),
@@ -183,7 +200,11 @@ export function buildOptionRows(
   const optionRowsRaw = optionRowsFromProduct.length
     ? optionRowsFromProduct
     : Array.from(fallbackOptionMap.values());
-  return optionRowsRaw.filter((row) => row.title.trim().toLowerCase() !== 'title');
+  return optionRowsRaw
+    .filter((row) => row.title.trim().toLowerCase() !== 'title')
+    .map((row) =>
+      optionRowKind(row.title) === 'size' ? { ...row, values: sortSizeOptionValues(row.values) } : row
+    );
 }
 
 export function pickDefaultVariant(product: any, stockReliable: boolean): any {

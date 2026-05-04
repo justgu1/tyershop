@@ -110,9 +110,11 @@ export function getProductGallerySlice(product: any, max = 2): string[] {
 /**
  * [principal, secundária] — secundária vazia se não houver 2ª URL distinta.
  */
+const PLACEHOLDER_IMG = '/no-data.webp';
+
 export function getVariantGalleryUrls(variant: any, product: any): [string, string] {
   const order = buildOrderedCandidates(variant, product);
-  const primary = order[0] ?? '/logo.webp';
+  const primary = order[0] ?? PLACEHOLDER_IMG;
   const secondary = order.find((u) => u !== primary) ?? '';
   return [primary, secondary || ''];
 }
@@ -122,5 +124,5 @@ export function getVariantSlideUrls(variant: any, product: any): string[] {
   const order = buildOrderedCandidates(variant, product);
   if (order.length) return order;
   const t = String(product?.thumbnail ?? '').trim();
-  return [t || '/logo.webp'];
+  return [t || PLACEHOLDER_IMG];
 }
