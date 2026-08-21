@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - sealed-secret.yaml
+  # NOTES.md tem os detalhes/limitações desse deploy
+  - backend.yaml
+  - frontend.yaml
+  - api.yaml
+  - ingressroute.yaml
