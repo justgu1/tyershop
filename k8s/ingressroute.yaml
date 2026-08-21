@@ -1,0 +1,60 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: tyershop
+  namespace: apps
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`hg.tyershop.com`)
+      kind: Rule
+      middlewares:
+        - name: redirect-websecure
+          namespace: shared
+      services:
+        - name: tyershop-frontend
+          port: 80
+    - match: Host(`medusa.hg.tyershop.com`)
+      kind: Rule
+      middlewares:
+        - name: redirect-websecure
+          namespace: shared
+      services:
+        - name: tyershop-backend
+          port: 9000
+    - match: Host(`api.hg.tyershop.com`)
+      kind: Rule
+      middlewares:
+        - name: redirect-websecure
+          namespace: shared
+      services:
+        - name: tyershop-api
+          port: 3000
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: tyershop-tls
+  namespace: apps
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`hg.tyershop.com`)
+      kind: Rule
+      services:
+        - name: tyershop-frontend
+          port: 80
+    - match: Host(`medusa.hg.tyershop.com`)
+      kind: Rule
+      services:
+        - name: tyershop-backend
+          port: 9000
+    - match: Host(`api.hg.tyershop.com`)
+      kind: Rule
+      services:
+        - name: tyershop-api
+          port: 3000
+  tls:
+    certResolver: letsencrypt
