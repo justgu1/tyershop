@@ -8,3 +8,4 @@ resources:
   - frontend.yaml
   - api.yaml
   - ingressroute.yaml
+  - middleware-cloudflare-only.yaml
