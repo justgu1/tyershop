@@ -27,9 +27,9 @@ spec:
             - name: MEDUSA_URL
               value: "http://tyershop-backend.apps.svc.cluster.local:9000"
             - name: CHECKOUT_PUBLIC_BASE_URL
-              value: "https://hg.tyershop.com"
+              value: "https://homolog.tyershop.com"
             - name: CORS_ORIGIN
-              value: "https://hg.tyershop.com"
+              value: "https://homolog.tyershop.com"
             - name: MERCADOPAGO_ACCESS_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -45,6 +45,21 @@ spec:
                 secretKeyRef:
                   name: tyershop-secrets
                   key: SMTP_HOST
+            - name: SMTP_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: SMTP_PORT
+            - name: SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: SMTP_USER
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: SMTP_PASSWORD
             - name: NEWSLETTER_FROM
               valueFrom:
                 secretKeyRef:
