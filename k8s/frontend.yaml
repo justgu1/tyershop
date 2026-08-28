@@ -18,7 +18,7 @@ spec:
           image: ghcr.io/justgu1/tyershop-frontend:latest
           ports:
             - name: http
-              containerPort: 80
+              containerPort: 8080
           env:
             - name: PUBLIC_MEDUSA_URL
               value: "https://medusa.homolog.tyershop.com"
