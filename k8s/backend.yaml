@@ -60,7 +60,9 @@ spec:
             - name: AWS_ENDPOINT
               value: http://minio.shared.svc.cluster.local:9000
             - name: AWS_URL
-              value: http://minio.shared.svc.cluster.local:9000/tyershop
+              # URL interna do cluster não abre no navegador do cliente —
+              # bucket tyershop é público, exposto via /cdn na api
+              value: https://api.homolog.tyershop.com/cdn/tyershop
           readinessProbe:
             httpGet:
               path: /health
