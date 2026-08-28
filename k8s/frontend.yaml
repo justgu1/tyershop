@@ -21,13 +21,13 @@ spec:
               containerPort: 80
           env:
             - name: PUBLIC_MEDUSA_URL
-              value: "https://medusa.hg.tyershop.com"
+              value: "https://medusa.homolog.tyershop.com"
             - name: MEDUSA_INTERNAL_URL
               value: "http://tyershop-backend.apps.svc.cluster.local:9000"
             - name: MEDUSA_URL
               value: "http://tyershop-backend.apps.svc.cluster.local:9000"
             - name: PUBLIC_API_URL
-              value: "https://api.hg.tyershop.com"
+              value: "https://api.homolog.tyershop.com"
             - name: PUBLIC_MEDUSA_PUBLISHABLE_KEY
               valueFrom:
                 secretKeyRef:

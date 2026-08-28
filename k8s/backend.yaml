@@ -46,11 +46,11 @@ spec:
                   name: tyershop-secrets
                   key: AWS_SECRET_ACCESS_KEY
             - name: STORE_CORS
-              value: "https://hg.tyershop.com"
+              value: "https://homolog.tyershop.com"
             - name: ADMIN_CORS
-              value: "https://medusa.hg.tyershop.com"
+              value: "https://medusa.homolog.tyershop.com"
             - name: AUTH_CORS
-              value: "https://hg.tyershop.com,https://medusa.hg.tyershop.com"
+              value: "https://homolog.tyershop.com,https://medusa.homolog.tyershop.com"
             - name: AWS_BUCKET
               value: tyershop
             - name: AWS_DEFAULT_REGION

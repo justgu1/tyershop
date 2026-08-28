@@ -120,7 +120,10 @@ const smtpPort = Number(process.env.SMTP_PORT || 1025);
 const smtpTransport = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'mailpit',
   port: Number.isFinite(smtpPort) ? smtpPort : 1025,
-  secure: false,
+  secure: smtpPort === 465,
+  auth: process.env.SMTP_USER
+    ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
+    : undefined,
 });
 
 function escapeMailText(s) {
