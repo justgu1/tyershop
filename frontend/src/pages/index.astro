@@ -87,7 +87,8 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
       preload="auto"
       aria-hidden="true"
     >
-      <source src="/video/hero.mp4" type="video/mp4" />
+      <source src="/video/hero.webm" type="video/webm" />
+      <source src="/video/hero.compressed.mp4" type="video/mp4" />
     </video>
     <div class="hero__overlay" aria-hidden="true"></div>
     <a href="#produtos-vendidos" class="hero__scroll" aria-label="Scroll para produtos">
@@ -240,7 +241,9 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
       </header>
       <div class="editorial__content">
         <div class="editorial__left">
-          <img src="/logo.webp" alt="Tyer" width="240" height="104" loading="lazy" decoding="async" />
+          <img src="/icons/youtube.svg" alt="" width="40" height="40" class="editorial__left-icon" decoding="async" />
+          <span class="editorial__left-dash" aria-hidden="true">—</span>
+          <span class="editorial__left-label">Canal Tyer Basket Ball</span>
         </div>
         <div class="editorial__right">
           <a
@@ -300,24 +303,6 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
             </li>
             <li>
               <a
-                class="editorial__social-link"
-                href={YOUTUBE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="YouTube @tyer_br"
-              >
-                <img
-                  class="editorial__social-ico"
-                  src="/icons/youtube.svg"
-                  width="32"
-                  height="32"
-                  alt=""
-                  decoding="async"
-                />
-              </a>
-            </li>
-            <li>
-              <a
                 class="editorial__fam-link"
                 href={WHATSAPP_GROUP_URL}
                 target="_blank"
@@ -345,11 +330,21 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
   <section class="section history-section" aria-labelledby="history-title">
     <div class="section-content history-content">
       <div class="history__text">
-        <h2 class="history__title" id="history-title">Nossa História</h2>
-        <p class="history__text-body">TYER foi nascida do basquete — e existe porque dele. Somos muito mais que uma marca de roupas. Somos uma comunidade unida pelo jogo, feita por pessoas que vivem basquete todos os dias. Isso é ser TYER. Isso é TYER GANG.</p>
-        <p class="history__text-body">Acreditamos em verdadeiros MVPs: aqueles que se esforçam para melhorar diariamente dentro e fora da quadra. Nossa missão é fortalecer a cultura, contar histórias reais e apoiar quem faz o basquete crescer no Brasil.</p>
-        <p class="history__text-body">Do jogo de rua para os grandes palcos, estamos juntos nessa, elevando o nível e levando o basquete cada vez mais longe.</p>
-        <p class="history__text-body">Não vestimos basquete. Somos basquete. 🏀🇧🇷</p>
+        <h2 class="history__title" id="history-title">Isso é Tyer!</h2>
+        <p class="history__text-body">A TYER nasceu do basquete.</p>
+        <p class="history__text-body">Fomos a primeira marca <em>nacional</em> 100% nichada e dedicada a quem realmente ama o jogo. Mas, com o tempo, percebemos que não fomos feitos <em>APENAS</em> para vender roupas maneiras para vocês jogarem.</p>
+        <p class="history__text-body">Construímos algo maior!</p>
+        <p class="history__text-body">Viramos uma comunidade. Uma família. Uma gang unida pelo mesmo propósito, pela mesma paixão e, principalmente, pelo mesmo jogo...</p>
+        <p class="history__text-body">A TYER foi criada por pessoas que vivem o basquete <em>TODOS OS DIAS</em>. Gente que joga, assiste, cria, trabalha, treina, erra, aprende e volta para a quadra no dia seguinte querendo ser melhor.</p>
+        <p class="history__text-body"><em>Isso é ser TYER.</em><br /><em>Isso é TYER GANG.</em></p>
+        <p class="history__text-body">Não importa se você está começando agora, jogando na rua com os amigos ou disputando nas maiores quadras do país. <em>Estaremos com vocês!</em></p>
+        <p class="history__text-body">Acreditamos que existe um verdadeiro atleta dentro de cada um de nós, e é por essas pessoas que existimos!</p>
+        <p class="history__text-body">Queremos fortalecer a cultura do basquete, contar histórias reais, valorizar quem vive o jogo e apoiar quem está fazendo o basquete crescer no Brasil.</p>
+        <p class="history__text-body"><em>Estamos em todos os lugares, elevando o nível e levando o basquete cada vez mais longe.</em></p>
+        <p class="history__text-body">Porque, para nós, basquete nunca foi apenas uma modalidade...</p>
+        <p class="history__text-body">É cultura.<br />É identidade.<br />É comunidade.<br />É família.</p>
+        <p class="history__text-body"><em>Não vestimos basquete.</em><br /><em>Somos basquete.</em></p>
+        <p class="history__text-body"><em>TYER GANG.</em></p>
       </div>
       <div class="history__image" aria-hidden="true">
         <img src="/our-history.webp" alt="" width="560" height="700" loading="lazy" decoding="async" onerror="this.src='/no-data.webp'" />
@@ -729,7 +724,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 }
 
 /* ── Editorial ── */
-.editorial__content { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; max-width: var(--max-w); margin: 0 auto; padding: 0 40px; }
+.editorial__content { display: grid; grid-template-columns: 0.75fr 1.25fr; gap: 48px; align-items: start; max-width: var(--max-w); margin: 0 auto; padding: 0 40px; }
 @media (max-width: 768px) {
   .editorial__content {
     display: flex;
@@ -747,8 +742,10 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
     width: 100%;
   }
 }
-.editorial__left { display: flex; align-items: center; justify-content: center; padding: 40px; }
-.editorial__left img { max-width: 240px; height: auto; opacity: 0.9; }
+.editorial__left { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 40px; }
+.editorial__left-icon { width: 40px; height: 40px; object-fit: contain; filter: brightness(0) invert(1); opacity: 0.9; flex-shrink: 0; }
+.editorial__left-dash { font-family: var(--font-title); font-size: clamp(24px, 3vw, 36px); color: var(--c-muted); line-height: 1; }
+.editorial__left-label { font-family: var(--font-title); font-size: clamp(18px, 2.2vw, 26px); text-transform: uppercase; letter-spacing: 0.03em; line-height: 1.1; }
 .editorial__right-link { display: block; border-radius: 8px; overflow: hidden; transition: transform 0.25s ease, box-shadow 0.25s ease; }
 .editorial__right-link:hover, .editorial__right-link:focus-visible {
   transform: scale(1.02);
