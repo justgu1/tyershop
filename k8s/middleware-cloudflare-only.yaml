@@ -1,3 +1,11 @@
+# DESATIVADO (removido do kustomization.yaml) — causou 403 em TODO o tráfego,
+# inclusive vindo da própria Cloudflare. Causa provável: Service/LB do cluster
+# faz SNAT no tráfego externo (externalTrafficPolicy: Cluster, padrão do k8s),
+# então o Traefik nunca vê o IP real de quem conectou — só um IP interno do
+# cluster, que não bate com nenhum range da Cloudflare. Pra reativar, primeiro
+# confirmar o externalTrafficPolicy do Service do Traefik/LoadBalancer e o IP
+# que o Traefik realmente enxerga (log de acesso) antes de religar isso.
+#
 # Só deixa passar tráfego que vem da Cloudflare (esconde o IP real da VPS
 # atrás do proxy) — ranges oficiais, atualizar se a Cloudflare mudar
 # (https://www.cloudflare.com/ips-v4, /ips-v6).
