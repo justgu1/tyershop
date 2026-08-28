@@ -12,22 +12,16 @@ spec:
       services:
         - name: tyershop-frontend
           port: 80
-      middlewares:
-        - name: cloudflare-only
     - match: Host(`medusa.homolog.tyershop.com`)
       kind: Rule
       services:
         - name: tyershop-backend
           port: 9000
-      middlewares:
-        - name: cloudflare-only
     - match: Host(`api.homolog.tyershop.com`)
       kind: Rule
       services:
         - name: tyershop-api
           port: 3000
-      middlewares:
-        - name: cloudflare-only
     # produção: aguardando DNS de tyershop.com sair do Squarespace (185.133.35.22)
     # e apontar pra nossa VPS (167.88.44.4) — rota já preparada
     - match: Host(`tyershop.com`) || Host(`www.tyershop.com`)
@@ -35,7 +29,5 @@ spec:
       services:
         - name: tyershop-frontend
           port: 80
-      middlewares:
-        - name: cloudflare-only
   tls:
     certResolver: letsencrypt
