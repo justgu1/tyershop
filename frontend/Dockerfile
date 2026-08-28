@@ -41,9 +41,22 @@ COPY frontend/ ./
 
 RUN npm run build
 
-# ─── Production stage (Nginx) ─────────────────────────────────
-FROM nginx:alpine AS prod
+# ─── Production stage ─────────────────────────────────────────
+# adapter é @astrojs/node standalone (SSR: dist/client + dist/server/entry.mjs)
+# não é site estático — nginx servindo dist/ direto só mostra a página default
+# dele, porque não existe dist/index.html (rota real fica em dist/client/)
+FROM node:22-slim AS prod
 
-COPY --from=builder /app/dist /usr/share/nginx/html
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+WORKDIR /app
+
+ENV HOST=0.0.0.0
+ENV PORT=8080
+
+COPY --chown=node:node --from=builder /app/package.json ./
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
+COPY --chown=node:node --from=builder /app/dist ./dist
+
+USER node
+
+EXPOSE 8080
+CMD ["node", "./dist/server/entry.mjs"]
