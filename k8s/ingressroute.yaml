@@ -7,20 +7,27 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`hg.tyershop.com`)
+    - match: Host(`homolog.tyershop.com`)
       kind: Rule
       services:
         - name: tyershop-frontend
           port: 80
-    - match: Host(`medusa.hg.tyershop.com`)
+    - match: Host(`medusa.homolog.tyershop.com`)
       kind: Rule
       services:
         - name: tyershop-backend
           port: 9000
-    - match: Host(`api.hg.tyershop.com`)
+    - match: Host(`api.homolog.tyershop.com`)
       kind: Rule
       services:
         - name: tyershop-api
           port: 3000
+    # produção: aguardando DNS de tyershop.com sair do Squarespace (185.133.35.22)
+    # e apontar pra nossa VPS (167.88.44.4) — rota já preparada
+    - match: Host(`tyershop.com`) || Host(`www.tyershop.com`)
+      kind: Rule
+      services:
+        - name: tyershop-frontend
+          port: 80
   tls:
     certResolver: letsencrypt

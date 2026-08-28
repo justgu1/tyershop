@@ -36,6 +36,12 @@ RUN --mount=type=cache,target=/root/.npm \
 
 COPY backend/ ./
 
+# sem NODE_ENV=production o `medusa build` não gera o bundle estático do
+# admin (.medusa/admin fica sem index.html) — é isso que travava o start
+# em produção com "Could not find index.html in the admin build directory"
+ENV NODE_ENV=production
+ENV MEDUSA_BACKEND_URL=https://medusa.homolog.tyershop.com
+
 RUN npm run build
 
 # ─── Production stage ─────────────────────────────────────────
