@@ -36,9 +36,6 @@ RUN --mount=type=cache,target=/root/.npm \
 
 COPY backend/ ./
 
-# sem NODE_ENV=production o `medusa build` não gera o bundle estático do
-# admin (.medusa/admin fica sem index.html) — é isso que travava o start
-# em produção com "Could not find index.html in the admin build directory"
 ENV NODE_ENV=production
 ENV MEDUSA_BACKEND_URL=https://medusa.homolog.tyershop.com
 
@@ -49,11 +46,16 @@ FROM node:22-slim AS prod
 
 WORKDIR /app
 
-COPY --chown=node:node --from=builder /app/package.json ./
-COPY --chown=node:node --from=builder /app/node_modules ./node_modules
-# Medusa 2 (`medusa build`) gera `.medusa/server` + `.medusa/admin`, não `dist`
-COPY --chown=node:node --from=builder /app/.medusa ./.medusa
+# `medusa build` gera o app pronto pra rodar em .medusa/server (com o próprio
+# package.json) — é ele que vira a raiz do container, não o /app de build.
+# Rodar "npm run start" a partir do /app de build (como antes) faz o loader
+# do admin resolver o outDir errado (rootDirectory = cwd = /app em vez de
+# .medusa/server), daí o "Could not find index.html in the admin build
+# directory" mesmo com o build tendo funcionado certo.
+COPY --chown=node:node --from=builder /app/.medusa/server ./
 COPY --chown=node:node --from=builder /app/medusa-config.js ./
+
+RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund
 
 USER node
 
