@@ -102,7 +102,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 
   <!-- MAIS VENDIDOS -->
   <section id="produtos-vendidos" class="section products-section" aria-labelledby="products-title">
-    <div class="section-bg" style="background-image:url('/products-section-background.webp')"></div>
+    <div class="section-bg" style="background-image:url('/products-section-background.webp?v=2')"></div>
     <div class="section-overlay"></div>
     <div class="container section-content">
       <header class="section__header section__header--centered">
@@ -347,7 +347,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
         <p class="history__text-body"><em>TYER GANG.</em></p>
       </div>
       <div class="history__image" aria-hidden="true">
-        <img src="/our-history.webp" alt="" width="1200" height="1600" loading="lazy" decoding="async" onerror="this.src='/no-data.webp'" />
+        <img src="/our-history.webp?v=2" alt="" width="1200" height="1600" loading="lazy" decoding="async" onerror="this.src='/no-data.webp'" />
       </div>
     </div>
   </section>
@@ -719,42 +719,30 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 }
 
 /* ── Editorial ── */
-.editorial__content { display: grid; grid-template-columns: 0.75fr 1.25fr; gap: 48px; align-items: start; max-width: var(--max-w); margin: 0 auto; padding: 0 40px; }
-@media (max-width: 768px) {
-  .editorial__content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 32px;
-  }
-  .editorial__left,
-  .editorial__right {
-    width: 100%;
-    align-items: center;
-    text-align: center;
-  }
-  /* Mobile: ícones de rede acima do banner do YouTube */
-  .editorial__content { padding-inline: 0; } /* .container já dá os 20px */
-  .editorial__right-link {
-    width: 100%;
-    order: 2;
-  }
-  .editorial__social {
-    order: 1;
-    justify-content: center;
-  }
+/* Sequência única, em qualquer tela: logo YT + nome → banner → ícones */
+.editorial__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 40px;
 }
-.editorial__left { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 40px; }
+@media (max-width: 768px) {
+  .editorial__content { padding-inline: 0; } /* .container já dá os 20px */
+}
+.editorial__left { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 0; }
 .editorial__left-icon { width: 40px; height: 40px; object-fit: contain; filter: brightness(0) invert(1); opacity: 0.9; flex-shrink: 0; }
 .editorial__left-dash { font-family: var(--font-title); font-size: clamp(24px, 3vw, 36px); color: var(--c-muted); line-height: 1; }
 .editorial__left-label { font-family: var(--font-title); font-size: clamp(18px, 2.2vw, 26px); text-transform: uppercase; letter-spacing: 0.03em; line-height: 1.1; }
-.editorial__right-link { display: block; border-radius: 8px; overflow: hidden; transition: transform 0.25s ease, box-shadow 0.25s ease; }
+.editorial__right { display: flex; flex-direction: column; align-items: center; gap: 24px; width: 100%; }
+.editorial__right-link { display: block; width: 100%; border-radius: 8px; overflow: hidden; transition: transform 0.25s ease, box-shadow 0.25s ease; }
 .editorial__right-link:hover, .editorial__right-link:focus-visible {
   transform: scale(1.02);
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
   outline: none;
 }
-.editorial__right { display: flex; flex-direction: column; align-items: flex-start; gap: 24px; }
 .editorial__right-img { width: 100%; height: auto; display: block; vertical-align: top; }
 .editorial__social {
   width: 100%;
@@ -805,13 +793,13 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 }
 .history-content {
   display: grid; grid-template-columns: 1fr 1fr; gap: 64px;
-  max-width: var(--max-w); margin: 0 auto; padding: 0 40px; align-items: center;
+  max-width: var(--max-w); margin: 0 auto; padding: 96px 40px; align-items: center;
 }
 @media (max-width: 768px) {
   .history-content { grid-template-columns: 1fr; gap: 48px; }
   .history__image { order: -1; }
 }
-@media (max-width: 480px) { .history-content { padding: 0 20px; } }
+@media (max-width: 480px) { .history-content { padding: 96px 20px; } }
 .history__text { display: flex; flex-direction: column; gap: 16px; }
 .history__title { font-family: var(--font-title); font-size: clamp(36px, 5vw, 64px); text-transform: uppercase; line-height: 0.95; margin: 0; }
 .history__text-body { font-size: 15px; line-height: 1.8; color: var(--c-muted); }
