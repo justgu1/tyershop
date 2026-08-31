@@ -4,11 +4,15 @@ import ProductCard from '../../components/ProductCard.astro';
 import { getLangFromUrl, getPathForLang, t } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
 import { getProductListQueryString, resolveDefaultRegionId } from '../../lib/medusa-pricing';
+import { getMedusaStoreUrl } from '../../lib/medusa-env';
+
+// Catálogo dinâmico: renderiza por requisição (ver index.astro).
+export const prerender = false;
 
 const lang: Lang = getLangFromUrl(Astro.url);
 const pk = 'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
 const headers = { 'x-publishable-api-key': pk };
-const base = import.meta.env.MEDUSA_INTERNAL_URL || import.meta.env.MEDUSA_URL || 'http://localhost:9003';
+const base = getMedusaStoreUrl();
 
 let regionId: string | null = null;
 let newProducts: any[] = [];
