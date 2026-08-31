@@ -153,7 +153,7 @@ type VariantSnapshot = {
 };
 
 function getStoreConfig() {
-  const key = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
+  const key = 'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
   if (typeof window === 'undefined') {
     return { base: 'http://localhost:9003', key };
   }

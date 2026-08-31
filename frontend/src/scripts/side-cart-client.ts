@@ -99,7 +99,7 @@ function renderFeedback(message: string, tone: string) {
 
 async function fetchRegionId() {
   const base = '';
-  const key = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
+  const key = 'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
   const res = await fetch(`${base}/store/regions?limit=1`, { headers: { 'x-publishable-api-key': key } });
   const data = await res.json();
   return data?.regions?.[0]?.id || null;
@@ -107,7 +107,7 @@ async function fetchRegionId() {
 
 async function syncRemoteCart(items: Array<{ variantId: string; quantity: number }>) {
   const base = '';
-  const key = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
+  const key = 'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
   const regionId = await fetchRegionId();
   if (!regionId) throw new Error('Sem regiao');
   const created = await fetch(`${base}/store/carts`, {
