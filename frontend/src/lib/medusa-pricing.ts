@@ -41,8 +41,10 @@ export async function resolveDefaultRegionId(
   headers: Record<string, string>,
   timeout = 5000
 ): Promise<string | null> {
-  const fromEnv = import.meta.env.PUBLIC_MEDUSA_REGION_ID as string | undefined;
-  if (fromEnv) return fromEnv;
+  const fromEnv = process.env.PUBLIC_MEDUSA_REGION_ID as string | undefined;
+  // Só aceita um id real de região — placeholders de deploy (ex.: CHANGEME)
+  // não podem virar region_id na query da Store API.
+  if (fromEnv && fromEnv.startsWith('reg_')) return fromEnv;
   try {
     const r = await fetch(`${baseUrl}/store/regions`, {
       headers,

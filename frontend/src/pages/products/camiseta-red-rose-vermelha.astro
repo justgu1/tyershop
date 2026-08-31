@@ -3,6 +3,10 @@ import Layout from '../../layouts/Layout.astro';
 import { getLangFromUrl } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
 import { getProductListQueryString, resolveDefaultRegionId } from '../../lib/medusa-pricing';
+import { getMedusaStoreUrl } from '../../lib/medusa-env';
+
+// Busca produtos relacionados no Medusa: renderiza por requisição.
+export const prerender = false;
 import ProductTemplate from '../../components/drops/products/camiseta-tyer-red-rose-vermelha.astro';
 
 const lang: Lang = getLangFromUrl(Astro.url);
@@ -14,11 +18,7 @@ let related: any[] = [];
 let newest: any[] = [];
 
 try {
-  const url =
-    import.meta.env.MEDUSA_INTERNAL_URL ||
-    import.meta.env.MEDUSA_URL ||
-    import.meta.env.PUBLIC_MEDUSA_URL ||
-    'http://backend:9000';
+  const url = getMedusaStoreUrl();
   const regionId = await resolveDefaultRegionId(url, medusaHeaders);
   const q = getProductListQueryString(regionId);
   const res = await fetch(

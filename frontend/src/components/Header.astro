@@ -1,5 +1,6 @@
 ---
 import { t, getPathForLang, type Lang } from "../i18n/utils";
+import { getMedusaStoreUrl } from "../lib/medusa-env";
 
 interface NavDrop {
   handle: string;
@@ -15,12 +16,9 @@ interface Props {
 const lang: Lang = Astro.props.lang ?? "pt";
 const drops: NavDrop[] = Array.isArray(Astro.props.drops) ? Astro.props.drops : [];
 
-const url =
-  import.meta.env.MEDUSA_INTERNAL_URL ||
-  import.meta.env.MEDUSA_URL ||
-  "http://localhost:9003";
+const url = getMedusaStoreUrl();
 const medusaBase = (
-  import.meta.env.PUBLIC_MEDUSA_URL || url
+  process.env.PUBLIC_MEDUSA_URL || url
 ).replace(/\/$/, "");
 const resetSentHint = t(lang, "account", "reset_sent_hint");
 const searchRecentsTitle = t(lang, "search", "recents_title");

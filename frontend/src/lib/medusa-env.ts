@@ -1,9 +1,15 @@
-/** URL base do Store API Medusa (build e runtime devem usar a mesma origem para paths estáticos baterem com o fetch). */
+/**
+ * URL base do Store API Medusa.
+ *
+ * Lê `process.env` em RUNTIME (adapter Node): `import.meta.env` é resolvido
+ * em build time pelo Vite — se o CI não definir a variável, o valor colapsa
+ * para o fallback e o SSR passa a fetchear localhost dentro do pod.
+ */
 export function getMedusaStoreUrl(): string {
   return (
-    import.meta.env.MEDUSA_INTERNAL_URL ||
-    import.meta.env.MEDUSA_URL ||
-    import.meta.env.PUBLIC_MEDUSA_URL ||
+    process.env.MEDUSA_INTERNAL_URL ||
+    process.env.MEDUSA_URL ||
+    process.env.PUBLIC_MEDUSA_URL ||
     'http://localhost:9003'
   );
 }
