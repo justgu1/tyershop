@@ -5,7 +5,7 @@ import { t, getPathForLang, type Lang } from '../i18n/utils';
 import { getProductListQueryString, resolveDefaultRegionId } from '../lib/medusa-pricing';
 
 const lang: Lang = 'pt';
-const pk = 'pk_56a7e1a252f159acbc6c590a025dac7a69d4c869fd621f0273ad10c2a87e3975';
+const pk = 'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
 
 let products: any[] = [];
 let collections: any[] = [];
@@ -243,7 +243,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
         <div class="editorial__left">
           <img src="/icons/youtube.svg" alt="" width="40" height="40" class="editorial__left-icon" decoding="async" />
           <span class="editorial__left-dash" aria-hidden="true">—</span>
-          <span class="editorial__left-label">Canal Tyer Basket Ball</span>
+          <span class="editorial__left-label">Tyer BasketBall</span>
         </div>
         <div class="editorial__right">
           <a
@@ -347,7 +347,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
         <p class="history__text-body"><em>TYER GANG.</em></p>
       </div>
       <div class="history__image" aria-hidden="true">
-        <img src="/our-history.webp" alt="" width="560" height="700" loading="lazy" decoding="async" onerror="this.src='/no-data.webp'" />
+        <img src="/our-history.webp" alt="" width="1200" height="1600" loading="lazy" decoding="async" onerror="this.src='/no-data.webp'" />
       </div>
     </div>
   </section>
@@ -500,29 +500,24 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 .products-showcase > :global(*) { min-width: 0; }
 @media (max-width: 900px) { .products-showcase { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) {
+  /* Arrows sobrepostas ao carrossel, simétricas (base já é absolute top:50%) */
   .products-showcase-nav {
     display: flex;
-    position: relative;
-    top: auto;
-    transform: none;
-    align-self: center;
-    flex-shrink: 0;
   }
+  .products-showcase-nav--prev { left: 12px; }
+  .products-showcase-nav--next { right: 12px; }
+  /* Viewport full-bleed (sangra até as bordas da tela) */
   .products-showcase-wrap {
-    display: flex;
-    flex-direction: row;
-    align-items: stretch;
-    gap: 8px;
     margin-inline: -20px;
-    padding-inline: 20px;
     min-width: 0;
   }
   .products-showcase-viewport {
-    flex: 1;
+    width: 100%;
     min-width: 0;
     overflow-x: auto;
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
+    scroll-padding-inline: 20px;
     -webkit-overflow-scrolling: touch;
     padding-bottom: 10px;
     scrollbar-width: thin;
@@ -536,19 +531,19 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
     gap: 16px;
     align-items: stretch;
     width: max-content;
-    min-width: 100%;
+    padding-inline: 20px; /* card alinhado às margens de 20px da página */
   }
   .products-showcase > :global(*) {
-    flex: 0 0 100cqi;
-    max-width: 100cqi;
+    flex: 0 0 calc(100cqi - 40px);
+    max-width: calc(100cqi - 40px);
     scroll-snap-align: start;
     scroll-snap-stop: always;
     box-sizing: border-box;
   }
   @supports not (width: 1cqi) {
     .products-showcase > :global(*) {
-      flex: 0 0 calc(100vw - 120px);
-      max-width: min(360px, calc(100vw - 120px));
+      flex: 0 0 calc(100vw - 80px);
+      max-width: min(360px, calc(100vw - 80px));
     }
   }
 }
@@ -738,8 +733,15 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
     align-items: center;
     text-align: center;
   }
+  /* Mobile: ícones de rede acima do banner do YouTube */
+  .editorial__content { padding-inline: 0; } /* .container já dá os 20px */
   .editorial__right-link {
     width: 100%;
+    order: 2;
+  }
+  .editorial__social {
+    order: 1;
+    justify-content: center;
   }
 }
 .editorial__left { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 40px; }
