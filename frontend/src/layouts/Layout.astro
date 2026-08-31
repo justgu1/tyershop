@@ -3,11 +3,9 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import SideCart from '../components/SideCart.astro';
 import { getLangFromUrl, hreflangMap, type Lang } from '../i18n/utils';
+import { getMedusaStoreUrl } from '../lib/medusa-env';
 
-const medusaInternal =
-  import.meta.env.MEDUSA_INTERNAL_URL ||
-  import.meta.env.MEDUSA_URL ||
-  'http://localhost:9003';
+const medusaInternal = getMedusaStoreUrl();
 const storePk =
   'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
 const storeHeaders = { 'x-publishable-api-key': storePk };
