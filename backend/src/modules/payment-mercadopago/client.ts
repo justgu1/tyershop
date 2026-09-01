@@ -72,6 +72,12 @@ export type MercadoPagoPayment = {
 export class MercadoPagoClient {
   constructor(private readonly options: MercadoPagoClientOptions) {}
 
+  /** `''`/undefined viram `undefined` — mandar string vazia faz o Mercado Pago rejeitar o payload inteiro. */
+  private get notificationUrl(): string | undefined {
+    const url = this.options.notificationUrl?.trim();
+    return url ? url : undefined;
+  }
+
   private async request<T>(path: string, init: RequestInit & { idempotencyKey?: string } = {}): Promise<T> {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.options.accessToken}`,
@@ -104,7 +110,7 @@ export class MercadoPagoClient {
           identification: input.payer.identification,
         },
         external_reference: input.externalReference,
-        notification_url: this.options.notificationUrl,
+        notification_url: this.notificationUrl,
       }),
     });
   }
@@ -124,7 +130,7 @@ export class MercadoPagoClient {
           identification: input.payer.identification,
         },
         external_reference: input.externalReference,
-        notification_url: this.options.notificationUrl,
+        notification_url: this.notificationUrl,
       }),
     });
   }
@@ -152,7 +158,7 @@ export class MercadoPagoClient {
           },
         },
         external_reference: input.externalReference,
-        notification_url: this.options.notificationUrl,
+        notification_url: this.notificationUrl,
       }),
     });
   }

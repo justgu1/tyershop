@@ -44,6 +44,8 @@ export async function POST(req: MedusaRequest<Body>, res: MedusaResponse) {
 
   await paymentModuleService.updatePaymentSession({
     id: session.id,
+    amount: session.amount,
+    currency_code: session.currency_code,
     data: { status: "submitted", mp_payment_id: payment.id, mp_status: payment.status },
   });
 
