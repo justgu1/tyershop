@@ -4,10 +4,11 @@ import Footer from "../components/Footer.astro";
 import SideCart from "../components/SideCart.astro";
 import PromoPopup from "../components/PromoPopup.astro";
 import { getLangFromUrl, hreflangMap, type Lang } from "../i18n/utils";
-import { getMedusaStoreUrl, getPublishableKey } from "../lib/medusa-env";
+import { getMedusaStoreUrl, getPublishableKey, getMercadoPagoPublicKey } from "../lib/medusa-env";
 
 const medusaInternal = getMedusaStoreUrl();
 const storePk = getPublishableKey();
+const mpPk = getMercadoPagoPublicKey();
 const storeHeaders = { "x-publishable-api-key": storePk };
 let navDrops: { handle: string; name: string; num: string; img: string }[] = [];
 try {
@@ -111,8 +112,9 @@ const schemas: object[] = [
       ))
     }
     <meta name="theme-color" content="#0a0a0a" />
-    <script is:inline define:vars={{ storePk }}>
+    <script is:inline define:vars={{ storePk, mpPk }}>
       window.__MEDUSA_PK__ = storePk;
+      window.__MERCADOPAGO_PK__ = mpPk;
     </script>
   </head>
   <body class={bodyClass} data-lang={lang}>
