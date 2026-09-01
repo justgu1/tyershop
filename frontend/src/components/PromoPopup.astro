@@ -1,0 +1,225 @@
+---
+import { t, type Lang } from '../i18n/utils';
+
+interface Props {
+  lang?: Lang;
+}
+const { lang = 'pt' } = Astro.props;
+const publicApiUrl = (import.meta.env.PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '');
+---
+
+<div class="promo-popup" id="promo-popup" hidden role="dialog" aria-label={t(lang, 'promo', 'title')} aria-live="polite">
+  <button type="button" class="promo-popup__close" id="promo-popup-close" aria-label={t(lang, 'promo', 'close')}>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  </button>
+  <div class="promo-popup__body">
+    <p class="promo-popup__kicker">{t(lang, 'promo', 'kicker')}</p>
+    <h3 class="promo-popup__title">{t(lang, 'promo', 'title')}</h3>
+    <p class="promo-popup__text">{t(lang, 'promo', 'text')}</p>
+    <form class="promo-popup__form" id="promo-popup-form" novalidate>
+      <input
+        type="email"
+        name="email"
+        required
+        class="promo-popup__input"
+        id="promo-popup-email"
+        placeholder="seu@email.com"
+        aria-label="E-mail"
+        autocomplete="email"
+      />
+      <button type="submit" class="promo-popup__cta" id="promo-popup-submit">{t(lang, 'promo', 'cta')}</button>
+    </form>
+    <p class="promo-popup__feedback" id="promo-popup-feedback" hidden role="status"></p>
+  </div>
+  <div class="promo-popup__img">
+    <img src="/collections/tyer-tech.webp" alt="" width="96" height="200" loading="lazy" decoding="async" />
+  </div>
+</div>
+
+<script define:vars={{ publicApiUrl }}>
+  (function () {
+    const KEY = 'tyer_promo_dismissed_v1';
+    const popup = document.getElementById('promo-popup');
+    if (!(popup instanceof HTMLElement)) return;
+    let dismissed = false;
+    try {
+      dismissed = sessionStorage.getItem(KEY) === '1';
+    } catch {
+      /* storage indisponível: mostra normalmente */
+    }
+
+    const show = () => {
+      popup.hidden = false;
+      requestAnimationFrame(() => popup.classList.add('is-visible'));
+    };
+    const dismiss = () => {
+      popup.classList.remove('is-visible');
+      try {
+        sessionStorage.setItem(KEY, '1');
+      } catch {
+        /* ignore */
+      }
+      window.setTimeout(() => {
+        popup.hidden = true;
+      }, 250);
+    };
+
+    if (!dismissed) window.setTimeout(show, 1800);
+
+    document.getElementById('promo-popup-close')?.addEventListener('click', dismiss);
+
+    const form = document.getElementById('promo-popup-form');
+    const emailInput = document.getElementById('promo-popup-email');
+    const submitBtn = document.getElementById('promo-popup-submit');
+    const feedback = document.getElementById('promo-popup-feedback');
+
+    form?.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const email = emailInput instanceof HTMLInputElement ? emailInput.value.trim() : '';
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        if (feedback instanceof HTMLElement) {
+          feedback.hidden = false;
+          feedback.textContent = 'E-mail inválido.';
+          feedback.classList.add('is-err');
+          feedback.classList.remove('is-ok');
+        }
+        return;
+      }
+      if (submitBtn instanceof HTMLButtonElement) submitBtn.disabled = true;
+      try {
+        const res = await fetch(publicApiUrl + '/api/newsletter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        if (!res.ok) throw new Error('fail');
+        if (feedback instanceof HTMLElement) {
+          feedback.hidden = false;
+          feedback.textContent = 'Cadastrado! Fique de olho no seu e-mail.';
+          feedback.classList.add('is-ok');
+          feedback.classList.remove('is-err');
+        }
+        if (form instanceof HTMLFormElement) form.hidden = true;
+        try {
+          sessionStorage.setItem(KEY, '1');
+        } catch {
+          /* ignore */
+        }
+      } catch {
+        if (feedback instanceof HTMLElement) {
+          feedback.hidden = false;
+          feedback.textContent = 'Não foi possível cadastrar agora. Tente de novo.';
+          feedback.classList.add('is-err');
+          feedback.classList.remove('is-ok');
+        }
+      } finally {
+        if (submitBtn instanceof HTMLButtonElement) submitBtn.disabled = false;
+      }
+    });
+  })();
+</script>
+
+<style>
+  .promo-popup {
+    position: fixed;
+    top: calc(var(--header-h) + 16px);
+    right: 16px;
+    z-index: 460;
+    width: min(320px, calc(100vw - 32px));
+    display: flex;
+    align-items: stretch;
+    background: #f5f2ec;
+    color: #0a0a0a;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: none;
+  }
+  .promo-popup.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  .promo-popup__close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.06);
+    border: 0;
+    border-radius: 50%;
+    color: #0a0a0a;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .promo-popup__close:hover {
+    background: rgba(0, 0, 0, 0.12);
+  }
+  .promo-popup__body {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 18px 16px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .promo-popup__kicker {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--c-accent, #e77e23);
+  }
+  .promo-popup__title {
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1.15;
+    margin: 0;
+  }
+  .promo-popup__text {
+    font-size: 12px;
+    line-height: 1.4;
+    color: #4a4a4a;
+    margin: 2px 0 8px;
+  }
+  .promo-popup__cta {
+    align-self: flex-start;
+    background: var(--c-accent, #e77e23);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-decoration: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    transition: background 0.15s ease;
+  }
+  .promo-popup__cta:hover {
+    background: var(--c-accent-d, #c96a10);
+  }
+  .promo-popup__img {
+    flex: 0 0 96px;
+    width: 96px;
+    position: relative;
+  }
+  .promo-popup__img img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  @media (max-width: 420px) {
+    .promo-popup__img {
+      display: none;
+    }
+  }
+</style>

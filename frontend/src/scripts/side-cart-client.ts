@@ -99,7 +99,7 @@ function renderFeedback(message: string, tone: string) {
 
 async function fetchRegionId() {
   const base = '';
-  const key = 'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
+  const key = (window as any).__MEDUSA_PK__ || '';
   const res = await fetch(`${base}/store/regions?limit=1`, { headers: { 'x-publishable-api-key': key } });
   const data = await res.json();
   return data?.regions?.[0]?.id || null;
@@ -107,7 +107,7 @@ async function fetchRegionId() {
 
 async function syncRemoteCart(items: Array<{ variantId: string; quantity: number }>) {
   const base = '';
-  const key = 'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
+  const key = (window as any).__MEDUSA_PK__ || '';
   const regionId = await fetchRegionId();
   if (!regionId) throw new Error('Sem regiao');
   const created = await fetch(`${base}/store/carts`, {
@@ -272,7 +272,7 @@ function renderCart() {
       <div class="sc-item__head">
         <span class="sc-item__name">${titleH}</span>
       </div>
-      <button class="sc-item__remove" type="button" data-id="${item.variantId}" data-action="remove" aria-label="Remover do carrinho">
+      <button class="sc-item__remove" type="button" data-id="${item.variantId}" data-action="remove" aria-label="Remover da bag">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
       <div class="sc-item__body">
@@ -280,7 +280,7 @@ function renderCart() {
           <img class="sc-item__img" src="${thumb}" alt="" width="88" height="88" loading="lazy" decoding="async" />
         </div>
         <div class="sc-item__right">
-          ${isOutOfStock ? '<div class="sc-item__stock">Sem estoque</div>' : ''}
+          ${isOutOfStock ? '<div class="sc-item__stock">Esgotado</div>' : ''}
           ${variantH ? `<div class="sc-item__variant">${variantH}</div>` : ''}
           <div class="sc-item__footer">
             <span class="sc-item__price">${fmt((item.price || 0) * (item.quantity || 1))}</span>
@@ -313,7 +313,7 @@ function renderCart() {
     checkoutBtn.disabled = items.length === 0 || hasOutOfStock(items);
   }
   renderFeedback(
-    hasOutOfStock(items) ? 'Remova itens sem estoque para finalizar a compra.' : '',
+    hasOutOfStock(items) ? 'Remova itens esgotados para finalizar a compra.' : '',
     hasOutOfStock(items) ? 'error' : ''
   );
 }
@@ -416,7 +416,7 @@ document.getElementById('side-cart-checkout')?.addEventListener('click', async (
   const items = getCartItems();
   if (!items.length) return;
   if (hasOutOfStock(items)) {
-    renderFeedback('Remova itens sem estoque para finalizar a compra.', 'error');
+    renderFeedback('Remova itens esgotados para finalizar a compra.', 'error');
     return;
   }
   const btn = document.getElementById('side-cart-checkout');

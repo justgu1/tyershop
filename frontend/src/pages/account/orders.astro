@@ -2,7 +2,9 @@
 import Layout from '../../layouts/Layout.astro';
 import { getLangFromUrl, t, getPathForLang } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
+import { getPublishableKey } from '../../lib/medusa-env';
 const lang: Lang = getLangFromUrl(Astro.url);
+const pk = getPublishableKey();
 ---
 <Layout title={t(lang, 'account', 'order_history')} lang={lang} noindex>
   <div class="orders-page container">
@@ -30,7 +32,7 @@ const lang: Lang = getLangFromUrl(Astro.url);
 .orders-empty { color: var(--c-muted); font-size: 14px; padding: 40px 0; }
 .orders-loading { color: var(--c-muted); font-size: 14px; }
 </style>
-<script>
+<script define:vars={{ pk }}>
   async function loadOrders() {
     const container = document.getElementById('orders-list');
     const loading   = document.getElementById('orders-loading');
@@ -41,7 +43,6 @@ const lang: Lang = getLangFromUrl(Astro.url);
       return;
     }
     try {
-      const pk = 'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
       const res = await fetch('/store/orders', {
         headers: {
           Authorization: `Bearer ${token}`,

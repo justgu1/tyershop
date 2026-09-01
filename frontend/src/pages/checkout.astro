@@ -63,14 +63,14 @@ const apiBase = (import.meta.env.PUBLIC_API_URL || '').replace(/\/$/, '');
   async function init() {
     const items = getCart();
     if (!items.length) {
-      if (summaryEl) summaryEl.textContent = 'Carrinho vazio.';
+      if (summaryEl) summaryEl.textContent = 'Bag vazia.';
       return;
     }
     let medusaCartId = '';
     try {
       medusaCartId = await createMedusaCartFromLocalCart();
     } catch (e) {
-      if (summaryEl) summaryEl.textContent = e instanceof Error ? e.message : 'Erro ao preparar carrinho.';
+      if (summaryEl) summaryEl.textContent = e instanceof Error ? e.message : 'Erro ao preparar bag.';
       return;
     }
     const amount = await medusaTotalMajorFromCart(medusaCartId);

@@ -3,28 +3,32 @@ import Layout from '../layouts/Layout.astro';
 import ProductCard from '../components/ProductCard.astro';
 import { t, getPathForLang, type Lang } from '../i18n/utils';
 import { getProductListQueryString, resolveDefaultRegionId } from '../lib/medusa-pricing';
-import { getMedusaStoreUrl } from '../lib/medusa-env';
+import { getMedusaStoreUrl, getPublishableKey } from '../lib/medusa-env';
 
 // Home busca catálogo no Medusa: precisa renderizar por requisição —
 // pré-renderizada o HTML congelaria com o estado do build (sem backend).
 export const prerender = false;
 
 const lang: Lang = 'pt';
-const pk = 'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
+const pk = getPublishableKey();
+const publicApiUrl = (import.meta.env.PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '');
 
 let products: any[] = [];
 let collections: any[] = [];
+let siteConfig: any = null;
 
 try {
   const url = getMedusaStoreUrl();
   const headers = { 'x-publishable-api-key': pk };
   const regionId = await resolveDefaultRegionId(url, headers);
   const pq = getProductListQueryString(regionId);
-  const [pRes, cRes] = await Promise.all([
+  const [pRes, cRes, scRes] = await Promise.all([
     fetch(`${url}/store/products?${pq}&limit=8`, { headers, signal: AbortSignal.timeout(5000) }),
     fetch(`${url}/store/collections?limit=50`, { headers, signal: AbortSignal.timeout(5000) }),
+    fetch(`${url}/store/site-config`, { headers, signal: AbortSignal.timeout(5000) }),
   ]);
   if (pRes.ok) products = ((await pRes.json()).products ?? []).slice(0, 4);
+  if (scRes.ok) siteConfig = (await scRes.json()).site_config ?? null;
   if (cRes.ok) {
     collections = (await cRes.json()).collections ?? [];
     const countPromises = collections.map(c =>
@@ -96,6 +100,24 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
       <source src="/video/hero.compressed.mp4" type="video/mp4" />
     </video>
     <div class="hero__overlay" aria-hidden="true"></div>
+    {siteConfig?.countdown?.enabled && siteConfig?.countdown?.targetIso && (
+      <div class="hero__countdown" id="hero-countdown" data-target-iso={siteConfig.countdown.targetIso}>
+        <p class="hero__countdown-label">{siteConfig.countdown.label || 'Próximo Drop em'}</p>
+        <div class="hero__countdown-clock" role="timer" aria-live="off">
+          <div class="hero__countdown-unit"><span class="hero__countdown-num" data-cd="d">00</span><span class="hero__countdown-u">dias</span></div>
+          <div class="hero__countdown-unit"><span class="hero__countdown-num" data-cd="h">00</span><span class="hero__countdown-u">h</span></div>
+          <div class="hero__countdown-unit"><span class="hero__countdown-num" data-cd="m">00</span><span class="hero__countdown-u">min</span></div>
+          <div class="hero__countdown-unit"><span class="hero__countdown-num" data-cd="s">00</span><span class="hero__countdown-u">s</span></div>
+        </div>
+        {siteConfig?.countdown?.presaveEnabled && (
+          <form class="hero__presave" id="hero-presave-form" novalidate data-api-url={publicApiUrl}>
+            <input type="email" name="email" required class="hero__presave-input" placeholder="seu@email.com" aria-label="E-mail" autocomplete="email" />
+            <button type="submit" class="hero__presave-btn">{siteConfig.countdown.presaveCta || 'Pre-save o drop'}</button>
+          </form>
+        )}
+        <p class="hero__presave-feedback" id="hero-presave-feedback" hidden></p>
+      </div>
+    )}
     <a href="#produtos-vendidos" class="hero__scroll" aria-label="Scroll para produtos">
       <span class="hero__scroll-label">Desça para ver mais</span>
       <svg width="20" height="28" viewBox="0 0 20 28" fill="none" aria-hidden="true">
@@ -107,8 +129,6 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 
   <!-- MAIS VENDIDOS -->
   <section id="produtos-vendidos" class="section products-section" aria-labelledby="products-title">
-    <div class="section-bg" style="background-image:url('/products-section-background.webp?v=2')"></div>
-    <div class="section-overlay"></div>
     <div class="container section-content">
       <header class="section__header section__header--centered">
         <h2 class="section__title" id="products-title">Mais Vendidos</h2>
@@ -175,8 +195,6 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 
   {collections.length > 0 && (
   <section id="collection" class="section collections-section" aria-labelledby="collections-title">
-    <div class="section-bg" style="background-image:url('/collections-section-background.webp')"></div>
-    <div class="section-overlay"></div>
     <div class="section-content collections-wrap">
       <h2 class="collections-title section__title" id="collections-title">Drops</h2>
       <div
@@ -238,8 +256,6 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 
   <!-- EDITORIAL -->
   <section id="editorial" class="section editorial-section" aria-labelledby="editorial-title">
-    <div class="section-bg" style="background-image:url('/editorial-section-background.webp')"></div>
-    <div class="section-overlay"></div>
     <div class="container section-content">
       <header class="section__header section__header--centered">
         <h2 class="section__title" id="editorial-title">{t(lang, 'sections', 'social_title')}</h2>
@@ -332,7 +348,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
   </section>
 
   <!-- HISTORY — no background image, uses site default bg -->
-  <section class="section history-section" aria-labelledby="history-title">
+  <section id="historia" class="section history-section" aria-labelledby="history-title">
     <div class="section-content history-content">
       <div class="history__text">
         <h2 class="history__title" id="history-title">Isso é Tyer!</h2>
@@ -404,6 +420,62 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
   visibility: visible;
 }
 .hero__overlay { position: absolute; inset: 0; z-index: 1; background: linear-gradient(to bottom, rgba(0,0,0,.75) 0%, transparent); }
+.hero__countdown {
+  position: absolute;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 16px 24px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  color: #fff;
+}
+.hero__countdown-label { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--c-accent, #e77e23); margin: 0; }
+.hero__countdown-clock { display: flex; gap: 14px; }
+.hero__countdown-unit { display: flex; flex-direction: column; align-items: center; min-width: 42px; }
+.hero__countdown-num { font-family: var(--font-title); font-size: 28px; line-height: 1; }
+.hero__countdown-u { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); margin-top: 2px; }
+.hero__countdown.is-over .hero__countdown-clock { opacity: 0.4; }
+.hero__presave { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; justify-content: center; }
+.hero__presave-input {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 13px;
+  min-width: 180px;
+}
+.hero__presave-input::placeholder { color: rgba(255, 255, 255, 0.5); }
+.hero__presave-btn {
+  background: var(--c-accent, #e77e23);
+  color: #fff;
+  border: 1px solid var(--c-accent, #e77e23);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.hero__presave-btn:hover { background: var(--c-accent-d, #c96a10); }
+.hero__presave-feedback { font-size: 12px; margin: 2px 0 0; }
+.hero__presave-feedback.is-ok { color: #7dffb2; }
+.hero__presave-feedback.is-err { color: #ff8a8a; }
+@media (max-width: 560px) {
+  .hero__countdown { bottom: 72px; padding: 12px 16px; }
+  .hero__countdown-num { font-size: 22px; }
+}
 .hero__scroll {
   position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
   z-index: 2; color: rgba(255,255,255,0.6); transition: color var(--ease);
@@ -416,25 +488,6 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 
 /* ── Section base ── */
 .section { position: relative; min-height: 75svh; display: flex; align-items: center; overflow: hidden; }
-
-/* Bg layer — position:absolute is NOT affected by any parent rules */
-.section-bg {
-  position: absolute !important;
-  inset: 0;
-  background-size: cover;
-  background-position: center center;
-  background-repeat: no-repeat;
-  filter: blur(3px);
-  transform: scale(1.06);
-  z-index: 0;
-}
-.section-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.72);
-  z-index: 1;
-  pointer-events: none;
-}
 .section-content { position: relative; z-index: 2; width: 100%; padding-block: 64px; }
 
 /* ── Section header ── */
@@ -1059,9 +1112,79 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
   
     stage.addEventListener('mouseenter', stopAuto);
     stage.addEventListener('mouseleave', startAuto);
-  
+
     startAuto();
     })();
-  
+
+    /* ─────────────────────────────────────────────
+       HERO COUNTDOWN + PRE-SAVE
+    ───────────────────────────────────────────── */
+    (function () {
+      const box = document.getElementById('hero-countdown');
+      if (!box) return;
+      const targetIso = box.dataset.targetIso;
+      const target = targetIso ? new Date(targetIso).getTime() : NaN;
+      if (!Number.isFinite(target)) return;
+
+      const dEl = box.querySelector('[data-cd="d"]');
+      const hEl = box.querySelector('[data-cd="h"]');
+      const mEl = box.querySelector('[data-cd="m"]');
+      const sEl = box.querySelector('[data-cd="s"]');
+      const pad = (n) => String(Math.max(0, n)).padStart(2, '0');
+
+      function tick() {
+        const diff = target - Date.now();
+        if (diff <= 0) {
+          if (dEl) dEl.textContent = '00';
+          if (hEl) hEl.textContent = '00';
+          if (mEl) mEl.textContent = '00';
+          if (sEl) sEl.textContent = '00';
+          box.classList.add('is-over');
+          clearInterval(timer);
+          return;
+        }
+        const totalSec = Math.floor(diff / 1000);
+        const days = Math.floor(totalSec / 86400);
+        const hours = Math.floor((totalSec % 86400) / 3600);
+        const mins = Math.floor((totalSec % 3600) / 60);
+        const secs = totalSec % 60;
+        if (dEl) dEl.textContent = pad(days);
+        if (hEl) hEl.textContent = pad(hours);
+        if (mEl) mEl.textContent = pad(mins);
+        if (sEl) sEl.textContent = pad(secs);
+      }
+      tick();
+      const timer = setInterval(tick, 1000);
+
+      const form = document.getElementById('hero-presave-form');
+      const feedback = document.getElementById('hero-presave-feedback');
+      form?.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const input = form.querySelector('input[type="email"]');
+        const email = input ? input.value.trim() : '';
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          if (feedback) { feedback.hidden = false; feedback.textContent = 'E-mail inválido.'; feedback.className = 'hero__presave-feedback is-err'; }
+          return;
+        }
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
+        try {
+          const apiUrl = form.dataset.apiUrl || '';
+          const res = await fetch(apiUrl + '/api/newsletter', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          if (!res.ok) throw new Error('fail');
+          if (feedback) { feedback.hidden = false; feedback.textContent = 'Pre-save feito! Avisamos você.'; feedback.className = 'hero__presave-feedback is-ok'; }
+          form.hidden = true;
+        } catch {
+          if (feedback) { feedback.hidden = false; feedback.textContent = 'Não deu certo agora. Tente de novo.'; feedback.className = 'hero__presave-feedback is-err'; }
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      });
+    })();
+
   })();
 </script>

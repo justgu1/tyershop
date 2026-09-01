@@ -1,0 +1,375 @@
+---
+import { t, getPathForLang, type Lang } from '../i18n/utils';
+import { getProductVariantData, getVariantMaxQty } from '../lib/product-variants';
+import { getVariantPriceInfo } from '../lib/medusa-pricing';
+import { optionRowKind, swatchFillForValue } from '../lib/variant-option-ui';
+import { getVariantSlideUrls } from '../lib/product-variant-gallery';
+
+interface Props {
+  product: any;
+  lang?: Lang;
+  reverse?: boolean;
+}
+
+const { product, lang = 'pt', reverse = false } = Astro.props;
+
+const { normalizedVariants, optionRows, defaultVariant } = getProductVariantData(product);
+const colorRow = optionRows.find((row: { title: string }) => optionRowKind(row.title) === 'color');
+
+const handle = product.handle ?? '';
+const title = product.title ?? '';
+
+/** 1 variante representante por cor (a troca de cor no mosaico não usa tamanho). */
+function pickVariantForColor(colorValue: string) {
+  const inColor = normalizedVariants.filter((v) => v.options?.[colorRow!.id] === colorValue);
+  return inColor.find((v) => !v.soldOut) ?? inColor[0] ?? defaultVariant;
+}
+
+/* `defaultVariant` é o objeto raw da Medusa (options[] em array), não o
+   normalizado (options{} em mapa) — precisa achar o normalizado equivalente. */
+const defaultNormalized = normalizedVariants.find((v) => v.id === defaultVariant?.id);
+const activeColor = colorRow ? String(defaultNormalized?.options?.[colorRow.id] ?? '') : '';
+
+const colorVariants = colorRow
+  ? colorRow.values.map((val: string) => {
+      const v = pickVariantForColor(val);
+      const slides = [...new Set(getVariantSlideUrls(v, product))].slice(0, 5);
+      return { value: val, variant: v, slides: slides.length ? slides : ['/no-data.webp'] };
+    })
+  : [];
+
+const priceInfo = getVariantPriceInfo(defaultVariant);
+const galleryUrls = colorRow
+  ? colorVariants.find((c) => c.value === activeColor)?.slides ?? ['/no-data.webp']
+  : (() => {
+      const s = [...new Set(getVariantSlideUrls(defaultVariant, product))].slice(0, 5);
+      return s.length ? s : ['/no-data.webp'];
+    })();
+
+/* DOM precisa de slots suficientes p/ cobrir a cor com mais fotos — trocar de cor
+   só liga/desliga slots e troca src, nunca recria nó (CSS scoped não pega em injectHTML). */
+const maxTileCount = Math.min(
+  5,
+  Math.max(galleryUrls.length, ...colorVariants.map((c) => c.slides.length), 1)
+);
+const tileSlots = Array.from({ length: maxTileCount }, (_, i) => galleryUrls[i] ?? null);
+
+const descriptionText = String(product.description ?? '')
+  .replace(/<[^>]+>/g, ' ')
+  .replace(/&nbsp;/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+const descriptionShort =
+  descriptionText.length > 220 ? descriptionText.slice(0, 217).replace(/\s+\S*$/, '') + '…' : descriptionText;
+---
+
+<article class:list={['mosaic-item', { 'mosaic-item--reverse': reverse }]} data-mosaic-item>
+  <a
+    href={getPathForLang(`/product/${handle}`, lang)}
+    class="mosaic-item__gallery"
+    data-count={galleryUrls.length}
+    data-gallery
+    aria-label={title}
+  >
+    {tileSlots.map((url, i) => (
+      <span class:list={['mosaic-item__tile', { 'mosaic-item__tile--main': i === 0 }]} hidden={url == null} data-tile>
+        <img
+          src={url ?? '/no-data.webp'}
+          alt={i === 0 ? title : ''}
+          class="mosaic-item__img"
+          loading="lazy"
+          decoding="async"
+          aria-hidden={i === 0 ? undefined : 'true'}
+          onerror="this.onerror=null;this.src='/no-data.webp'"
+        />
+      </span>
+    ))}
+  </a>
+
+  <div class="mosaic-item__info">
+    <a href={getPathForLang(`/product/${handle}`, lang)} class="mosaic-item__title-link">
+      <h3 class="mosaic-item__title">{title}</h3>
+    </a>
+
+    {colorRow && colorRow.values.length > 0 && (
+      <div class="mosaic-item__colors" role="list" aria-label={colorRow.title} data-color-switch>
+        {colorVariants.map(({ value: val, variant: v, slides }) => {
+          const { fill, isGradient } = swatchFillForValue(val);
+          const style: { background?: string; backgroundColor?: string } = {};
+          if (isGradient && fill) style.background = fill;
+          else if (fill) style.backgroundColor = fill;
+          const vPrice = getVariantPriceInfo(v);
+          return (
+            <button
+              type="button"
+              class:list={['mosaic-item__swatch', { 'is-active': val === activeColor }]}
+              title={val}
+              role="listitem"
+              aria-pressed={val === activeColor}
+              aria-label={val}
+              data-color={val}
+              data-variant-id={v?.id}
+              data-price={vPrice?.amountCents ?? ''}
+              data-price-display={vPrice?.display ?? ''}
+              data-price-original-display={vPrice?.originalDisplay ?? ''}
+              data-variant-title={v?.title ?? ''}
+              data-max-qty={getVariantMaxQty(v) ?? ''}
+              data-slides={JSON.stringify(slides)}
+            >
+              <span class:list={['mosaic-item__swatch-inner', { 'mosaic-item__swatch-inner--neutral': !fill }]} style={style} />
+            </button>
+          );
+        })}
+      </div>
+    )}
+
+    {descriptionShort && <p class="mosaic-item__desc">{descriptionShort}</p>}
+
+    <div class="mosaic-item__footer">
+      <div class="mosaic-item__price-box" data-price-box>
+        <span class="mosaic-item__price-striked" data-price-striked hidden={!priceInfo?.originalDisplay}>{priceInfo?.originalDisplay ?? ''}</span>
+        <span class="mosaic-item__price" data-price-current>{priceInfo?.display ?? ''}</span>
+      </div>
+      <div class="mosaic-item__actions">
+        <a href={getPathForLang(`/product/${handle}`, lang)} class="btn btn-outline mosaic-item__view">
+          {t(lang, 'shop', 'view_product') || 'Ver produto'}
+        </a>
+        <button
+          type="button"
+          class="pc__quick-add mosaic-item__add"
+          data-variant-id={defaultVariant?.id}
+          data-title={title}
+          data-price={priceInfo?.amountCents ?? ''}
+          data-thumbnail={galleryUrls[0]}
+          data-variant-title={defaultVariant?.title ?? ''}
+          data-max-qty={getVariantMaxQty(defaultVariant) ?? ''}
+          aria-label={`${t(lang, 'product', 'add_to_cart')} — ${title}`}
+        >
+          <img src="/icons/bag.svg" alt="" width="18" height="18" />
+          <span class="pc__quick-add__label">{t(lang, 'product', 'add_to_cart')}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</article>
+
+<style>
+  .mosaic-item {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 40px;
+    align-items: center;
+    padding-block: 40px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .mosaic-item--reverse {
+    grid-template-columns: 1fr 1.15fr;
+  }
+  .mosaic-item--reverse .mosaic-item__gallery {
+    order: 2;
+  }
+
+  /* Mosaico real: sem crop nem deformação (object-fit: contain), grid denso.
+     1 imagem → tile único. 2+ → 1 grande + resto em blocos menores. */
+  .mosaic-item__gallery {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 1fr;
+    grid-auto-flow: dense;
+    gap: 8px;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .mosaic-item__gallery[data-count='1'] {
+    grid-template-columns: 1fr;
+  }
+  .mosaic-item__tile {
+    display: block;
+    aspect-ratio: 1 / 1;
+    background: var(--c-bg-mute, #1a1a1a);
+    overflow: hidden;
+  }
+  .mosaic-item__tile[hidden] {
+    display: none !important;
+  }
+  .mosaic-item__tile--main {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+  .mosaic-item__gallery[data-count='1'] .mosaic-item__tile--main {
+    grid-column: span 1;
+    aspect-ratio: 16 / 10;
+  }
+  .mosaic-item__gallery[data-count='2'] .mosaic-item__tile {
+    grid-column: span 2;
+    aspect-ratio: 1 / 1;
+  }
+  .mosaic-item__img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+    transition: transform 0.4s ease;
+  }
+  .mosaic-item__tile:hover .mosaic-item__img {
+    transform: scale(1.04);
+  }
+
+  .mosaic-item__info {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .mosaic-item__title-link {
+    text-decoration: none;
+  }
+  .mosaic-item__title {
+    font-family: var(--font-title);
+    font-size: clamp(24px, 3vw, 36px);
+    text-transform: uppercase;
+    line-height: 1.05;
+    color: var(--c-text);
+    margin: 0;
+  }
+  .mosaic-item__colors {
+    display: flex;
+    gap: 8px;
+  }
+  .mosaic-item__swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .mosaic-item__swatch:hover {
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+  .mosaic-item__swatch.is-active {
+    border-color: var(--c-accent);
+    transform: scale(1.08);
+  }
+  .mosaic-item__swatch-inner {
+    display: block;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+  }
+  .mosaic-item__swatch-inner--neutral {
+    background-color: #9ca3af;
+  }
+  .mosaic-item__desc {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--c-muted);
+    margin: 0;
+    max-width: 48ch;
+  }
+  .mosaic-item__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 8px;
+  }
+  .mosaic-item__price-box {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .mosaic-item__price-striked {
+    font-size: 13px;
+    text-decoration: line-through;
+    color: var(--c-muted);
+  }
+  .mosaic-item__price {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--c-text);
+  }
+  .mosaic-item__actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .mosaic-item__view {
+    padding: 10px 18px;
+    font-size: 12px;
+  }
+  /* `.pc__quick-add` (classe extra no botão) só serve pra cair na delegação
+     global de clique em product-card-client.ts — o visual é todo daqui, já
+     que o CSS scoped do ProductCard não alcança este componente. */
+  .mosaic-item__add {
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    background: var(--c-accent);
+    border: 1px solid var(--c-accent);
+    border-radius: var(--r-md, 8px);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .mosaic-item__add:hover {
+    background: var(--c-accent-d);
+    border-color: var(--c-accent-d);
+  }
+  .mosaic-item__add img {
+    filter: brightness(0) invert(1);
+  }
+  .mosaic-item__add :global(.pc__quick-add__label) {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #fff;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 780px) {
+    .mosaic-item,
+    .mosaic-item--reverse {
+      grid-template-columns: 1fr;
+      gap: 20px;
+      padding-block: 28px;
+    }
+    .mosaic-item--reverse .mosaic-item__gallery {
+      order: 0;
+    }
+
+    /* Mobile: mosaico denso vira faixa horizontal com scroll-snap — evita
+       blocos minúsculos/espremidos numa tela estreita. */
+    .mosaic-item__gallery {
+      display: flex;
+      grid-template-columns: unset;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      gap: 8px;
+      border-radius: 10px;
+      scrollbar-width: none;
+    }
+    .mosaic-item__gallery::-webkit-scrollbar {
+      display: none;
+    }
+    .mosaic-item__tile,
+    .mosaic-item__tile--main,
+    .mosaic-item__gallery[data-count='1'] .mosaic-item__tile--main,
+    .mosaic-item__gallery[data-count='2'] .mosaic-item__tile {
+      flex: 0 0 78%;
+      aspect-ratio: 4 / 5;
+      scroll-snap-align: center;
+      border-radius: 10px;
+    }
+  }
+</style>

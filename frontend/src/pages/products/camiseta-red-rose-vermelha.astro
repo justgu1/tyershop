@@ -3,7 +3,7 @@ import Layout from '../../layouts/Layout.astro';
 import { getLangFromUrl } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
 import { getProductListQueryString, resolveDefaultRegionId } from '../../lib/medusa-pricing';
-import { getMedusaStoreUrl } from '../../lib/medusa-env';
+import { getMedusaStoreUrl, getPublishableKey } from '../../lib/medusa-env';
 
 // Busca produtos relacionados no Medusa: renderiza por requisição.
 export const prerender = false;
@@ -11,7 +11,7 @@ import ProductTemplate from '../../components/drops/products/camiseta-tyer-red-r
 
 const lang: Lang = getLangFromUrl(Astro.url);
 const handle = 'camiseta-tyer-red-rose-vermelha';
-const pk = 'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
+const pk = getPublishableKey();
 const medusaHeaders = { 'x-publishable-api-key': pk };
 let product: any = null;
 let related: any[] = [];
