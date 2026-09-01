@@ -484,6 +484,8 @@ if (root) {
         const el = btn as HTMLButtonElement;
         const value = el.getAttribute('data-option-value') || '';
         const selectedForCheck = { ...selected, [row.id]: value };
+        /* Combo esgotado continua selecionável (mostra o aviso "avisar-me"); só
+           bloqueia quando a combinação nem existe. */
         const hasAnyVariant = variants.some((v) => variantMatches(v, selectedForCheck));
         el.classList.toggle('is-selected', selected[row.id] === value);
         el.classList.toggle('is-unavailable', !hasAnyVariant);

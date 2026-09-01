@@ -3,7 +3,7 @@ import Layout from '../../layouts/Layout.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import { getLangFromUrl, t, getPathForLang } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
-import { getMedusaStoreUrl } from '../../lib/medusa-env';
+import { getMedusaStoreUrl, getPublishableKey } from '../../lib/medusa-env';
 import { getProductListQueryString, getVariantPriceInfo, resolveDefaultRegionId } from '../../lib/medusa-pricing';
 import { getVariantSlideUrls } from '../../lib/product-variant-gallery';
 import { formatVariationValuesOnly, getProductVariantData } from '../../lib/product-variants';
@@ -23,7 +23,7 @@ export const prerender = false;
 const lang: Lang = getLangFromUrl(Astro.url);
 
 const { handle } = Astro.params;
-const pk = 'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
+const pk = getPublishableKey();
 const medusaHeaders = { 'x-publishable-api-key': pk };
 let product: any = null;
 let related: any[] = [];
@@ -518,7 +518,7 @@ const jsonLd = productFound
           </button>
           <button
             type="button"
-            class="btn pdp-atc-icon"
+            class="btn pdp-atc-icon pdp-atc-icon--labeled"
             id="pdp-atc"
             data-variant-id={defaultVariant?.id}
             data-title={product.title}
@@ -529,7 +529,8 @@ const jsonLd = productFound
             data-qty="1"
             aria-label={t(lang, 'product', 'add_to_cart')}
           >
-            <img src="/icons/quick-cart.svg" alt="" width="22" height="22" />
+            <img src="/icons/bag.svg" alt="" width="28" height="28" />
+            <span class="pdp-atc-icon__label">{t(lang, 'product', 'add_to_bag_cta')}</span>
           </button>
         </div>
 
@@ -682,7 +683,7 @@ const jsonLd = productFound
               id="pdp-sticky-atc"
               aria-label={t(lang, 'product', 'add_to_cart')}
             >
-              <img src="/icons/quick-cart.svg" alt="" width="22" height="22" />
+              <img src="/icons/bag.svg" alt="" width="22" height="22" />
             </button>
           </div>
         </div>
@@ -1091,8 +1092,10 @@ const jsonLd = productFound
     font-size: 10px;
   }
   .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__quick-add) {
-    width: 30px;
-    height: 30px;
+    padding: 8px 12px;
+  }
+  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__quick-add__label) {
+    font-size: 10px;
   }
   .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__variants) {
     margin-top: 6px;
@@ -1904,16 +1907,15 @@ const jsonLd = productFound
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: var(--c-surface2);
-    border: 1px solid var(--c-border);
+    background: var(--c-accent);
+    border: 1px solid var(--c-accent);
     border-radius: var(--r);
-    color: var(--c-text);
+    color: #fff;
     transition: background var(--ease), border-color var(--ease);
   }
   .pdp-atc-icon:hover:not(:disabled) {
-    background: var(--c-accent);
-    border-color: var(--c-accent);
-    color: var(--c-black);
+    background: var(--c-accent-d);
+    border-color: var(--c-accent-d);
   }
   .pdp-atc-icon:disabled {
     opacity: 0.45;
@@ -1921,10 +1923,21 @@ const jsonLd = productFound
   }
   .pdp-atc-icon img {
     display: block;
-    filter: none;
+    filter: brightness(0) invert(1);
   }
-  .pdp-atc-icon:hover:not(:disabled) img {
-    filter: brightness(0);
+  .pdp-atc-icon--labeled {
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    padding: 0 18px;
+    gap: 10px;
+  }
+  .pdp-atc-icon__label {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
   }
   .pdp-qty-btn {
     width: 36px;

@@ -13,3 +13,11 @@ export function getMedusaStoreUrl(): string {
     'http://localhost:9003'
   );
 }
+
+/**
+ * Publishable key da Store API Medusa. Mesma lógica de runtime da URL acima:
+ * lida em `process.env` a cada request (SSR), nunca fixa em build time.
+ */
+export function getPublishableKey(): string {
+  return process.env.PUBLIC_MEDUSA_PUBLISHABLE_KEY || '';
+}

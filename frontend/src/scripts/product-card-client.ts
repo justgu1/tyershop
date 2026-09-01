@@ -14,6 +14,7 @@ type VariantMap = {
   maxQty?: number | null;
   options: Record<string, string>;
   images?: string[];
+  slideUrls?: string[];
   priceDisplay?: string;
   originalDisplay?: string | null;
   discountPercent?: number;
@@ -27,58 +28,6 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
   document.documentElement.dataset.pcInitDone = 'true';
 
   const PLACEHOLDER = '/no-data.webp';
-
-  const prefetchedImages = new Set<string>();
-  const prefetchHoverImage = (url: string) => {
-    if (!url || prefetchedImages.has(url)) return;
-    prefetchedImages.add(url);
-    const img = new Image();
-    img.src = url;
-  };
-
-  const hoverImages = document.querySelectorAll('.pc__img--secondary');
-  if ('IntersectionObserver' in window) {
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          const el = entry.target;
-          if (el instanceof HTMLImageElement && el.currentSrc) {
-            prefetchHoverImage(el.currentSrc);
-          } else if (el instanceof HTMLImageElement && el.src) {
-            prefetchHoverImage(el.src);
-          }
-          io.unobserve(el);
-        });
-      },
-      { rootMargin: '300px' }
-    );
-    hoverImages.forEach((img) => io.observe(img));
-  } else {
-    hoverImages.forEach((img) => {
-      if (img instanceof HTMLImageElement) prefetchHoverImage(img.src);
-    });
-  }
-
-  const bindHoverReady = (img: HTMLImageElement) => {
-    const parent = img.closest('.pc__img-wrap');
-    if (!(parent instanceof HTMLElement)) return;
-    if (img.dataset.hasSecondary !== 'true') {
-      parent.classList.remove('is-hover-ready');
-      return;
-    }
-    if (img.complete && img.naturalWidth > 0) {
-      parent.classList.add('is-hover-ready');
-    } else {
-      img.addEventListener('load', () => parent.classList.add('is-hover-ready'), { once: true });
-    }
-    img.addEventListener('error', () => parent.classList.remove('is-hover-ready'), { once: true });
-  };
-
-  hoverImages.forEach((img) => {
-    if (!(img instanceof HTMLImageElement)) return;
-    bindHoverReady(img);
-  });
 
   function decodeJson<T>(value: string): T | null {
     try {
@@ -95,8 +44,6 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
   function initCard(card: Element) {
     if (!(card instanceof HTMLElement) || card.dataset.quickInit === '1') return;
     card.dataset.quickInit = '1';
-    const secondary = card.querySelector('.pc__img--secondary');
-    if (secondary instanceof HTMLImageElement) bindHoverReady(secondary);
     const quickBtn = card.querySelector('.pc__quick-add');
     if (!(quickBtn instanceof HTMLButtonElement)) return;
     const stockReliable = card.dataset.stockReliable === 'true';
@@ -105,17 +52,21 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
     if (!Array.isArray(variants) || variants.length === 0 || !Array.isArray(optionRows)) return;
 
     const primaryImage = card.querySelector('.pc__img--primary');
-    const secondaryImage = card.querySelector('.pc__img--secondary');
     const imgWrap = card.querySelector('.pc__img-wrap');
     const priceCurrent = card.querySelector('.pc__price-current');
     const priceStriked = card.querySelector('.pc__price-striked');
     const priceBox = card.querySelector('.pc__price-box');
     const discountTag = card.querySelector('.pc__tag--discount');
+    const soldoutTag = card.querySelector('[data-pc-soldout-tag]');
+    const categoryTags = card.querySelector('[data-pc-category-tags]');
     const bottomRow = card.querySelector('.pc__bottom');
     const stockNotifyWrap = card.querySelector('.pc__stock-notify');
     const stockNotifyEmail = card.querySelector('.pc__stock-notify__input') as HTMLInputElement | null;
     const stockNotifyBtn = card.querySelector('.pc__stock-notify__btn') as HTMLButtonElement | null;
     const stockNotifyFeedback = card.querySelector('.pc__stock-notify__feedback');
+    const galleryPrevBtn = card.querySelector('[data-gallery-prev]');
+    const galleryNextBtn = card.querySelector('[data-gallery-next]');
+    const galleryDots = card.querySelector('[data-gallery-dots]');
     let stockNotifyMsgs = { ok: '', err: '' };
     try {
       stockNotifyMsgs = {
@@ -129,10 +80,6 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
     const productHandle = card.dataset.productHandle || '';
     const productTitle = card.dataset.productTitle || '';
     const fallbackGallery = [quickBtn.dataset.thumbnail || PLACEHOLDER].filter(Boolean);
-    if (secondaryImage instanceof HTMLImageElement) {
-      const secondarySrc = secondaryImage.getAttribute('src') || '';
-      if (secondarySrc && secondarySrc !== fallbackGallery[0]) fallbackGallery.push(secondarySrc);
-    }
     const allowedOptionIds = new Set(optionRows.map((row) => row.id));
 
     function variantIsOutOfStock(v: VariantMap) {
@@ -173,21 +120,98 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
       });
     }
 
-    const applyGallery = (urls: string[]) => {
-      const source = (Array.isArray(urls) && urls.length ? urls : fallbackGallery).slice(0, 2);
-      const main = source[0] || PLACEHOLDER;
-      const second = source[1] || '';
+    let galleryUrls: string[] = [];
+    let galleryIndex = 0;
+    /* true = o slide atual veio só do preview de hover, não de clique na seta
+       — aí sim volta pro slide 1 quando o mouse sai. Depois de uma navegação
+       manual (seta), o hover pra de mexer no slide. */
+    let hoverPreviewActive = false;
+    let manualNavUsed = false;
+    let fadeRaf: number | null = null;
+
+    /* O `src` troca na hora, sempre — nada de delay/cancelamento aqui, senão
+       hover muito rapido (varios enter/leave antes do fade acabar) cancela a
+       troca pra sempre e a imagem fica em branco. O fade e' so cosmetico: um
+       toggle de opacidade que roda em paralelo, nunca segura a troca real. */
+    const renderGallerySlide = () => {
+      const url = galleryUrls[galleryIndex] || fallbackGallery[0] || PLACEHOLDER;
       if (primaryImage instanceof HTMLImageElement) {
-        primaryImage.src = main;
+        const img = primaryImage;
+        if (img.getAttribute('src') !== url) {
+          img.src = url;
+          if (fadeRaf != null) cancelAnimationFrame(fadeRaf);
+          img.classList.add('is-swapping');
+          fadeRaf = requestAnimationFrame(() => {
+            fadeRaf = requestAnimationFrame(() => {
+              img.classList.remove('is-swapping');
+              fadeRaf = null;
+            });
+          });
+        }
       }
-      if (secondaryImage instanceof HTMLImageElement) {
-        secondaryImage.dataset.hasSecondary = second ? 'true' : 'false';
-        secondaryImage.src = second || main;
-        if (second) bindHoverReady(secondaryImage);
-        else imgWrap?.classList.remove('is-hover-ready');
+      quickBtn.dataset.thumbnail = url;
+      if (galleryDots instanceof HTMLElement) {
+        galleryDots.querySelectorAll('span').forEach((dot, i) => {
+          dot.classList.toggle('is-active', i === galleryIndex);
+        });
       }
-      quickBtn.dataset.thumbnail = main;
     };
+
+    /* Galeria completa só entra no card (data-variants) como texto — nenhuma
+       imagem extra é baixada até a seta (ou o hover) trocar o `src`. */
+    const setupGallery = (urls: string[]) => {
+      galleryUrls = urls.length ? urls : fallbackGallery;
+      galleryIndex = 0;
+      manualNavUsed = false;
+      hoverPreviewActive = false;
+      const multi = galleryUrls.length > 1;
+      if (galleryPrevBtn instanceof HTMLElement) galleryPrevBtn.hidden = !multi;
+      if (galleryNextBtn instanceof HTMLElement) galleryNextBtn.hidden = !multi;
+      if (galleryDots instanceof HTMLElement) {
+        galleryDots.hidden = !multi;
+        galleryDots.innerHTML = multi
+          ? galleryUrls.map((_, i) => `<span class="${i === 0 ? 'is-active' : ''}"></span>`).join('')
+          : '';
+      }
+      renderGallerySlide();
+    };
+
+    galleryPrevBtn?.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (galleryUrls.length < 2) return;
+      manualNavUsed = true;
+      hoverPreviewActive = false;
+      galleryIndex = (galleryIndex - 1 + galleryUrls.length) % galleryUrls.length;
+      renderGallerySlide();
+    });
+    galleryNextBtn?.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (galleryUrls.length < 2) return;
+      manualNavUsed = true;
+      hoverPreviewActive = false;
+      galleryIndex = (galleryIndex + 1) % galleryUrls.length;
+      renderGallerySlide();
+    });
+
+    /* Preview no hover: mostra a 2ª foto (não empilha por cima — troca o
+       mesmo <img> que as setas usam), some quando o mouse sai. Some só se a
+       pessoa não tiver navegado manualmente pelas setas nesse meio tempo. */
+    if (imgWrap instanceof HTMLElement) {
+      imgWrap.addEventListener('mouseenter', () => {
+        if (galleryUrls.length < 2 || manualNavUsed) return;
+        galleryIndex = 1;
+        hoverPreviewActive = true;
+        renderGallerySlide();
+      });
+      imgWrap.addEventListener('mouseleave', () => {
+        if (!hoverPreviewActive) return;
+        hoverPreviewActive = false;
+        galleryIndex = 0;
+        renderGallerySlide();
+      });
+    }
 
     const setFromVariant = (variant: VariantMap | null) => {
       if (!variant) return;
@@ -208,6 +232,8 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
       const oos = variantIsOutOfStock(variant);
       quickBtn.disabled = oos;
       if (bottomRow instanceof HTMLElement) bottomRow.classList.toggle('pc__bottom--oos', oos);
+      if (soldoutTag instanceof HTMLElement) soldoutTag.hidden = !oos;
+      if (categoryTags instanceof HTMLElement) categoryTags.hidden = oos;
       if (stockNotifyWrap instanceof HTMLElement) {
         const showNotify = oos && (!!productId.trim() || !!productHandle.trim());
         stockNotifyWrap.hidden = !showNotify;
@@ -217,7 +243,7 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
           stockNotifyFeedback.classList.remove('is-ok', 'is-err');
         }
       }
-      applyGallery(variant.images || []);
+      setupGallery(variant.slideUrls?.length ? variant.slideUrls : variant.images || []);
       if (priceCurrent instanceof HTMLElement) {
         priceCurrent.textContent = variant.priceDisplay ?? '';
       }
@@ -235,7 +261,7 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
       }
       if (discountTag instanceof HTMLElement) {
         const p = variant.discountPercent ?? 0;
-        if (p > 0) {
+        if (p > 0 && !oos) {
           discountTag.textContent = `${p}% off`;
           discountTag.style.display = '';
         } else {
@@ -258,6 +284,8 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
           if (!(btn instanceof HTMLButtonElement)) return;
           const value = btn.getAttribute('data-option-value') || '';
           const selectedForCheck = { ...selected, [row.id]: value };
+          /* Combo esgotado continua selecionável (mostra o aviso "avisar-me"); só
+             bloqueia quando a combinação nem existe. */
           const hasAnyVariant = variants.some((v) => variantMatches(v, selectedForCheck));
           btn.classList.toggle('is-selected', selected[row.id] === value);
           btn.classList.toggle('is-unavailable', !hasAnyVariant);

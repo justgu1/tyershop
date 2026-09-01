@@ -4,13 +4,13 @@ import ProductCard from '../../components/ProductCard.astro';
 import { getLangFromUrl, getPathForLang, t } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
 import { getProductListQueryString, resolveDefaultRegionId } from '../../lib/medusa-pricing';
-import { getMedusaStoreUrl } from '../../lib/medusa-env';
+import { getMedusaStoreUrl, getPublishableKey } from '../../lib/medusa-env';
 
 // Catálogo dinâmico: renderiza por requisição (ver index.astro).
 export const prerender = false;
 
 const lang: Lang = getLangFromUrl(Astro.url);
-const pk = 'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
+const pk = getPublishableKey();
 const headers = { 'x-publishable-api-key': pk };
 const base = getMedusaStoreUrl();
 
@@ -323,6 +323,11 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
     --pc-price-current: #0a0a0a;
     --pc-price-striked: rgba(10, 10, 10, 0.45);
     --pc-name-color: #0a0a0a;
+    --pc-muted-text: rgba(10, 10, 10, 0.55);
+    --pc-muted-text-strong: rgba(10, 10, 10, 0.72);
+    --pc-divider: rgba(10, 10, 10, 0.1);
+    --pc-ok-text: #16a34a;
+    --pc-err-text: #dc2626;
   }
   body.page-shop .shop-main {
     background: var(--c-bg);
@@ -331,8 +336,8 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
     color: #0a0a0a;
   }
   body.page-shop .shop-layout .pc__quick-add img {
-    filter: brightness(0);
-    opacity: 0.88;
+    filter: brightness(0) invert(1);
+    opacity: 1;
   }
   body.page-shop .shop-sidebar {
     background: #141414;
@@ -658,6 +663,52 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
 }
 #shop-infinite-grid .pc__img-wrap.is-hover-ready:hover .pc__img--secondary { opacity: 1; }
 #shop-infinite-grid .pc__img-wrap.is-hover-ready:hover .pc__img--primary { opacity: 0; }
+#shop-infinite-grid .pc__img--primary.is-swapping { opacity: 0; }
+#shop-infinite-grid .pc__gallery-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(10, 10, 10, 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+#shop-infinite-grid .pc__img-wrap:hover .pc__gallery-arrow { opacity: 1; }
+#shop-infinite-grid .pc__gallery-arrow:hover { background: rgba(10, 10, 10, 0.85); }
+#shop-infinite-grid .pc__gallery-arrow--prev { left: 8px; }
+#shop-infinite-grid .pc__gallery-arrow--next { right: 8px; }
+#shop-infinite-grid .pc__gallery-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+#shop-infinite-grid .pc__gallery-dots span {
+  width: 12px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+  transition: background 0.15s ease, width 0.15s ease;
+}
+#shop-infinite-grid .pc__gallery-dots span.is-active {
+  background: var(--c-accent);
+  width: 18px;
+}
 #shop-infinite-grid .pc__tags { position: absolute; left: 8px; display: flex; flex-direction: column; gap: 4px; }
 #shop-infinite-grid .pc__tags--priority { top: 8px; }
 #shop-infinite-grid .pc__tags--category { top: 8px; left: auto; right: 8px; align-items: flex-end; }
@@ -699,8 +750,8 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
 }
 #shop-infinite-grid .pc__bottom {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
   gap: 10px;
   margin-top: auto;
   padding-bottom: 8px;
@@ -729,24 +780,37 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
 #shop-infinite-grid .pc__quick-add {
   position: static;
   transform: none;
-  background: var(--c-surface2);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
+  width: 100%;
+  background: var(--c-accent);
+  border: 1px solid var(--c-accent);
+  border-radius: var(--r-md, 8px);
+  padding: 10px 14px;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease;
   flex-shrink: 0;
 }
+#shop-infinite-grid .pc__quick-add img {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+#shop-infinite-grid .pc__quick-add__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  white-space: nowrap;
+}
 #shop-infinite-grid .pc__quick-add:hover {
-  background: var(--c-accent);
-  border-color: var(--c-accent);
+  background: var(--c-accent-d);
+  border-color: var(--c-accent-d);
 }
 #shop-infinite-grid .pc__quick-add:disabled {
-  opacity: 0.7;
+  opacity: 0.5;
   cursor: not-allowed;
   border-color: rgba(248, 113, 113, 0.45);
 }
@@ -1180,6 +1244,14 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
       return pr[1] ? [pr[0], pr[1]] : [pr[0]];
     }
 
+    /** Galeria completa (nao só as 2 primeiras) — alinhado a getVariantSlideUrls. */
+    function getVariantSlideArrayForJson(variant, p) {
+      var order = buildVariantImageOrder(variant, p);
+      if (order.length) return order;
+      var t = String((p && p.thumbnail) || "").trim();
+      return [t || "/no-data.webp"];
+    }
+
     function optionRowKindShop(title) {
       var t = String(title || "").trim();
       if (!t) return "other";
@@ -1445,6 +1517,7 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
           maxQty: getVariantMaxQty(variant),
           options: optionMapFromVariant(variant),
           images: getVariantImageArrayForJson(variant, p),
+          slideUrls: getVariantSlideArrayForJson(variant, p),
           priceDisplay: prV.display || "",
           originalDisplay: prV.original || null,
           discountPercent: discV,
@@ -1515,26 +1588,23 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
         if (!value) return "";
         return String(row.title || row.id) + ": " + value;
       }).filter(Boolean).join(" | ");
-      var priorityTags = [];
+      var soldoutTagHtml =
+        '<span class="pc__tag pc__tag--soldout" data-pc-soldout-tag' +
+        (sold ? "" : " hidden") +
+        '><img src="/icons/cross.svg" alt="" width="12" height="12" />Esgotado</span>';
+      var discountTagHtml =
+        '<span class="pc__tag pc__tag--discount" data-pc-discount-tag' +
+        (!sold && discountPct > 0 ? "" : ' style="display:none"') +
+        ">" + (discountPct > 0 ? discountPct + "% off" : "") + "</span>";
       var categoryTags = [];
-      if (sold) {
-        priorityTags.push('<span class="pc__tag pc__tag--soldout"><img src="/icons/cross.svg" alt="" width="12" height="12" />Sem estoque</span>');
-      } else if (discountPct > 0) {
-        priorityTags.push('<span class="pc__tag pc__tag--discount">' + discountPct + '% off</span>');
-      }
       if (!sold && isExclusive) categoryTags.push('<span class="pc__tag pc__tag--exclusive">Exclusivo</span>');
       if (!sold && topPopular.has(p.id)) categoryTags.push('<span class="pc__tag pc__tag--popular"><img src="/icons/em-alta.svg" alt="" width="12" height="12" />Em alta</span>');
       if (!sold && topNew.has(p.id)) categoryTags.push('<span class="pc__tag pc__tag--new"><img src="/icons/novo.svg" alt="" width="12" height="12" />Novo</span>');
 
-      var tagBlock = "";
-      if (priorityTags.length) tagBlock += '<div class="pc__tags pc__tags--priority">' + priorityTags.join("") + "</div>";
-      if (categoryTags.length) tagBlock += '<div class="pc__tags pc__tags--category">' + categoryTags.join("") + "</div>";
-      var secondaryImg =
-        '<img src="' +
-        escapeHtml(hover || thumb) +
-        '" alt="" class="pc__img pc__img--secondary" data-has-secondary="' +
-        (hover ? "true" : "false") +
-        '" width="480" height="480" loading="lazy" decoding="async" aria-hidden="true" onerror="this.onerror=null;this.src=\'/no-data.webp\'" />';
+      var tagBlock =
+        '<div class="pc__tags pc__tags--priority">' + soldoutTagHtml + discountTagHtml + "</div>" +
+        '<div class="pc__tags pc__tags--category" data-pc-category-tags' + (sold ? " hidden" : "") + ">" +
+        categoryTags.join("") + "</div>";
 
       return (
         '<article class="pc" role="listitem" data-stock-reliable="' +
@@ -1552,20 +1622,22 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
         '" data-option-rows="' +
         encodedJsonAttr(optionRows) +
         '">' +
+        '<div class="pc__img-wrap">' +
         '<a href="/product/' +
         escapeHtml(handle) +
         '" class="pc__link" aria-label="' +
         escapeHtml(title) +
-        '"><div class="pc__img-wrap"><img src="' +
+        '"><img src="' +
         escapeHtml(thumb) +
         '" alt="' +
         escapeHtml(title) +
-        '" class="pc__img' +
-        ' pc__img--primary' +
-        '" width="480" height="480" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=\'/no-data.webp\'" />' +
-        secondaryImg +
+        '" class="pc__img pc__img--primary" width="480" height="480" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=\'/no-data.webp\'" />' +
         tagBlock +
-        "</div></a>" +
+        "</a>" +
+        '<button type="button" class="pc__gallery-arrow pc__gallery-arrow--prev" data-gallery-prev aria-label="Imagem anterior" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg></button>' +
+        '<button type="button" class="pc__gallery-arrow pc__gallery-arrow--next" data-gallery-next aria-label="Próxima imagem" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg></button>' +
+        '<div class="pc__gallery-dots" data-gallery-dots hidden></div>' +
+        "</div>" +
         '<div class="pc__body"><a href="/product/' +
         escapeHtml(handle) +
         '" class="pc__body-link"><h3 class="pc__name">' +
@@ -1594,7 +1666,7 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
         escapeHtml(String(getVariantMaxQty(v) || "")) +
         '"' +
         (sold ? ' disabled="disabled"' : "") +
-        '><img src="/icons/quick-cart.svg" alt="" width="20" height="20" />' +
+        '><img src="/icons/bag.svg" alt="" width="18" height="18" /><span class="pc__quick-add__label">Adicionar à bag</span>' +
         "</button></div>" +
         stockNotifyHtml +
         "</div></article>"
@@ -1642,12 +1714,6 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
               var card = el.firstElementChild;
               if (card) {
                 grid.appendChild(card);
-                var secondary = card.querySelector(".pc__img--secondary");
-                if (secondary && secondary instanceof HTMLImageElement && secondary.src && !prefetchedImages.has(secondary.src)) {
-                  prefetchedImages.add(secondary.src);
-                  var pre = new Image();
-                  pre.src = secondary.src;
-                }
               }
             }
           }

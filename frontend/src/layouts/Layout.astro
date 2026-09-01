@@ -1,14 +1,14 @@
 ---
-import Header from '../components/Header.astro';
-import Footer from '../components/Footer.astro';
-import SideCart from '../components/SideCart.astro';
-import { getLangFromUrl, hreflangMap, type Lang } from '../i18n/utils';
-import { getMedusaStoreUrl } from '../lib/medusa-env';
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import SideCart from "../components/SideCart.astro";
+import PromoPopup from "../components/PromoPopup.astro";
+import { getLangFromUrl, hreflangMap, type Lang } from "../i18n/utils";
+import { getMedusaStoreUrl, getPublishableKey } from "../lib/medusa-env";
 
 const medusaInternal = getMedusaStoreUrl();
-const storePk =
-  'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
-const storeHeaders = { 'x-publishable-api-key': storePk };
+const storePk = getPublishableKey();
+const storeHeaders = { "x-publishable-api-key": storePk };
 let navDrops: { handle: string; name: string; num: string; img: string }[] = [];
 try {
   const cRes = await fetch(`${medusaInternal}/store/collections?limit=50`, {
@@ -17,12 +17,14 @@ try {
   });
   if (cRes.ok) {
     const data = await cRes.json();
-    navDrops = (data.collections || []).map((c: { handle: string; title: string }, i: number) => ({
-      handle: c.handle,
-      name: c.title,
-      num: String(i + 1).padStart(2, '0'),
-      img: `/collections/${c.handle}.webp`,
-    }));
+    navDrops = (data.collections || []).map(
+      (c: { handle: string; title: string }, i: number) => ({
+        handle: c.handle,
+        name: c.title,
+        num: String(i + 1).padStart(2, "0"),
+        img: `/collections/${c.handle}.webp`,
+      }),
+    );
   }
 } catch {}
 const showCollectionsInNav = navDrops.length > 0;
@@ -31,7 +33,7 @@ interface Props {
   title: string;
   description?: string;
   ogImage?: string;
-  ogType?: 'website' | 'article' | 'product';
+  ogType?: "website" | "article" | "product";
   canonical?: string;
   noindex?: boolean;
   jsonLd?: object | object[];
@@ -43,29 +45,35 @@ interface Props {
 const lang = Astro.props.lang ?? getLangFromUrl(Astro.url);
 const {
   title,
-  description = 'Tyer — Exclusive streetwear drops. Pieces with identity, made to last.',
-  ogImage = '/logo.webp',
-  ogType = 'website',
+  description = "Tyer — Exclusive streetwear drops. Pieces with identity, made to last.",
+  ogImage = "/logo.webp",
+  ogType = "website",
   canonical = Astro.url.href,
   noindex = false,
   jsonLd,
-  bodyClass = '',
+  bodyClass = "",
   bare = false,
 } = Astro.props;
 
-const siteName = 'Tyer';
+const siteName = "Tyer";
 const fullTitle = title === siteName ? siteName : `${title} | ${siteName}`;
 const canonPath = Astro.url.pathname;
 const hreflangs = hreflangMap(canonPath);
 
 const schemas: object[] = [
-  { '@context': 'https://schema.org', '@type': 'Organization', name: 'Tyer', url: 'https://tyer.com.br', logo: 'https://tyer.com.br/logo.webp' },
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Tyer",
+    url: "https://tyer.com.br",
+    logo: "https://tyer.com.br/logo.webp",
+  },
   ...(Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []),
 ];
 ---
 
 <!doctype html>
-<html lang={lang === 'pt' ? 'pt-BR' : lang}>
+<html lang={lang === "pt" ? "pt-BR" : lang}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -73,10 +81,12 @@ const schemas: object[] = [
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
     {noindex && <meta name="robots" content="noindex, nofollow" />}
-    {Object.entries(hreflangs).map(([l, url]) => (
-      <link rel="alternate" hreflang={l === 'pt' ? 'pt-BR' : l} href={url} />
-    ))}
-    <link rel="alternate" hreflang="x-default" href={hreflangs['en']} />
+    {
+      Object.entries(hreflangs).map(([l, url]) => (
+        <link rel="alternate" hreflang={l === "pt" ? "pt-BR" : l} href={url} />
+      ))
+    }
+    <link rel="alternate" hreflang="x-default" href={hreflangs["en"]} />
     <meta property="og:type" content={ogType} />
     <meta property="og:site_name" content={siteName} />
     <meta property="og:title" content={fullTitle} />
@@ -91,217 +101,358 @@ const schemas: object[] = [
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=Bebas+Neue&display=swap" rel="stylesheet" />
-    {schemas.map(s => <script type="application/ld+json" set:html={JSON.stringify(s)} />)}
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=Bebas+Neue&display=swap"
+      rel="stylesheet"
+    />
+    {
+      schemas.map((s) => (
+        <script type="application/ld+json" set:html={JSON.stringify(s)} />
+      ))
+    }
     <meta name="theme-color" content="#0a0a0a" />
+    <script is:inline define:vars={{ storePk }}>
+      window.__MEDUSA_PK__ = storePk;
+    </script>
   </head>
   <body class={bodyClass} data-lang={lang}>
     <a class="skip-link" href="#main-content">Skip to content</a>
     {!bare && <Header lang={lang} drops={navDrops} />}
     {!bare && <SideCart lang={lang} />}
+    {!bare && <PromoPopup lang={lang} />}
     <main id="main-content" tabindex="-1">
       <slot />
     </main>
     {!bare && <Footer lang={lang} showCollectionsLink={showCollectionsInNav} />}
     <script>
-      import '../scripts/product-card-client';
-      import '../scripts/side-cart-client';
+      import "../scripts/product-card-client";
+      import "../scripts/side-cart-client";
+      import "../scripts/mosaic-item-client";
     </script>
   </body>
 </html>
 
 <style is:global>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 
-:root {
-  --c-bg:       #0a0a0a;
-  --c-surface:  #111111;
-  --c-surface2: #1a1a1a;
-  --c-border:   #222222;
-  --c-text:     #f0f0f0;
-  --c-muted:    #666666;
-  --c-accent:   #E77E23;
-  --c-accent-d: #c96a10;
-  --c-white:    #ffffff;
-  --c-black:    #000000;
-  --header-h:   72px;
-  /* Largura total do viewport: sem teto em telas grandes */
-  --max-w:      none;
-  --r:          3px;
-  --r-md:       6px;
-  --ease:       200ms cubic-bezier(0.4, 0, 0.2, 1);
-  --font:       'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-title: 'Bebas Neue', 'Impact', sans-serif;
-  /* Barras de scroll (Firefox + WebKit) */
-  --scrollbar-size: 10px;
-  --scrollbar-track: #0c0c0c;
-  --scrollbar-thumb: #343434;
-  --scrollbar-thumb-hover: #454545;
-  --scrollbar-thumb-active: #5a5a5a;
-}
+  /* Sem isso o browser usa o highlight default (as vezes quase branco em
+     fundo claro), some texto claro-sobre-claro em cards com fundo branco. */
+  ::selection {
+    background: var(--c-accent, #e77e23);
+    color: #fff;
+  }
 
-html {
-  scroll-behavior: smooth;
-  font-size: 16px;
-  background: var(--c-bg);
-  color: var(--c-text);
-  overflow-x: hidden;
-  max-width: 100%;
-}
-body {
-  font-family: var(--font);
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
-  max-width: 100%;
-}
+  :root {
+    --c-bg: #0a0a0a;
+    --c-surface: #111111;
+    --c-surface2: #1a1a1a;
+    --c-border: #222222;
+    --c-text: #f0f0f0;
+    --c-muted: #666666;
+    --c-accent: #e77e23;
+    --c-accent-d: #c96a10;
+    --c-white: #ffffff;
+    --c-black: #000000;
+    --header-h: 72px;
+    /* Largura total do viewport: sem teto em telas grandes */
+    --max-w: none;
+    --r: 3px;
+    --r-md: 6px;
+    --ease: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    --font: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-title: "Bebas Neue", "Impact", sans-serif;
+    /* Barras de scroll (Firefox + WebKit) */
+    --scrollbar-size: 10px;
+    --scrollbar-track: #0c0c0c;
+    --scrollbar-thumb: #343434;
+    --scrollbar-thumb-hover: #454545;
+    --scrollbar-thumb-active: #5a5a5a;
+  }
 
-/** Scrollbars — alinhadas ao tema escuro (pista discreta, thumb com volume + hover laranja). */
-html {
-  scrollbar-gutter: stable;
-}
-html,
-body,
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
-}
-*::-webkit-scrollbar {
-  width: var(--scrollbar-size);
-  height: var(--scrollbar-size);
-}
-*::-webkit-scrollbar-track {
-  background: var(--scrollbar-track);
-  border-radius: 999px;
-}
-*::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #3d3d3d 0%, #2a2a2a 55%, #232323 100%);
-  border-radius: 999px;
-  border: 2px solid var(--scrollbar-track);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
-}
-*::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, var(--scrollbar-thumb-hover) 0%, #383838 100%);
-  border-color: rgba(231, 126, 35, 0.35);
-}
-*::-webkit-scrollbar-thumb:active {
-  background: linear-gradient(180deg, var(--c-accent) 0%, var(--c-accent-d) 100%);
-  border-color: rgba(231, 126, 35, 0.5);
-}
-*::-webkit-scrollbar-corner {
-  background: var(--scrollbar-track);
-}
+  html {
+    scroll-behavior: smooth;
+    font-size: 16px;
+    background: var(--c-bg);
+    color: var(--c-text);
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+  body {
+    font-family: var(--font);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    max-width: 100%;
+  }
 
-/** Loja clara: track claro + thumb cinza que aquece no accent. */
-body.page-shop,
-body.page-shop * {
-  scrollbar-color: #b0b0b0 #ebebeb;
-}
-body.page-shop *::-webkit-scrollbar-track {
-  background: #ebebeb;
-}
-body.page-shop *::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #d4d4d4 0%, #b8b8b8 100%);
-  border: 2px solid #ebebeb;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
-}
-body.page-shop *::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #e8a060 0%, var(--c-accent) 45%, var(--c-accent-d) 100%);
-  border-color: #f0f0f0;
-}
-body.page-shop *::-webkit-scrollbar-thumb:active {
-  background: var(--c-accent-d);
-}
-body.page-shop *::-webkit-scrollbar-corner {
-  background: #ebebeb;
-}
+  /** Scrollbars — alinhadas ao tema escuro (pista discreta, thumb com volume + hover laranja). */
+  html {
+    scrollbar-gutter: stable;
+  }
+  html,
+  body,
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+  *::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+  *::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #3d3d3d 0%, #2a2a2a 55%, #232323 100%);
+    border-radius: 999px;
+    border: 2px solid var(--scrollbar-track);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+      180deg,
+      var(--scrollbar-thumb-hover) 0%,
+      #383838 100%
+    );
+    border-color: rgba(231, 126, 35, 0.35);
+  }
+  *::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(
+      180deg,
+      var(--c-accent) 0%,
+      var(--c-accent-d) 100%
+    );
+    border-color: rgba(231, 126, 35, 0.5);
+  }
+  *::-webkit-scrollbar-corner {
+    background: var(--scrollbar-track);
+  }
 
-main { padding-top: var(--header-h); min-height: 60vh; max-width: 100%; }
-/** PDP: evita scroll horizontal por grid/preços (iOS costuma respeitar mais no main). */
-body.pdp-body main {
-  overflow-x: clip;
-  max-width: 100%;
-}
-a { color: inherit; text-decoration: none; }
-button { cursor: pointer; border: none; background: none; font-family: inherit; font-size: inherit; }
-img { max-width: 100%; height: auto; display: block; }
-ul, ol { list-style: none; }
-input, textarea, select { font-family: inherit; font-size: inherit; }
+  /** Loja clara: track claro + thumb cinza que aquece no accent. */
+  body.page-shop,
+  body.page-shop * {
+    scrollbar-color: #b0b0b0 #ebebeb;
+  }
+  body.page-shop *::-webkit-scrollbar-track {
+    background: #ebebeb;
+  }
+  body.page-shop *::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #d4d4d4 0%, #b8b8b8 100%);
+    border: 2px solid #ebebeb;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  }
+  body.page-shop *::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+      180deg,
+      #e8a060 0%,
+      var(--c-accent) 45%,
+      var(--c-accent-d) 100%
+    );
+    border-color: #f0f0f0;
+  }
+  body.page-shop *::-webkit-scrollbar-thumb:active {
+    background: var(--c-accent-d);
+  }
+  body.page-shop *::-webkit-scrollbar-corner {
+    background: #ebebeb;
+  }
 
-.skip-link {
-  position: absolute; top: -100%; left: 16px; z-index: 9999;
-  background: var(--c-accent); color: var(--c-white);
-  padding: 8px 16px; border-radius: var(--r); font-size: 14px; font-weight: 600;
-}
-.skip-link:focus { top: 16px; }
+  main {
+    padding-top: var(--header-h);
+    min-height: 60vh;
+    max-width: 100%;
+  }
+  /** PDP: evita scroll horizontal por grid/preços (iOS costuma respeitar mais no main). */
+  body.pdp-body main {
+    overflow-x: clip;
+    max-width: 100%;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  button {
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: inherit;
+    font-size: inherit;
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+  ul,
+  ol {
+    list-style: none;
+  }
+  input,
+  textarea,
+  select {
+    font-family: inherit;
+    font-size: inherit;
+  }
 
-.container { max-width: none; width: 100%; margin-inline: auto; padding-inline: 40px; }
-@media (max-width: 768px) { .container { padding-inline: 20px; } }
+  .skip-link {
+    position: absolute;
+    top: -100%;
+    left: 16px;
+    z-index: 9999;
+    background: var(--c-accent);
+    color: var(--c-white);
+    padding: 8px 16px;
+    border-radius: var(--r);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .skip-link:focus {
+    top: 16px;
+  }
 
-/** Grelha de produtos (loja, coleções, etc.) — reutilizável em qualquer página. */
-.shop-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 20px;
-  align-items: stretch;
-}
-.shop-grid > * {
-  min-width: 0;
-}
+  .container {
+    max-width: none;
+    width: 100%;
+    margin-inline: auto;
+    padding-inline: 40px;
+  }
+  @media (max-width: 768px) {
+    .container {
+      padding-inline: 20px;
+    }
+  }
 
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 12px 28px; border-radius: var(--r);
-  font-size: 12px; font-weight: 700;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  transition: all var(--ease);
-  cursor: pointer; border: 1.5px solid transparent;
-  font-family: var(--font); white-space: nowrap; line-height: 1;
-}
-.btn-primary { background: var(--c-accent); color: var(--c-white); border-color: var(--c-accent); }
-.btn-primary:hover { background: var(--c-accent-d); border-color: var(--c-accent-d); }
-.btn-outline { background: transparent; color: var(--c-text); border-color: #333; }
-.btn-outline:hover { background: var(--c-surface2); border-color: #555; }
-.btn-sm { padding: 8px 18px; font-size: 11px; }
-:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
+  /** Grelha de produtos (loja, coleções, etc.) — reutilizável em qualquer página. */
+  .shop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+    align-items: stretch;
+  }
+  .shop-grid > * {
+    min-width: 0;
+  }
 
-.backdrop {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.75);
-  opacity: 0; visibility: hidden;
-  transition: opacity var(--ease), visibility var(--ease);
-  z-index: 400;
-}
-.backdrop.is-active { opacity: 1; visibility: visible; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 28px;
+    border-radius: var(--r);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: all var(--ease);
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    font-family: var(--font);
+    white-space: nowrap;
+    line-height: 1;
+  }
+  .btn-primary {
+    background: var(--c-accent);
+    color: var(--c-white);
+    border-color: var(--c-accent);
+  }
+  .btn-primary:hover {
+    background: var(--c-accent-d);
+    border-color: var(--c-accent-d);
+  }
+  .btn-outline {
+    background: transparent;
+    color: var(--c-text);
+    border-color: #333;
+  }
+  .btn-outline:hover {
+    background: var(--c-surface2);
+    border-color: #555;
+  }
+  .btn-sm {
+    padding: 8px 18px;
+    font-size: 11px;
+  }
+  :focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 3px;
+  }
 
-.section-label {
-  font-size: 11px; font-weight: 700;
-  letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--c-accent);
-}
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity var(--ease),
+      visibility var(--ease);
+    z-index: 400;
+  }
+  .backdrop.is-active {
+    opacity: 1;
+    visibility: visible;
+  }
 
-/* Acessibilidade: preferências em data-* no <html> (definido pelo painel do rodapé) */
-/* Padrão = sem atributo. Quatro passos: md → lg → xl → 2xl */
-html[data-tyer-a11y-font="md"] { font-size: 106.25%; }
-html[data-tyer-a11y-font="lg"] { font-size: 112.5%; }
-html[data-tyer-a11y-font="xl"] { font-size: 125%; }
-html[data-tyer-a11y-font="2xl"] { font-size: 131.25%; }
-html[data-tyer-a11y-contrast="on"] {
-  --c-text: #ffffff;
-  --c-muted: #d0d0d0;
-  --c-bg: #000000;
-  --c-surface: #0a0a0a;
-  --c-surface2: #181818;
-  --c-border: #555555;
-  --c-white: #ffffff;
-}
-html[data-tyer-a11y-motion="reduce"] *,
-html[data-tyer-a11y-motion="reduce"] *::before,
-html[data-tyer-a11y-motion="reduce"] *::after {
-  animation-duration: 0.001ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.001ms !important;
-  scroll-behavior: auto !important;
-}
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--c-accent);
+  }
+
+  /* Acessibilidade: preferências em data-* no <html> (definido pelo painel do rodapé) */
+  /* Padrão = sem atributo. Quatro passos: md → lg → xl → 2xl */
+  html[data-tyer-a11y-font="md"] {
+    font-size: 106.25%;
+  }
+  html[data-tyer-a11y-font="lg"] {
+    font-size: 112.5%;
+  }
+  html[data-tyer-a11y-font="xl"] {
+    font-size: 125%;
+  }
+  html[data-tyer-a11y-font="2xl"] {
+    font-size: 131.25%;
+  }
+  html[data-tyer-a11y-contrast="on"] {
+    --c-text: #ffffff;
+    --c-muted: #d0d0d0;
+    --c-bg: #000000;
+    --c-surface: #0a0a0a;
+    --c-surface2: #181818;
+    --c-border: #555555;
+    --c-white: #ffffff;
+  }
+  html[data-tyer-a11y-motion="reduce"] *,
+  html[data-tyer-a11y-motion="reduce"] *::before,
+  html[data-tyer-a11y-motion="reduce"] *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  main {
+    /* Escurece a imagem de fundo direto no `background` do main — nunca
+       fica por cima do conteudo (e' a propria camada de fundo da box, sempre
+       atras de tudo que e' filho, sem depender de z-index/position de cada
+       pagina acertar por conta propria). */
+    background-image: linear-gradient(rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.85)), url("/parallax-background.jpeg");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 200% auto;
+    background-attachment: fixed;
+    background-position-x: 35%;
+    background-position-y: 42%;
+  }
 </style>

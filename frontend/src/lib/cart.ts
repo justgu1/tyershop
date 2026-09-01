@@ -153,12 +153,14 @@ type VariantSnapshot = {
 };
 
 function getStoreConfig() {
-  const key = 'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
   if (typeof window === 'undefined') {
+    const key = process.env.PUBLIC_MEDUSA_PUBLISHABLE_KEY || '';
     return { base: 'http://localhost:9003', key };
   }
   // No browser: mesma origem (ex. http://localhost:4321/store/...). O `vite.server.proxy` em
   // astro.config.mjs encaminha /store (e /auth) ao Medusa — evita CORS. Não usar :9003 direto no cliente.
+  // Key vinda do Layout.astro (window.__MEDUSA_PK__), lida do `.env` em runtime — ver lib/medusa-env.ts.
+  const key = (window as any).__MEDUSA_PK__ || '';
   return { base: '', key };
 }
 
