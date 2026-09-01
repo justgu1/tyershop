@@ -8,3 +8,6 @@ build/
 .env
 coverage/
 *.log
+
+# dados (produtos/clientes/vendas) — não pertence ao repo, contém PII
+backend/data/*.csv

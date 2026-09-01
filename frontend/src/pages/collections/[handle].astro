@@ -1,9 +1,9 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import ProductCard from '../../components/ProductCard.astro';
+import CollectionMosaicItem from '../../components/CollectionMosaicItem.astro';
 import { getLangFromUrl, t, getPathForLang } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
-import { getMedusaStoreUrl } from '../../lib/medusa-env';
+import { getMedusaStoreUrl, getPublishableKey } from '../../lib/medusa-env';
 import { getProductListQueryString, resolveDefaultRegionId } from '../../lib/medusa-pricing';
 
 export const prerender = false;
@@ -12,7 +12,7 @@ const lang: Lang = getLangFromUrl(Astro.url);
 const { handle } = Astro.params;
 const h = String(handle ?? '').trim();
 
-const pk = 'pk_c02aca4c002484d85c530e07b7a9cd4bfcc515fe4b6bde15d90fc086c84d2674';
+const pk = getPublishableKey();
 const headers = { 'x-publishable-api-key': pk };
 const base = getMedusaStoreUrl();
 
@@ -67,44 +67,56 @@ const metaDesc =
 >
   {
     found ? (
-      <main class="collection-page container">
-        <nav class="collection-breadcrumb" aria-label="Breadcrumb">
-          <ol class="collection-breadcrumb__list">
-            <li>
-              <a href={getPathForLang('/', lang)}>{t(lang, 'collections', 'breadcrumb_home')}</a>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li>
-              <a href={`${getPathForLang('/', lang)}#collection`}>{t(lang, 'nav', 'collections')}</a>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li aria-current="page">{colTitle}</li>
-          </ol>
-        </nav>
-
-        <header class="collection-header">
-          <h1 class="collection-header__title">{colTitle}</h1>
-          <p class="collection-header__count">
-            {products.length}{' '}
-            {products.length === 1 ? t(lang, 'collections', 'piece_one') : t(lang, 'collections', 'pieces')}
-          </p>
-        </header>
-
-        {products.length > 0 ? (
-          <div class="shop-grid collection-grid" role="list" aria-label={colTitle}>
-            {products.map((p) => (
-              <ProductCard product={p} lang={lang} role="listitem" />
-            ))}
+      <main class="collection-page">
+        <section class="collection-banner">
+          <img
+            src={`/collections/${collection!.handle}.webp`}
+            alt=""
+            class="collection-banner__img"
+            onerror="this.style.display='none'"
+          />
+          <div class="collection-banner__overlay" aria-hidden="true" />
+          <div class="collection-banner__content container">
+            <nav class="collection-breadcrumb" aria-label="Breadcrumb">
+              <ol class="collection-breadcrumb__list">
+                <li>
+                  <a href={getPathForLang('/', lang)}>{t(lang, 'collections', 'breadcrumb_home')}</a>
+                </li>
+                <li aria-hidden="true">/</li>
+                <li>
+                  <a href={`${getPathForLang('/', lang)}#collection`}>{t(lang, 'nav', 'collections')}</a>
+                </li>
+                <li aria-hidden="true">/</li>
+                <li aria-current="page">{colTitle}</li>
+              </ol>
+            </nav>
+            <p class="collection-banner__eyebrow">{t(lang, 'drops', 'the_collection')}</p>
+            <h1 class="collection-banner__title">{colTitle}</h1>
+            {metaDesc && <p class="collection-banner__desc">{metaDesc}</p>}
+            <p class="collection-banner__count">
+              {products.length}{' '}
+              {products.length === 1 ? t(lang, 'collections', 'piece_one') : t(lang, 'collections', 'pieces')}
+            </p>
           </div>
-        ) : (
-          <p class="collection-empty">{t(lang, 'collections', 'empty')}</p>
-        )}
+        </section>
 
-        <p class="collection-footer">
-          <a href={getPathForLang('/shop', lang)} class="btn btn-outline">
-            {t(lang, 'collections', 'back_shop')}
-          </a>
-        </p>
+        <div class="container">
+          {products.length > 0 ? (
+            <div class="collection-mosaic" role="list" aria-label={colTitle}>
+              {products.map((p, i) => (
+                <CollectionMosaicItem product={p} lang={lang} reverse={i % 2 === 1} />
+              ))}
+            </div>
+          ) : (
+            <p class="collection-empty">{t(lang, 'collections', 'empty')}</p>
+          )}
+
+          <p class="collection-footer">
+            <a href={getPathForLang('/shop', lang)} class="btn btn-outline">
+              {t(lang, 'collections', 'back_shop')}
+            </a>
+          </p>
+        </div>
       </main>
     ) : (
       <div class="collection-nf container">
@@ -126,14 +138,46 @@ const metaDesc =
 
 <style>
   .collection-page {
-    padding-block: calc(var(--header-h) + 32px) 64px;
+    padding-bottom: 64px;
+  }
+  .container {
     max-width: var(--max-w, 1200px);
     margin-inline: auto;
     width: 100%;
     box-sizing: border-box;
   }
+
+  /* ── Banner ── */
+  .collection-banner {
+    position: relative;
+    min-height: min(56vh, 520px);
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+    margin-bottom: 48px;
+  }
+  .collection-banner__img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 25%;
+  }
+  .collection-banner__overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.88) 0%, rgba(0, 0, 0, 0.35) 55%, rgba(0, 0, 0, 0.15) 100%);
+  }
+  .collection-banner__content {
+    position: relative;
+    z-index: 1;
+    padding-top: calc(var(--header-h) + 24px);
+    padding-bottom: 40px;
+    color: #fff;
+  }
   .collection-breadcrumb {
-    margin-bottom: 24px;
+    margin-bottom: 20px;
   }
   .collection-breadcrumb__list {
     display: flex;
@@ -144,32 +188,49 @@ const metaDesc =
     margin: 0;
     padding: 0;
     font-size: 12px;
-    color: var(--c-muted);
+    color: rgba(255, 255, 255, 0.65);
   }
   .collection-breadcrumb a {
-    color: var(--c-muted);
+    color: rgba(255, 255, 255, 0.65);
     text-decoration: none;
   }
   .collection-breadcrumb a:hover {
     color: var(--c-accent);
   }
-  .collection-header {
-    margin-bottom: 40px;
-  }
-  .collection-header__title {
-    font-family: var(--font-title);
-    font-size: clamp(32px, 5vw, 56px);
+  .collection-banner__eyebrow {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
+    color: var(--c-accent);
     margin: 0 0 8px;
-    line-height: 1.05;
   }
-  .collection-header__count {
+  .collection-banner__title {
+    font-family: var(--font-title);
+    font-size: clamp(40px, 7vw, 84px);
+    text-transform: uppercase;
+    line-height: 0.95;
+    margin: 0 0 14px;
+    max-width: 16ch;
+  }
+  .collection-banner__desc {
+    max-width: 56ch;
+    font-size: 15px;
+    line-height: 1.55;
+    color: rgba(255, 255, 255, 0.82);
+    margin: 0 0 12px;
+  }
+  .collection-banner__count {
     margin: 0;
-    font-size: 14px;
-    color: var(--c-muted);
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
   }
-  .collection-grid {
-    margin-bottom: 48px;
+
+  /* ── Mosaico: cada item é um bloco próprio (ver CollectionMosaicItem.astro) ── */
+  .collection-mosaic {
+    display: flex;
+    flex-direction: column;
   }
   .collection-empty {
     font-size: 15px;
@@ -216,12 +277,5 @@ const metaDesc =
     gap: 12px;
     justify-content: center;
     margin-top: 16px;
-  }
-</style>
-
-<style is:global>
-  .collection-grid .pc__img-wrap {
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.04);
   }
 </style>
