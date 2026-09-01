@@ -61,7 +61,7 @@ type ConfirmedSessionData = {
 type SessionData = PendingSessionData | ConfirmedSessionData | Record<string, unknown>;
 
 /** Mapa 1:1 entre status do Mercado Pago e o vocabulário do Medusa. */
-function mapMpStatusToMedusa(status: MercadoPagoPayment["status"]): "authorized" | "pending" | "canceled" | "error" {
+export function mapMpStatusToMedusa(status: MercadoPagoPayment["status"]): "authorized" | "pending" | "canceled" | "error" {
   switch (status) {
     case "approved":
     case "authorized":
