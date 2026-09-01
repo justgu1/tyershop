@@ -22,6 +22,22 @@ module.exports = defineConfig({
       maxUploadFileSize: 20 * 1024 * 1024,
     },
   modules: {
+    payment: {
+      resolve: "@medusajs/payment",
+      options: {
+        providers: [
+          {
+            resolve: "./src/modules/payment-mercadopago",
+            id: "mercadopago",
+            options: {
+              accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN,
+              publicKey: process.env.PUBLIC_MERCADOPAGO_PUBLIC_KEY,
+              notificationUrl: process.env.MERCADOPAGO_NOTIFICATION_URL,
+            },
+          },
+        ],
+      },
+    },
     file: {
       resolve: "@medusajs/file",
       options: {
