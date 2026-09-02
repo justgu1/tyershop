@@ -283,11 +283,18 @@ export default async function setupTyerStore({ container }: ExecArgs) {
       collectionIdByCsvId[csvId] = found.id;
       continue;
     }
-    const { result } = await createCollectionsWorkflow(container).run({
-      input: { collections: [{ title }] },
-    });
-    collectionIdByCsvId[csvId] = result[0].id;
-    logger.info(`Colecao criada: ${title} (${result[0].id})`);
+    try {
+      const { result } = await createCollectionsWorkflow(container).run({
+        input: { collections: [{ title }] },
+      });
+      collectionIdByCsvId[csvId] = result[0].id;
+      logger.info(`Colecao criada: ${title} (${result[0].id})`);
+    } catch (err: any) {
+      // Handle colidiu com algo não retornado pela query acima (ex.: registro
+      // soft-deleted de uma execução parcial anterior) — produtos dessa
+      // coleção ficam sem vínculo em vez de travar o script inteiro.
+      logger.warn(`Colecao "${title}" nao pode ser criada (${err?.message ?? err}), seguindo sem ela.`);
+    }
   }
   void wantedCollectionTitles;
   void collectionModuleService;
