@@ -49,6 +49,29 @@ function show(id: string, on = true) {
 /** Setado depois do registro/login silencioso — associa carrinho/pedido ao customer. */
 let currentAuthToken = '';
 
+/**
+ * Mesma chave/mesmo formato que Header.astro/account/* usam (`tyer_token` +
+ * `tyer_customer` no localStorage) — sem isso a conta criada no checkout
+ * fica presa só nesta aba: o resto do site (header, /account) continua
+ * mostrando "visitante" mesmo com o customer já criado e logado.
+ */
+async function persistSiteSession(token: string) {
+  currentAuthToken = token;
+  try {
+    localStorage.setItem('tyer_token', token);
+    const res = await fetch('/store/customers/me', {
+      headers: { authorization: `Bearer ${token}`, 'x-publishable-api-key': medusaKey() },
+    });
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.customer) localStorage.setItem('tyer_customer', JSON.stringify(data.customer));
+    }
+  } catch {
+    // Sessão local (checkout) já funciona via currentAuthToken; persistir
+    // pro resto do site é um bônus, não pode travar a compra.
+  }
+}
+
 async function medusaFetch(path: string, init: RequestInit = {}) {
   const res = await fetch(path, {
     ...init,
@@ -100,10 +123,9 @@ function init() {
 
   const items = getCart();
   if (!items.length) {
-    show('checkout-empty', true);
-    show('checkout-form-section', false);
-    const panel = qs('checkout-summary-panel');
-    if (panel) panel.hidden = true;
+    // Bag vazia não tem o que fazer no checkout — manda pra loja com um
+    // aviso, em vez de deixar a pessoa presa numa página em branco.
+    window.location.href = '/shop?empty_checkout=1';
     return;
   }
   renderSummary(items);
@@ -223,7 +245,7 @@ function init() {
           method: 'POST',
           body: JSON.stringify({ email: payer.email, password }),
         });
-        currentAuthToken = res.token;
+        await persistSiteSession(res.token);
         return true;
       } catch {
         setText('checkout-contact-error', 'Senha incorreta.');
@@ -253,7 +275,7 @@ function init() {
         method: 'POST',
         body: JSON.stringify({ email: payer.email, password }),
       }).catch(() => null);
-      if (login?.token) currentAuthToken = login.token;
+      if (login?.token) await persistSiteSession(login.token);
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
@@ -295,9 +317,7 @@ function init() {
     else cta.textContent = totalLabel ?? cta.textContent ?? '';
   }
 
-  function lockAddress() {
-    const payer = payerFromForm();
-    const addr = addressFromForm();
+  function lockAddress(payer: ReturnType<typeof payerFromForm>, addr: ReturnType<typeof addressFromForm>) {
     setText('checkout-locked-name', `${payer.first_name} ${payer.last_name}`.trim());
     setText(
       'checkout-locked-address',
@@ -305,6 +325,9 @@ function init() {
     );
     // Formulário continua visível (só desabilitado por baixo do overlay) —
     // não some, pra não passar a sensação de "sumiu tudo que preenchi".
+    // A classe is-locked já foi aplicada no clique (submitAddress), antes
+    // da cadeia de chamadas — aqui só garante, caso lockAddress seja
+    // chamado por outro caminho no futuro.
     show('checkout-address-overlay', true);
     qs('checkout-step-wrap')?.classList.add('is-locked');
     show('checkout-payment-block', true);
@@ -338,6 +361,14 @@ function init() {
       cta.disabled = true;
       cta.textContent = t('preparing');
     }
+    // Captura os dados AGORA (clique) e trava a edição por baixo enquanto a
+    // cadeia de chamadas roda (pode levar vários segundos — registro, cart,
+    // frete, payment session). Sem isso o usuário podia mexer nos campos
+    // enquanto esperava, e o resumo/endereço travado saía com valor
+    // diferente do que foi realmente enviado (ou até em branco).
+    const payer = payerFromForm();
+    const addr = addressFromForm();
+    qs('checkout-step-wrap')?.classList.add('is-locked');
     try {
       const accountOk = await ensureAccount();
       if (!accountOk) {
@@ -345,6 +376,7 @@ function init() {
           cta.disabled = false;
           cta.textContent = t('continueToPayment');
         }
+        qs('checkout-step-wrap')?.classList.remove('is-locked');
         return;
       }
       show('checkout-login-needed', false);
@@ -352,8 +384,6 @@ function init() {
       const { createMedusaCartFromLocalCart } = await import('../lib/medusa-checkout-cart');
       cartId = await createMedusaCartFromLocalCart();
 
-      const payer = payerFromForm();
-      const addr = addressFromForm();
       await medusaFetch(`/store/carts/${cartId}`, {
         method: 'POST',
         body: JSON.stringify({
@@ -404,9 +434,10 @@ function init() {
       paymentSessionId = sessions[sessions.length - 1]?.id;
       if (!paymentSessionId) throw new Error('Sem sessão de pagamento');
 
-      lockAddress();
+      lockAddress(payer, addr);
       syncCta(t('payButton').replace('{amount}', fmtBrl(total)));
     } catch (err) {
+      qs('checkout-step-wrap')?.classList.remove('is-locked');
       setText('checkout-contact-error', err instanceof Error ? err.message : t('errorGeneric'));
       show('checkout-contact-error', true);
     } finally {
