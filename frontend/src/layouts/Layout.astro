@@ -375,8 +375,12 @@ const schemas: object[] = [
     line-height: 1;
   }
   .btn-primary {
+    /* Branco em cima do laranja (#e77e23) dá ~2.8:1 de contraste — abaixo
+       do mínimo 4.5:1 do WCAG 2.1 AA pra texto normal (o botão usa 12px,
+       não entra no critério de "texto grande" que aceitaria 3:1). Preto
+       no mesmo fundo dá ~7.4:1, passa com folga. */
     background: var(--c-accent);
-    color: var(--c-white);
+    color: var(--c-black);
     border-color: var(--c-accent);
   }
   .btn-primary:hover {

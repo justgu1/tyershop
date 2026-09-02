@@ -317,6 +317,21 @@ function init() {
     else cta.textContent = totalLabel ?? cta.textContent ?? '';
   }
 
+  /**
+   * `pointer-events:none` (CSS) só bloqueia mouse/touch — teclado e leitor
+   * de tela continuam enxergando e focando os campos "travados" por baixo
+   * do overlay, e conseguem editar sem passar pelo Editar. `inert` tira o
+   * bloco inteiro da árvore de acessibilidade e da ordem de tab de verdade.
+   */
+  function lockStepWrap() {
+    qs('checkout-step-wrap')?.classList.add('is-locked');
+    qs('checkout-contact-section')?.setAttribute('inert', '');
+  }
+  function unlockStepWrap() {
+    qs('checkout-step-wrap')?.classList.remove('is-locked');
+    qs('checkout-contact-section')?.removeAttribute('inert');
+  }
+
   function lockAddress(payer: ReturnType<typeof payerFromForm>, addr: ReturnType<typeof addressFromForm>) {
     setText('checkout-locked-name', `${payer.first_name} ${payer.last_name}`.trim());
     setText(
@@ -325,27 +340,31 @@ function init() {
     );
     // Formulário continua visível (só desabilitado por baixo do overlay) —
     // não some, pra não passar a sensação de "sumiu tudo que preenchi".
-    // A classe is-locked já foi aplicada no clique (submitAddress), antes
-    // da cadeia de chamadas — aqui só garante, caso lockAddress seja
-    // chamado por outro caminho no futuro.
+    // lockStepWrap já foi chamado no clique (submitAddress), antes da
+    // cadeia de chamadas — aqui só garante, caso lockAddress seja chamado
+    // por outro caminho no futuro.
     show('checkout-address-overlay', true);
-    qs('checkout-step-wrap')?.classList.add('is-locked');
+    lockStepWrap();
     show('checkout-payment-block', true);
     const lock = qs('checkout-lock-indicator');
     if (lock) lock.hidden = false;
     stage = 'payment';
     syncCta();
     initMercadoPagoSdk();
+    // Foco vai pro botão Editar — sem isso quem usa teclado/leitor de tela
+    // fica sem indicação de que a etapa mudou.
+    qs<HTMLButtonElement>('checkout-edit-address')?.focus();
   }
 
   qs('checkout-edit-address')?.addEventListener('click', () => {
     show('checkout-address-overlay', false);
-    qs('checkout-step-wrap')?.classList.remove('is-locked');
+    unlockStepWrap();
     show('checkout-payment-block', false);
     const lock = qs('checkout-lock-indicator');
     if (lock) lock.hidden = true;
     stage = 'address';
     syncCta();
+    qs<HTMLInputElement>('ck-email')?.focus();
   });
 
   // ---- Passo 1: dados + endereço → cria cart Medusa real, frete, payment session ----
@@ -368,7 +387,7 @@ function init() {
     // diferente do que foi realmente enviado (ou até em branco).
     const payer = payerFromForm();
     const addr = addressFromForm();
-    qs('checkout-step-wrap')?.classList.add('is-locked');
+    lockStepWrap();
     try {
       const accountOk = await ensureAccount();
       if (!accountOk) {
@@ -376,7 +395,7 @@ function init() {
           cta.disabled = false;
           cta.textContent = t('continueToPayment');
         }
-        qs('checkout-step-wrap')?.classList.remove('is-locked');
+        unlockStepWrap();
         return;
       }
       show('checkout-login-needed', false);
@@ -437,7 +456,7 @@ function init() {
       lockAddress(payer, addr);
       syncCta(t('payButton').replace('{amount}', fmtBrl(total)));
     } catch (err) {
-      qs('checkout-step-wrap')?.classList.remove('is-locked');
+      unlockStepWrap();
       setText('checkout-contact-error', err instanceof Error ? err.message : t('errorGeneric'));
       show('checkout-contact-error', true);
     } finally {
