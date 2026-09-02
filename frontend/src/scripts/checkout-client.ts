@@ -7,10 +7,14 @@
  *  3. Nossas 3 rotas store/checkout/mercadopago/{card,pix,boleto} — que fazem
  *     a cobrança de verdade — e a rota de status (polling p/ Pix/boleto).
  *
+ * Layout: esquerda = endereço (trava depois de confirmado, vira resumo +
+ * "Editar"), direita = resumo do pedido (dropdown) + pagamento, com um único
+ * botão de ação embaixo que muda de comportamento conforme a etapa/aba atual.
+ *
  * Toda troca de gateway futura muda isso aqui + o provider do Medusa, nunca
  * as páginas em volta.
  */
-import { getCart, getAppliedPromoCode, clearCart, type CartItem } from '../lib/cart';
+import { getCart, clearCart, type CartItem } from '../lib/cart';
 
 declare global {
   interface Window {
@@ -42,12 +46,16 @@ function show(id: string, on = true) {
   if (el) el.hidden = !on;
 }
 
+/** Setado depois do registro/login silencioso — associa carrinho/pedido ao customer. */
+let currentAuthToken = '';
+
 async function medusaFetch(path: string, init: RequestInit = {}) {
   const res = await fetch(path, {
     ...init,
     headers: {
       'content-type': 'application/json',
       'x-publishable-api-key': medusaKey(),
+      ...(currentAuthToken ? { authorization: `Bearer ${currentAuthToken}` } : {}),
       ...(init.headers as Record<string, string> | undefined),
     },
   });
@@ -78,14 +86,7 @@ function renderSummary(items: CartItem[]) {
   const subtotalCents = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   setText('checkout-summary-subtotal', fmtBrl(subtotalCents / 100));
   setText('checkout-summary-total', fmtBrl(subtotalCents / 100));
-}
-
-function setStep(step: 'address' | 'payment') {
-  const stepper = qs('checkout-stepper');
-  if (stepper) stepper.dataset.step = step;
-  document.querySelectorAll<HTMLElement>('[data-step-label]').forEach((el) => {
-    el.classList.toggle('is-active', el.dataset.stepLabel === step);
-  });
+  setText('checkout-summary-toggle-total', fmtBrl(subtotalCents / 100));
 }
 
 function init() {
@@ -119,6 +120,10 @@ function init() {
   let mp: any = null;
   let cardFields: { number: any; expiration: any; cvv: any } | null = null;
   let detectedPaymentMethodId = '';
+  /** 'address' = ainda editando endereço · 'payment' = travado, pagamento liberado. */
+  let stage: 'address' | 'payment' = 'address';
+  let paymentDone = false; // Pix/boleto gerados: espera confirmação, CTA fica desativado
+  let needsLogin = false; // e-mail já tem conta — pede senha em vez de criar de novo
 
   function stopPolling() {
     if (pollTimer != null) {
@@ -133,6 +138,10 @@ function init() {
       stopPolling();
       clearCart();
       show('checkout-form-section', false);
+      const panel = qs('checkout-summary-panel');
+      if (panel) panel.hidden = true;
+      const lock = qs('checkout-lock-indicator');
+      if (lock) lock.hidden = true;
       show('checkout-success', true);
       return true;
     }
@@ -185,21 +194,155 @@ function init() {
     );
   }
 
+  function randomPassword(): string {
+    const bytes = new Uint8Array(18);
+    crypto.getRandomValues(bytes);
+    return btoa(String.fromCharCode(...bytes)).replace(/[+/=]/g, '');
+  }
+
+  /**
+   * Cria conta + sessão sozinho (sem pedir senha) — se o e-mail já tiver
+   * conta, pede a senha em vez de tentar recriar. O reset (link "esqueci
+   * senha") acontece depois, pelo e-mail de confirmação do pedido.
+   */
+  async function ensureAccount(): Promise<boolean> {
+    const payer = payerFromForm();
+    if (needsLogin) {
+      const password = (qs<HTMLInputElement>('ck-login-password')?.value || '').trim();
+      if (!password) {
+        setText('checkout-contact-error', 'Digite sua senha.');
+        show('checkout-contact-error', true);
+        return false;
+      }
+      try {
+        const res = await medusaFetch('/auth/customer/emailpass', {
+          method: 'POST',
+          body: JSON.stringify({ email: payer.email, password }),
+        });
+        currentAuthToken = res.token;
+        return true;
+      } catch {
+        setText('checkout-contact-error', 'Senha incorreta.');
+        show('checkout-contact-error', true);
+        return false;
+      }
+    }
+
+    try {
+      const password = randomPassword();
+      const reg = await medusaFetch('/auth/customer/emailpass/register', {
+        method: 'POST',
+        body: JSON.stringify({ email: payer.email, password }),
+      });
+      await medusaFetch('/store/customers', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${reg.token}` },
+        body: JSON.stringify({
+          email: payer.email,
+          first_name: payer.first_name,
+          last_name: payer.last_name,
+          phone: (qs<HTMLInputElement>('ck-phone')?.value || '').trim() || undefined,
+        }),
+      });
+      // token do registro não carrega customer_id ainda — login pra pegar a sessão de verdade
+      const login = await medusaFetch('/auth/customer/emailpass', {
+        method: 'POST',
+        body: JSON.stringify({ email: payer.email, password }),
+      }).catch(() => null);
+      if (login?.token) currentAuthToken = login.token;
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (/already exists/i.test(msg)) {
+        needsLogin = true;
+        show('checkout-login-needed', true);
+        setText('checkout-contact-error', '');
+        show('checkout-contact-error', false);
+        return false;
+      }
+      // Conta é um bônus, não pode travar a compra se a criação falhar por
+      // outro motivo (rede, etc) — segue sem conta associada.
+      currentAuthToken = '';
+      return true;
+    }
+  }
+
+  function activePaymentTab(): string {
+    return document.querySelector<HTMLButtonElement>('[data-payment-tab].is-active')?.dataset.paymentTab || 'card';
+  }
+
+  /** O botão único embaixo do resumo muda de rótulo conforme a etapa/aba atual. */
+  function syncCta(totalLabel?: string) {
+    const cta = qs<HTMLButtonElement>('checkout-summary-cta');
+    if (!cta) return;
+    if (paymentDone) {
+      cta.disabled = true;
+      cta.textContent = t('processing') === 'processing' ? 'Aguardando pagamento…' : t('processing');
+      return;
+    }
+    cta.disabled = false;
+    if (stage === 'address') {
+      cta.textContent = t('continueToPayment');
+      return;
+    }
+    const tab = activePaymentTab();
+    if (tab === 'pix') cta.textContent = t('pixGenerate') || 'Gerar Pix';
+    else if (tab === 'boleto') cta.textContent = t('boletoGenerate') || 'Gerar boleto';
+    else cta.textContent = totalLabel ?? cta.textContent ?? '';
+  }
+
+  function lockAddress() {
+    const payer = payerFromForm();
+    const addr = addressFromForm();
+    setText('checkout-locked-name', `${payer.first_name} ${payer.last_name}`.trim());
+    setText(
+      'checkout-locked-address',
+      `${addr.street_name}, ${addr.street_number} — ${addr.neighborhood}, ${addr.city}/${addr.federal_unit} · ${addr.zip_code}`
+    );
+    show('checkout-contact-section', false);
+    show('checkout-address-locked', true);
+    show('checkout-payment-block', true);
+    const lock = qs('checkout-lock-indicator');
+    if (lock) lock.hidden = false;
+    stage = 'payment';
+    syncCta();
+    initMercadoPagoSdk();
+  }
+
+  qs('checkout-edit-address')?.addEventListener('click', () => {
+    show('checkout-address-locked', false);
+    show('checkout-payment-block', false);
+    show('checkout-contact-section', true);
+    const lock = qs('checkout-lock-indicator');
+    if (lock) lock.hidden = true;
+    stage = 'address';
+    syncCta();
+  });
+
   // ---- Passo 1: dados + endereço → cria cart Medusa real, frete, payment session ----
-  qs('checkout-contact-form')?.addEventListener('submit', async (ev) => {
-    ev.preventDefault();
+  async function submitAddress() {
     if (!contactFormValid()) {
       setText('checkout-contact-error', t('errorFields'));
       show('checkout-contact-error', true);
       return;
     }
     show('checkout-contact-error', false);
-    const btn = qs<HTMLButtonElement>('checkout-continue-btn');
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = t('preparing');
+    const cta = qs<HTMLButtonElement>('checkout-summary-cta');
+    if (cta) {
+      cta.disabled = true;
+      cta.textContent = t('preparing');
     }
     try {
+      const accountOk = await ensureAccount();
+      if (!accountOk) {
+        if (cta) {
+          cta.disabled = false;
+          cta.textContent = t('continueToPayment');
+        }
+        return;
+      }
+      show('checkout-login-needed', false);
+
       const { createMedusaCartFromLocalCart } = await import('../lib/medusa-checkout-cart');
       cartId = await createMedusaCartFromLocalCart();
 
@@ -236,6 +379,7 @@ function init() {
       const total = Number(cart.total ?? 0);
       const shipping = Number(cart.shipping_total ?? 0);
       setText('checkout-summary-total', fmtBrl(total));
+      setText('checkout-summary-toggle-total', fmtBrl(total));
       if (shipping > 0) {
         setText('checkout-summary-shipping', fmtBrl(shipping));
         show('checkout-summary-shipping-row', true);
@@ -254,29 +398,18 @@ function init() {
       paymentSessionId = sessions[sessions.length - 1]?.id;
       if (!paymentSessionId) throw new Error('Sem sessão de pagamento');
 
-      document.querySelectorAll<HTMLElement>('[data-pay-amount]').forEach((el) => {
-        el.textContent = t('payButton').replace('{amount}', fmtBrl(total));
-      });
-
-      show('checkout-contact-section', false);
-      show('checkout-payment-section', true);
-      setStep('payment');
-      initMercadoPagoSdk();
+      lockAddress();
+      syncCta(t('payButton').replace('{amount}', fmtBrl(total)));
     } catch (err) {
       setText('checkout-contact-error', err instanceof Error ? err.message : t('errorGeneric'));
       show('checkout-contact-error', true);
     } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = t('continueToPayment');
-      }
+      if (cta) cta.disabled = false;
     }
-  });
-
-  qs('checkout-back-to-address')?.addEventListener('click', () => {
-    show('checkout-payment-section', false);
-    show('checkout-contact-section', true);
-    setStep('address');
+  }
+  qs('checkout-contact-form')?.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    void submitAddress();
   });
 
   // ---- Abas de método de pagamento ----
@@ -287,11 +420,22 @@ function init() {
       document.querySelectorAll<HTMLElement>('[data-payment-panel]').forEach((p) => {
         p.hidden = p.dataset.paymentPanel !== method;
       });
+      syncCta();
     });
+  });
+
+  // ---- Resumo: dropdown ----
+  qs('checkout-summary-toggle')?.addEventListener('click', () => {
+    const toggle = qs<HTMLButtonElement>('checkout-summary-toggle');
+    const body = qs('checkout-summary-body');
+    const open = body?.hidden ?? false;
+    if (body) body.hidden = !open;
+    toggle?.setAttribute('aria-expanded', String(open));
   });
 
   // ---- Cartão: Secure Fields ----
   function initMercadoPagoSdk() {
+    if (mp) return; // já montado (voltar do "Editar" não precisa remontar)
     const pk = (window.__MERCADOPAGO_PK__ || '').trim();
     if (!pk) return;
     const mount = () => {
@@ -328,9 +472,7 @@ function init() {
     else document.getElementById('mp-sdk')?.addEventListener('load', mount);
   }
 
-  qs('checkout-card-form')?.addEventListener('submit', async (ev) => {
-    ev.preventDefault();
-    const btn = qs<HTMLButtonElement>('checkout-card-submit');
+  async function submitCard() {
     const holderName = (qs<HTMLInputElement>('ck-card-holder')?.value || '').trim();
     if (!mp || !cardFields || !holderName) {
       setText('checkout-card-error', t('errorFields'));
@@ -339,10 +481,11 @@ function init() {
     }
     setText('checkout-card-error', '');
     show('checkout-card-error', false);
-    const originalLabel = btn?.textContent ?? '';
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = t('processing');
+    const cta = qs<HTMLButtonElement>('checkout-summary-cta');
+    const originalLabel = cta?.textContent ?? '';
+    if (cta) {
+      cta.disabled = true;
+      cta.textContent = t('processing');
     }
     try {
       const payer = payerFromForm();
@@ -368,19 +511,21 @@ function init() {
     } catch (err) {
       setText('checkout-card-error', err instanceof Error ? err.message : t('errorGeneric'));
       show('checkout-card-error', true);
+      if (cta) cta.textContent = originalLabel;
     } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = originalLabel;
-      }
+      if (cta) cta.disabled = false;
     }
+  }
+  qs('checkout-card-form')?.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    void submitCard();
   });
 
   // ---- Pix ----
-  qs('checkout-pix-generate')?.addEventListener('click', async () => {
-    const btn = qs<HTMLButtonElement>('checkout-pix-generate');
+  async function generatePix() {
     show('checkout-pix-error', false);
-    if (btn) btn.disabled = true;
+    const cta = qs<HTMLButtonElement>('checkout-summary-cta');
+    if (cta) cta.disabled = true;
     try {
       const payer = payerFromForm();
       const data = await medusaFetch('/store/checkout/mercadopago/pix', {
@@ -395,14 +540,15 @@ function init() {
       if (codeEl) codeEl.value = data.qr_code || '';
       show('checkout-pix-form', false);
       show('checkout-pix-result', true);
+      paymentDone = true;
+      syncCta();
       startPolling(() => void completeCart());
     } catch (err) {
       setText('checkout-pix-error', err instanceof Error ? err.message : t('errorGeneric'));
       show('checkout-pix-error', true);
-    } finally {
-      if (btn) btn.disabled = false;
+      if (cta) cta.disabled = false;
     }
-  });
+  }
 
   qs('checkout-pix-copy')?.addEventListener('click', async () => {
     const codeEl = qs<HTMLTextAreaElement>('checkout-pix-code');
@@ -417,10 +563,10 @@ function init() {
   });
 
   // ---- Boleto ----
-  qs('checkout-boleto-generate')?.addEventListener('click', async () => {
-    const btn = qs<HTMLButtonElement>('checkout-boleto-generate');
+  async function generateBoleto() {
     show('checkout-boleto-error', false);
-    if (btn) btn.disabled = true;
+    const cta = qs<HTMLButtonElement>('checkout-summary-cta');
+    if (cta) cta.disabled = true;
     try {
       const payer = payerFromForm();
       const addr = addressFromForm();
@@ -433,14 +579,30 @@ function init() {
       setText('checkout-boleto-barcode', data.barcode || '');
       show('checkout-boleto-form', false);
       show('checkout-boleto-result', true);
+      paymentDone = true;
+      syncCta();
       startPolling(() => void completeCart());
     } catch (err) {
       setText('checkout-boleto-error', err instanceof Error ? err.message : t('errorGeneric'));
       show('checkout-boleto-error', true);
-    } finally {
-      if (btn) btn.disabled = false;
+      if (cta) cta.disabled = false;
     }
+  }
+
+  // ---- Botão único: decide a ação pela etapa/aba atual ----
+  qs('checkout-summary-cta')?.addEventListener('click', () => {
+    if (paymentDone) return;
+    if (stage === 'address') {
+      void submitAddress();
+      return;
+    }
+    const tab = activePaymentTab();
+    if (tab === 'card') void submitCard();
+    else if (tab === 'pix') void generatePix();
+    else if (tab === 'boleto') void generateBoleto();
   });
+
+  syncCta();
 }
 
 if (document.readyState === 'loading') {

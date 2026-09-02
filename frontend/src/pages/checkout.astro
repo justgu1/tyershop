@@ -19,6 +19,8 @@ const c = (key: string) => t(lang, 'checkout', key);
     data-processing={c('processing')}
     data-pix-copy={c('pix_copy')}
     data-pix-copied={c('pix_copied')}
+    data-pix-generate={c('pix_generate')}
+    data-boleto-generate={c('boleto_generate')}
   >
     <header class="checkout-topbar">
       <a href={getPathForLang('/cart', lang)} class="checkout-topbar__back" aria-label={c('back_to_cart')}>
@@ -26,10 +28,9 @@ const c = (key: string) => t(lang, 'checkout', key);
         <span>{c('back_to_cart').replace(/^←\s*/, '')}</span>
       </a>
       <a href={getPathForLang('/', lang)} class="checkout-topbar__logo">TYER</a>
-      <div class="checkout-topbar__stepper" id="checkout-stepper" data-step="address">
-        <span class="checkout-topbar__step is-active" data-step-label="address">1. {c('contact_title')}</span>
-        <span class="checkout-topbar__step-sep">—</span>
-        <span class="checkout-topbar__step" data-step-label="payment">2. {c('payment_title')}</span>
+      <div class="checkout-topbar__lock" id="checkout-lock-indicator" hidden>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <span>Pagamento seguro via Mercado Pago</span>
       </div>
     </header>
 
@@ -44,23 +45,23 @@ const c = (key: string) => t(lang, 'checkout', key);
               <div class="checkout-grid">
                 <label class="checkout-field checkout-field--full">
                   <span>{c('email')}</span>
-                  <input id="ck-email" type="email" required autocomplete="email" />
+                  <input id="ck-email" name="email" type="email" required autocomplete="email" />
                 </label>
                 <label class="checkout-field">
                   <span>{c('first_name')}</span>
-                  <input id="ck-first-name" type="text" required autocomplete="given-name" />
+                  <input id="ck-first-name" name="given-name" type="text" required autocomplete="given-name" />
                 </label>
                 <label class="checkout-field">
                   <span>{c('last_name')}</span>
-                  <input id="ck-last-name" type="text" required autocomplete="family-name" />
+                  <input id="ck-last-name" name="family-name" type="text" required autocomplete="family-name" />
                 </label>
                 <label class="checkout-field">
                   <span>{c('cpf')}</span>
-                  <input id="ck-cpf" type="text" inputmode="numeric" placeholder="000.000.000-00" required />
+                  <input id="ck-cpf" name="cpf" type="text" inputmode="numeric" placeholder="000.000.000-00" required autocomplete="off" />
                 </label>
                 <label class="checkout-field">
                   <span>{c('phone')}</span>
-                  <input id="ck-phone" type="tel" autocomplete="tel" />
+                  <input id="ck-phone" name="tel" type="tel" autocomplete="tel" />
                 </label>
               </div>
 
@@ -68,117 +69,51 @@ const c = (key: string) => t(lang, 'checkout', key);
               <div class="checkout-grid">
                 <label class="checkout-field">
                   <span>{c('zip_code')}</span>
-                  <input id="ck-zip" type="text" inputmode="numeric" placeholder="00000-000" required />
+                  <input id="ck-zip" name="postal-code" type="text" inputmode="numeric" placeholder="00000-000" required autocomplete="postal-code" />
                 </label>
                 <label class="checkout-field checkout-field--full">
                   <span>{c('street_name')}</span>
-                  <input id="ck-street" type="text" required />
+                  <input id="ck-street" name="address-line1" type="text" required autocomplete="address-line1" />
                 </label>
                 <label class="checkout-field">
                   <span>{c('street_number')}</span>
-                  <input id="ck-number" type="text" required />
+                  <input id="ck-number" name="address-line2" type="text" required autocomplete="address-line2" />
                 </label>
                 <label class="checkout-field">
                   <span>{c('neighborhood')}</span>
-                  <input id="ck-neighborhood" type="text" required />
+                  <input id="ck-neighborhood" name="neighborhood" type="text" required autocomplete="off" />
                 </label>
                 <label class="checkout-field">
                   <span>{c('city')}</span>
-                  <input id="ck-city" type="text" required />
+                  <input id="ck-city" name="address-level2" type="text" required autocomplete="address-level2" />
                 </label>
                 <label class="checkout-field">
                   <span>{c('province')}</span>
-                  <input id="ck-province" type="text" maxlength="2" placeholder="SP" required />
+                  <input id="ck-province" name="address-level1" type="text" maxlength="2" placeholder="SP" required autocomplete="address-level1" />
+                </label>
+              </div>
+
+              <div id="checkout-login-needed" class="checkout-login-needed" hidden>
+                <p>Esse e-mail já tem conta na Tyer. Digite sua senha pra continuar.</p>
+                <label class="checkout-field">
+                  <span>Senha</span>
+                  <input id="ck-login-password" type="password" autocomplete="current-password" />
                 </label>
               </div>
 
               <p id="checkout-contact-error" class="checkout-error" hidden></p>
-              <button id="checkout-continue-btn" type="submit" class="btn btn-primary checkout-step__cta">
-                {c('continue_to_payment')}
-              </button>
             </form>
           </section>
 
-          <section id="checkout-payment-section" class="checkout-step" hidden>
-            <button type="button" id="checkout-back-to-address" class="checkout-step__back">
-              ← {c('address_title')}
+          <!-- Depois de confirmado: endereço vira resumo travado, pagamento libera à direita -->
+          <section id="checkout-address-locked" class="checkout-address-locked" hidden>
+            <div class="checkout-address-locked__info">
+              <p class="checkout-address-locked__name" id="checkout-locked-name"></p>
+              <p class="checkout-address-locked__lines" id="checkout-locked-address"></p>
+            </div>
+            <button type="button" id="checkout-edit-address" class="checkout-address-locked__edit">
+              Editar
             </button>
-            <h2 class="checkout-step__title">{c('payment_title')}</h2>
-            <div class="checkout-tabs" role="tablist">
-              <button type="button" class="checkout-tab is-active" data-payment-tab="card">{c('method_card')}</button>
-              <button type="button" class="checkout-tab" data-payment-tab="pix">{c('method_pix')}</button>
-              <button type="button" class="checkout-tab" data-payment-tab="boleto">{c('method_boleto')}</button>
-            </div>
-
-            <div data-payment-panel="card">
-              <form id="checkout-card-form" class="checkout-card-form">
-                <label class="checkout-field checkout-field--full">
-                  <span>{c('card_number')}</span>
-                  <div id="ck-card-number" class="checkout-secure-field"></div>
-                </label>
-                <div class="checkout-grid checkout-grid--card">
-                  <label class="checkout-field">
-                    <span>{c('card_expiration')}</span>
-                    <div id="ck-card-expiration" class="checkout-secure-field"></div>
-                  </label>
-                  <label class="checkout-field">
-                    <span>{c('card_cvv')}</span>
-                    <div id="ck-card-cvv" class="checkout-secure-field"></div>
-                  </label>
-                </div>
-                <label class="checkout-field checkout-field--full">
-                  <span>{c('card_holder_name')}</span>
-                  <input id="ck-card-holder" type="text" required />
-                </label>
-                <label class="checkout-field">
-                  <span>{c('installments')}</span>
-                  <select id="ck-installments">
-                    <option value="1">1x</option>
-                    <option value="2">2x</option>
-                    <option value="3">3x</option>
-                    <option value="6">6x</option>
-                  </select>
-                </label>
-                <p id="checkout-card-error" class="checkout-error" hidden></p>
-                <button id="checkout-card-submit" type="submit" class="btn btn-primary checkout-step__cta" data-pay-amount>
-                  {c('pay_button').replace('{amount}', '')}
-                </button>
-              </form>
-            </div>
-
-            <div data-payment-panel="pix" hidden>
-              <div id="checkout-pix-form">
-                <p class="checkout-hint">{c('pix_intro')}</p>
-                <p id="checkout-pix-error" class="checkout-error" hidden></p>
-                <button id="checkout-pix-generate" type="button" class="btn btn-primary checkout-step__cta">
-                  {c('pix_generate')}
-                </button>
-              </div>
-              <div id="checkout-pix-result" hidden>
-                <img id="checkout-pix-qr" alt="QR code Pix" class="checkout-pix-qr" />
-                <textarea id="checkout-pix-code" class="checkout-pix-code" readonly rows="3"></textarea>
-                <button id="checkout-pix-copy" type="button" class="btn btn-outline">{c('pix_copy')}</button>
-                <p class="checkout-waiting">{c('pix_waiting')}</p>
-              </div>
-            </div>
-
-            <div data-payment-panel="boleto" hidden>
-              <div id="checkout-boleto-form">
-                <p class="checkout-hint">{c('boleto_intro')}</p>
-                <p id="checkout-boleto-error" class="checkout-error" hidden></p>
-                <button id="checkout-boleto-generate" type="button" class="btn btn-primary checkout-step__cta">
-                  {c('boleto_generate')}
-                </button>
-              </div>
-              <div id="checkout-boleto-result" hidden>
-                <a id="checkout-boleto-link" href="#" target="_blank" rel="noopener" class="btn btn-outline">
-                  {c('boleto_open')}
-                </a>
-                <p class="checkout-boleto-barcode-label">{c('boleto_barcode')}</p>
-                <p id="checkout-boleto-barcode" class="checkout-boleto-barcode"></p>
-                <p class="checkout-waiting">{c('boleto_waiting')}</p>
-              </div>
-            </div>
           </section>
         </div>
 
@@ -190,22 +125,105 @@ const c = (key: string) => t(lang, 'checkout', key);
       </main>
 
       <aside class="checkout-summary" id="checkout-summary-panel">
-        <h2 class="checkout-summary__title">{t(lang, 'cart', 'summary')}</h2>
-        <div class="checkout-summary__items" id="checkout-summary-items"></div>
-        <div class="checkout-summary__totals">
-          <div class="checkout-summary__row">
-            <span>{t(lang, 'cart', 'subtotal')}</span>
-            <span id="checkout-summary-subtotal">—</span>
-          </div>
-          <div class="checkout-summary__row" id="checkout-summary-shipping-row" hidden>
-            <span>{c('shipping')}</span>
-            <span id="checkout-summary-shipping">—</span>
-          </div>
-          <div class="checkout-summary__row checkout-summary__row--total">
-            <span>{t(lang, 'cart', 'total')}</span>
-            <span id="checkout-summary-total">—</span>
+        <button type="button" class="checkout-summary__toggle" id="checkout-summary-toggle" aria-expanded="false">
+          <span class="checkout-summary__toggle-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            {t(lang, 'cart', 'summary')}
+          </span>
+          <span class="checkout-summary__toggle-total" id="checkout-summary-toggle-total">—</span>
+        </button>
+
+        <div class="checkout-summary__body" id="checkout-summary-body" hidden>
+          <div class="checkout-summary__items" id="checkout-summary-items"></div>
+          <div class="checkout-summary__totals">
+            <div class="checkout-summary__row">
+              <span>{t(lang, 'cart', 'subtotal')}</span>
+              <span id="checkout-summary-subtotal">—</span>
+            </div>
+            <div class="checkout-summary__row" id="checkout-summary-shipping-row" hidden>
+              <span>{c('shipping')}</span>
+              <span id="checkout-summary-shipping">—</span>
+            </div>
           </div>
         </div>
+
+        <!-- Pagamento: só aparece depois que endereço trava -->
+        <div id="checkout-payment-block" class="checkout-payment-block" hidden>
+          <div class="checkout-tabs" role="tablist">
+            <button type="button" class="checkout-tab is-active" data-payment-tab="card">{c('method_card')}</button>
+            <button type="button" class="checkout-tab" data-payment-tab="pix">{c('method_pix')}</button>
+            <button type="button" class="checkout-tab" data-payment-tab="boleto">{c('method_boleto')}</button>
+          </div>
+
+          <div data-payment-panel="card">
+            <form id="checkout-card-form" class="checkout-card-form">
+              <label class="checkout-field checkout-field--full">
+                <span>{c('card_number')}</span>
+                <div id="ck-card-number" class="checkout-secure-field"></div>
+              </label>
+              <div class="checkout-grid checkout-grid--card">
+                <label class="checkout-field">
+                  <span>{c('card_expiration')}</span>
+                  <div id="ck-card-expiration" class="checkout-secure-field"></div>
+                </label>
+                <label class="checkout-field">
+                  <span>{c('card_cvv')}</span>
+                  <div id="ck-card-cvv" class="checkout-secure-field"></div>
+                </label>
+              </div>
+              <label class="checkout-field checkout-field--full">
+                <span>{c('card_holder_name')}</span>
+                <input id="ck-card-holder" type="text" required />
+              </label>
+              <label class="checkout-field">
+                <span>{c('installments')}</span>
+                <select id="ck-installments">
+                  <option value="1">1x</option>
+                  <option value="2">2x</option>
+                  <option value="3">3x</option>
+                  <option value="6">6x</option>
+                </select>
+              </label>
+              <p id="checkout-card-error" class="checkout-error" hidden></p>
+            </form>
+          </div>
+
+          <div data-payment-panel="pix" hidden>
+            <div id="checkout-pix-form">
+              <p class="checkout-hint">{c('pix_intro')}</p>
+              <p id="checkout-pix-error" class="checkout-error" hidden></p>
+            </div>
+            <div id="checkout-pix-result" hidden>
+              <img id="checkout-pix-qr" alt="QR code Pix" class="checkout-pix-qr" />
+              <textarea id="checkout-pix-code" class="checkout-pix-code" readonly rows="3"></textarea>
+              <button id="checkout-pix-copy" type="button" class="btn btn-outline">{c('pix_copy')}</button>
+              <p class="checkout-waiting">{c('pix_waiting')}</p>
+            </div>
+          </div>
+
+          <div data-payment-panel="boleto" hidden>
+            <div id="checkout-boleto-form">
+              <p class="checkout-hint">{c('boleto_intro')}</p>
+              <p id="checkout-boleto-error" class="checkout-error" hidden></p>
+            </div>
+            <div id="checkout-boleto-result" hidden>
+              <a id="checkout-boleto-link" href="#" target="_blank" rel="noopener" class="btn btn-outline">
+                {c('boleto_open')}
+              </a>
+              <p class="checkout-boleto-barcode-label">{c('boleto_barcode')}</p>
+              <p id="checkout-boleto-barcode" class="checkout-boleto-barcode"></p>
+              <p class="checkout-waiting">{c('boleto_waiting')}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="checkout-summary__total-row">
+          <span>{t(lang, 'cart', 'total')}</span>
+          <span id="checkout-summary-total">—</span>
+        </div>
+        <button type="button" id="checkout-summary-cta" class="btn btn-primary checkout-summary__cta">
+          {c('continue_to_payment')}
+        </button>
       </aside>
     </div>
   </div>
@@ -229,12 +247,13 @@ const c = (key: string) => t(lang, 'checkout', key);
     height: 100vh;
     display: flex;
     flex-direction: column;
+    background: #0a0a0a;
   }
   .checkout-shell__body {
     flex: 1 1 auto;
     min-height: 0;
     display: grid;
-    grid-template-columns: 1fr 380px;
+    grid-template-columns: 1fr 400px;
   }
 
   .checkout-topbar {
@@ -250,36 +269,29 @@ const c = (key: string) => t(lang, 'checkout', key);
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: var(--c-muted);
+    color: #b8b8b8;
     text-decoration: none;
     font-size: 13px;
     white-space: nowrap;
   }
   .checkout-topbar__back:hover {
-    color: var(--c-text);
+    color: #fff;
   }
   .checkout-topbar__logo {
     font-family: var(--font-title);
     font-size: 18px;
     letter-spacing: 0.04em;
-    color: var(--c-text);
+    color: #fff;
     text-decoration: none;
     margin-inline: auto;
   }
-  .checkout-topbar__stepper {
+  .checkout-topbar__lock {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     font-size: 12px;
-    color: var(--c-muted);
+    color: #7dd88a;
     white-space: nowrap;
-  }
-  .checkout-topbar__step.is-active {
-    color: var(--c-accent);
-    font-weight: 700;
-  }
-  .checkout-topbar__step-sep {
-    opacity: 0.4;
   }
 
   .checkout-main {
@@ -287,22 +299,10 @@ const c = (key: string) => t(lang, 'checkout', key);
     padding: 32px 40px 60px;
   }
   .checkout-page__empty {
-    color: var(--c-muted);
+    color: #b8b8b8;
   }
   .checkout-step {
     max-width: 560px;
-  }
-  .checkout-step__back {
-    background: none;
-    border: 0;
-    color: var(--c-muted);
-    font-size: 13px;
-    cursor: pointer;
-    padding: 0;
-    margin-bottom: 16px;
-  }
-  .checkout-step__back:hover {
-    color: var(--c-accent);
   }
   .checkout-step__title {
     font-family: var(--font-title);
@@ -310,7 +310,7 @@ const c = (key: string) => t(lang, 'checkout', key);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     margin: 0 0 16px;
-    color: var(--c-text);
+    color: #fff;
   }
   .checkout-step__title:not(:first-child) {
     margin-top: 24px;
@@ -328,18 +328,18 @@ const c = (key: string) => t(lang, 'checkout', key);
     flex-direction: column;
     gap: 6px;
     font-size: 12px;
-    color: var(--c-muted);
+    color: #b8b8b8;
   }
   .checkout-field--full {
     grid-column: 1 / -1;
   }
   .checkout-field input,
   .checkout-field select {
-    background: #141414;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: #171717;
+    border: 1px solid rgba(255, 255, 255, 0.18);
     border-radius: var(--r-md, 8px);
     padding: 10px 12px;
-    color: var(--c-text);
+    color: #fff;
     font-size: 14px;
   }
   .checkout-field input:focus,
@@ -348,8 +348,8 @@ const c = (key: string) => t(lang, 'checkout', key);
     border-color: var(--c-accent);
   }
   .checkout-secure-field {
-    background: #141414;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: #171717;
+    border: 1px solid rgba(255, 255, 255, 0.18);
     border-radius: var(--r-md, 8px);
     padding: 4px 12px;
     height: 40px;
@@ -359,10 +359,63 @@ const c = (key: string) => t(lang, 'checkout', key);
     font-size: 13px;
     margin: 12px 0 0;
   }
-  .checkout-step__cta {
-    width: 100%;
-    margin-top: 18px;
+  .checkout-login-needed {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: rgba(231, 126, 35, 0.08);
+    border: 1px solid rgba(231, 126, 35, 0.3);
+    border-radius: var(--r-md, 8px);
   }
+  .checkout-login-needed p {
+    font-size: 13px;
+    color: #f0c896;
+    margin: 0 0 10px;
+  }
+  .checkout-login-needed .checkout-field {
+    max-width: 260px;
+  }
+
+  /* ── Endereço travado (esquerda, depois de confirmado) ── */
+  .checkout-address-locked {
+    max-width: 560px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 20px;
+    background: #141414;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--r-lg, 12px);
+  }
+  .checkout-address-locked__name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 4px;
+  }
+  .checkout-address-locked__lines {
+    font-size: 13px;
+    color: #b8b8b8;
+    margin: 0;
+    line-height: 1.5;
+  }
+  .checkout-address-locked__edit {
+    flex: 0 0 auto;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--r-md, 8px);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  .checkout-address-locked__edit:hover {
+    border-color: var(--c-accent);
+    color: var(--c-accent);
+  }
+
   .checkout-tabs {
     display: flex;
     gap: 8px;
@@ -372,9 +425,9 @@ const c = (key: string) => t(lang, 'checkout', key);
     flex: 1;
     padding: 10px;
     border-radius: var(--r-md, 8px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.18);
     background: transparent;
-    color: var(--c-muted);
+    color: #b8b8b8;
     font-size: 13px;
     font-weight: 700;
     text-transform: uppercase;
@@ -385,45 +438,45 @@ const c = (key: string) => t(lang, 'checkout', key);
     color: var(--c-accent);
   }
   .checkout-hint {
-    color: var(--c-muted);
+    color: #b8b8b8;
     font-size: 13px;
     line-height: 1.5;
     margin: 0 0 16px;
   }
   .checkout-pix-qr {
     display: block;
-    width: 200px;
-    height: 200px;
+    width: 180px;
+    height: 180px;
     margin: 0 auto 16px;
     border-radius: var(--r-md, 8px);
     background: #fff;
   }
   .checkout-pix-code {
     width: 100%;
-    background: #141414;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: #171717;
+    border: 1px solid rgba(255, 255, 255, 0.18);
     border-radius: var(--r-md, 8px);
-    color: var(--c-text);
+    color: #fff;
     font-size: 12px;
     padding: 10px;
     margin-bottom: 12px;
     resize: none;
   }
   .checkout-waiting {
-    color: var(--c-muted);
+    color: #b8b8b8;
     font-size: 13px;
     margin-top: 14px;
   }
   .checkout-boleto-barcode-label {
     font-size: 12px;
-    color: var(--c-muted);
+    color: #b8b8b8;
     margin: 16px 0 4px;
   }
   .checkout-boleto-barcode {
     font-size: 13px;
     font-family: monospace;
     word-break: break-all;
-    color: var(--c-text);
+    color: #fff;
   }
   .checkout-success {
     text-align: center;
@@ -434,34 +487,64 @@ const c = (key: string) => t(lang, 'checkout', key);
     text-transform: uppercase;
     font-size: 28px;
     margin: 0 0 12px;
+    color: #fff;
   }
   .checkout-success p {
-    color: var(--c-muted);
+    color: #b8b8b8;
     margin: 0 0 24px;
   }
 
-  /* ── Resumo do pedido: painel travado à direita, mesma altura do viewport ── */
+  /* ── Resumo + pagamento: painel travado à direita ── */
   .checkout-summary {
-    background: #111;
+    background: #131313;
     border-left: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 28px 24px;
+    padding: 24px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
   }
-  .checkout-summary__title {
+  .checkout-summary__toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: none;
+    border: 0;
+    padding: 0 0 16px;
+    cursor: pointer;
+    color: #fff;
+  }
+  .checkout-summary__toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-family: var(--font-title);
-    font-size: 14px;
+    font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--c-muted);
-    margin: 0 0 18px;
+    color: #b8b8b8;
+  }
+  .checkout-summary__toggle svg {
+    transition: transform 0.15s ease;
+  }
+  .checkout-summary__toggle[aria-expanded='true'] svg {
+    transform: rotate(180deg);
+  }
+  .checkout-summary__toggle-total {
+    font-size: 15px;
+    font-weight: 800;
+    color: #fff;
+  }
+  .checkout-summary__body {
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 16px;
   }
   .checkout-summary__items {
     display: flex;
     flex-direction: column;
     gap: 14px;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
   }
   .checkout-summary__item {
     display: flex;
@@ -469,12 +552,12 @@ const c = (key: string) => t(lang, 'checkout', key);
     align-items: center;
   }
   .checkout-summary__item img {
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
     object-fit: cover;
     border-radius: 8px;
-    background: var(--c-bg-mute, #1a1a1a);
-    flex: 0 0 56px;
+    background: #1a1a1a;
+    flex: 0 0 48px;
   }
   .checkout-summary__item-info {
     min-width: 0;
@@ -485,40 +568,49 @@ const c = (key: string) => t(lang, 'checkout', key);
   }
   .checkout-summary__item-title {
     font-size: 13px;
-    color: var(--c-text);
+    color: #fff;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .checkout-summary__item-meta {
     font-size: 12px;
-    color: var(--c-muted);
+    color: #999;
   }
   .checkout-summary__item-price {
     font-size: 13px;
-    color: var(--c-text);
+    color: #fff;
     white-space: nowrap;
   }
   .checkout-summary__totals {
-    margin-top: auto;
-    padding-top: 18px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
   }
   .checkout-summary__row {
     display: flex;
     justify-content: space-between;
     font-size: 13px;
-    color: var(--c-muted);
+    color: #999;
   }
-  .checkout-summary__row--total {
-    font-size: 16px;
+  .checkout-payment-block {
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .checkout-summary__total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 18px;
     font-weight: 800;
-    color: var(--c-text);
-    padding-top: 8px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    margin-top: auto;
+    padding-top: 4px;
+  }
+  .checkout-summary__cta {
+    width: 100%;
+    margin-top: 14px;
   }
 
   @media (max-width: 860px) {
@@ -535,7 +627,7 @@ const c = (key: string) => t(lang, 'checkout', key);
     .checkout-shell__body {
       grid-template-columns: 1fr;
     }
-    .checkout-topbar__stepper {
+    .checkout-topbar__lock {
       display: none;
     }
     .checkout-main {
@@ -544,8 +636,8 @@ const c = (key: string) => t(lang, 'checkout', key);
     }
     .checkout-summary {
       border-left: 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      order: -1;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      order: 2;
     }
     .checkout-grid,
     .checkout-grid--card {

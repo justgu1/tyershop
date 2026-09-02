@@ -120,6 +120,15 @@ const schemas: object[] = [
       window.__MERCADOPAGO_PK__ = mpPk;
       window.__API_URL__ = apiUrl;
     </script>
+    <script is:inline>
+      // Voltar pelo browser (ex.: checkout -> bag) pode restaurar um snapshot
+      // congelado da página (bfcache) sem re-rodar nada — badge do carrinho e
+      // afins ficam com o valor de antes. Força resync no que já escuta
+      // "cart:update" (badge, side cart, página /cart).
+      window.addEventListener('pageshow', (e) => {
+        if (e.persisted) window.dispatchEvent(new CustomEvent('cart:update'));
+      });
+    </script>
   </head>
   <body class={bodyClass} data-lang={lang}>
     <a class="skip-link" href="#main-content">Skip to content</a>
