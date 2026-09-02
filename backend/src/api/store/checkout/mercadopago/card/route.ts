@@ -5,7 +5,13 @@ type Body = {
   payment_session_id: string;
   /** Token gerado no browser via Secure Fields do Mercado Pago — nunca o número do cartão. */
   token: string;
-  payment_method_id: string;
+  /**
+   * Opcional — o Mercado Pago infere a bandeira a partir do token sozinho
+   * (confirmado: pagamento aprova normalmente sem mandar isso). Detectar via
+   * `binChanged` no browser é frágil (depende do evento disparar a tempo);
+   * só mandamos se o frontend conseguiu detectar, nunca bloqueamos por causa disso.
+   */
+  payment_method_id?: string;
   installments: number;
   payer: {
     email: string;
@@ -19,10 +25,8 @@ type Body = {
  */
 export async function POST(req: MedusaRequest<Body>, res: MedusaResponse) {
   const { payment_session_id, token, payment_method_id, installments, payer } = req.body ?? ({} as Body);
-  if (!payment_session_id || !token || !payment_method_id || !payer?.email) {
-    return res
-      .status(400)
-      .json({ message: "payment_session_id, token, payment_method_id e payer.email são obrigatórios." });
+  if (!payment_session_id || !token || !payer?.email) {
+    return res.status(400).json({ message: "payment_session_id, token e payer.email são obrigatórios." });
   }
 
   const client = getMercadoPagoClient();

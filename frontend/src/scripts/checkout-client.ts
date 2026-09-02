@@ -298,7 +298,9 @@ function init() {
         body: JSON.stringify({
           payment_session_id: paymentSessionId,
           token: tokenResult.id,
-          payment_method_id: detectedPaymentMethodId || tokenResult.payment_method_id,
+          // Opcional — o Mercado Pago infere a bandeira do token sozinho.
+          // `binChanged` é só um bônus quando dispara a tempo, nunca bloqueia o envio.
+          payment_method_id: detectedPaymentMethodId || undefined,
           installments,
           payer: { email: payer.email, cpf: payer.cpf },
         }),
