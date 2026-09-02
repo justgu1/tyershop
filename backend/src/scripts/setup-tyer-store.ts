@@ -121,7 +121,7 @@ export default async function setupTyerStore({ container }: ExecArgs) {
     entity: "region",
     fields: ["id", "currency_code"],
   });
-  let region = existingRegions.find((r: any) => r.currency_code === "brl");
+  let region: any = existingRegions.find((r: any) => r.currency_code === "brl");
   if (!region) {
     const { result: regionResult } = await createRegionsWorkflow(container).run({
       input: {
@@ -150,7 +150,7 @@ export default async function setupTyerStore({ container }: ExecArgs) {
     entity: "stock_location",
     fields: ["id", "name"],
   });
-  let stockLocation = existingLocations.find(
+  let stockLocation: any = existingLocations.find(
     (l: any) => l.name === "Estoque Principal"
   );
   if (!stockLocation) {
@@ -252,7 +252,7 @@ export default async function setupTyerStore({ container }: ExecArgs) {
     fields: ["id", "token"],
     filters: { type: "publishable" },
   });
-  let publishableApiKey = apiKeyData?.[0];
+  let publishableApiKey: any = apiKeyData?.[0];
   if (!publishableApiKey) {
     const {
       result: [created],
