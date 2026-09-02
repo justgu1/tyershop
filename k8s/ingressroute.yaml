@@ -7,6 +7,15 @@ spec:
   entryPoints:
     - websecure
   routes:
+    # /store e /auth no MESMO domínio do frontend → backend Medusa. Em dev
+    # local isso é o proxy do Vite (astro.config.mjs); em produção não tem
+    # Vite, então o cliente (fetch relativo tipo `/store/carts`) quebra sem
+    # essa rota — precisa vir ANTES da rota geral do frontend abaixo.
+    - match: Host(`homolog.tyershop.com`) && (PathPrefix(`/store`) || PathPrefix(`/auth`))
+      kind: Rule
+      services:
+        - name: tyershop-backend
+          port: 9000
     - match: Host(`homolog.tyershop.com`)
       kind: Rule
       services:
@@ -24,6 +33,11 @@ spec:
           port: 3000
     # produção: aguardando DNS de tyershop.com sair do Squarespace (185.133.35.22)
     # e apontar pra nossa VPS (167.88.44.4) — rota já preparada
+    - match: (Host(`tyershop.com`) || Host(`www.tyershop.com`)) && (PathPrefix(`/store`) || PathPrefix(`/auth`))
+      kind: Rule
+      services:
+        - name: tyershop-backend
+          port: 9000
     - match: Host(`tyershop.com`) || Host(`www.tyershop.com`)
       kind: Rule
       services:
