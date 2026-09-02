@@ -94,26 +94,3 @@ jobs:
           labels: ${{ steps.meta_api.outputs.labels }}
           cache-from: type=gha,scope=tyershop-api
           cache-to: type=gha,mode=max,scope=tyershop-api
-
-      - name: Update image tags in infra repo
-        env:
-          INFRA_SWARM_TOKEN: ${{ secrets.INFRA_SWARM_TOKEN }}
-          GH_PAT: ${{ secrets.GH_PAT }}
-        run: |
-          TOKEN="${INFRA_SWARM_TOKEN:-$GH_PAT}"
-          if [ -z "${TOKEN:-}" ]; then
-            echo "::notice::Sem token para infra — imagens no GHCR ok; justgu1/infra-swarm não foi atualizado. Cria um Fine-grained PAT (Contents: Read and write só em infra-swarm) ou classic com repo, guarda como secret INFRA_SWARM_TOKEN (ou GH_PAT) em Settings → Secrets → Actions."
-            exit 0
-          fi
-          SHA_TAG="sha-$(echo ${{ github.sha }} | cut -c1-7)"
-          git clone https://x-access-token:${TOKEN}@github.com/justgu1/infra-swarm.git /tmp/infra
-          cd /tmp/infra
-          git config user.email "ci@tyershop.com"
-          git config user.name "GitHub Actions"
-          sed -i "s|TYERSHOP_BACKEND_TAG=.*|TYERSHOP_BACKEND_TAG=${SHA_TAG}|" .env.example || true
-          sed -i "s|TYERSHOP_FRONTEND_TAG=.*|TYERSHOP_FRONTEND_TAG=${SHA_TAG}|" .env.example || true
-          sed -i "s|TYERSHOP_API_TAG=.*|TYERSHOP_API_TAG=${SHA_TAG}|" .env.example || true
-          git diff --quiet && echo "No changes" && exit 0
-          git add .env.example
-          git commit -m "chore(tyershop): update image tags to ${SHA_TAG} [ci skip]"
-          git push
