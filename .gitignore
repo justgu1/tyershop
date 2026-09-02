@@ -9,5 +9,8 @@ build/
 coverage/
 *.log
 
-# dados (produtos/clientes/vendas) — não pertence ao repo, contém PII
+# clientes/vendas têm PII (CPF, endereço, histórico) — nunca versionar.
+# import-medusa.csv (catálogo) é exceção: sem PII, precisa ser reproduzível
+# entre ambientes (dev/homolog/prod) — fica versionado.
 backend/data/*.csv
+!backend/data/import-medusa.csv
