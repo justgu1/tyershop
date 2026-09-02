@@ -4,11 +4,12 @@ import Footer from "../components/Footer.astro";
 import SideCart from "../components/SideCart.astro";
 import PromoPopup from "../components/PromoPopup.astro";
 import { getLangFromUrl, hreflangMap, type Lang } from "../i18n/utils";
-import { getMedusaStoreUrl, getPublishableKey, getMercadoPagoPublicKey } from "../lib/medusa-env";
+import { getMedusaStoreUrl, getPublishableKey, getMercadoPagoPublicKey, getApiUrl } from "../lib/medusa-env";
 
 const medusaInternal = getMedusaStoreUrl();
 const storePk = getPublishableKey();
 const mpPk = getMercadoPagoPublicKey();
+const apiUrl = getApiUrl();
 const storeHeaders = { "x-publishable-api-key": storePk };
 let navDrops: { handle: string; name: string; num: string; img: string }[] = [];
 try {
@@ -59,6 +60,8 @@ const {
 const siteName = "Tyer";
 const fullTitle = title === siteName ? siteName : `${title} | ${siteName}`;
 const canonPath = Astro.url.pathname;
+/** Popup de drop atrapalha o fluxo de compra — não mostra no carrinho/checkout. */
+const hidePromoPopup = /^\/(cart|checkout)(\/|$)/.test(canonPath);
 const hreflangs = hreflangMap(canonPath);
 
 const schemas: object[] = [
@@ -112,16 +115,17 @@ const schemas: object[] = [
       ))
     }
     <meta name="theme-color" content="#0a0a0a" />
-    <script is:inline define:vars={{ storePk, mpPk }}>
+    <script is:inline define:vars={{ storePk, mpPk, apiUrl }}>
       window.__MEDUSA_PK__ = storePk;
       window.__MERCADOPAGO_PK__ = mpPk;
+      window.__API_URL__ = apiUrl;
     </script>
   </head>
   <body class={bodyClass} data-lang={lang}>
     <a class="skip-link" href="#main-content">Skip to content</a>
     {!bare && <Header lang={lang} drops={navDrops} />}
     {!bare && <SideCart lang={lang} />}
-    {!bare && <PromoPopup lang={lang} />}
+    {!bare && !hidePromoPopup && <PromoPopup lang={lang} />}
     <main id="main-content" tabindex="-1">
       <slot />
     </main>

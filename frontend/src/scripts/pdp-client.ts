@@ -2,7 +2,6 @@
  * Cliente PDP: variantes, galeria, carrinho, sticky. Módulo único (evita TS/`OptionRow` no HTML).
  */
 import { addItem, getCart, hasOutOfStockItems, CART_MAX_WHEN_UNKNOWN } from '../lib/cart';
-import { createMedusaCartFromLocalCart } from '../lib/medusa-checkout-cart';
 
 type OptionRow = { id: string; title: string; values: string[] };
 
@@ -595,29 +594,9 @@ if (root) {
     const items = getCart();
     if (!items.length) return;
     if (hasOutOfStockItems(items)) return;
-    if (import.meta.env.PUBLIC_MERCADOPAGO_PUBLIC_KEY) {
-      window.location.href = '/checkout';
-      return;
-    }
-    const apiUrl = (window as unknown as { __API_URL__?: string }).__API_URL__ || '/api/create-checkout';
-    const btn = buyNowBtn;
-    const orig = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = '…';
-    try {
-      const cartId = await createMedusaCartFromLocalCart();
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cart_id: cartId }),
-      });
-      const data = await res.json();
-      if (data.init_point) window.location.href = data.init_point;
-      else throw new Error('No init_point');
-    } catch {
-      btn.disabled = false;
-      btn.textContent = orig ?? '';
-    }
+    // Página própria de checkout (transparente Mercado Pago) cria o
+    // carrinho Medusa de verdade lá — aqui só navega.
+    window.location.href = '/checkout';
   });
 
   function formatCep(v: string) {
@@ -628,9 +607,16 @@ if (root) {
   function applyCepToInputs(next: string) {
     if (cepInput && cepInput.value !== next) cepInput.value = next;
     if (cepSticky && cepSticky.value !== next) cepSticky.value = next;
-    if (cepHint) {
-      const ok = next.replace(/\D/g, '').length === 8;
-      cepHint.textContent = ok || next.length === 0 ? '' : 'CEP inválido';
+    const ok = next.replace(/\D/g, '').length === 8;
+    if (cepHint) cepHint.textContent = ok || next.length === 0 ? '' : 'CEP inválido';
+    // CEP digitado aqui pré-preenche o checkout — evita perguntar de novo
+    // quando "Comprar agora" leva direto pra lá.
+    if (ok) {
+      try {
+        localStorage.setItem('tyer_last_cep', next);
+      } catch {
+        /* storage indisponível: só não pré-preenche depois */
+      }
     }
   }
   cepInput?.addEventListener('input', () => {
