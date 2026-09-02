@@ -45,6 +45,19 @@ spec:
                 secretKeyRef:
                   name: tyershop-secrets
                   key: AWS_SECRET_ACCESS_KEY
+            - name: MERCADOPAGO_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MERCADOPAGO_ACCESS_TOKEN
+            - name: PUBLIC_MERCADOPAGO_PUBLIC_KEY
+              # Mesma chave do secret usado pelo frontend (tyershop-secrets) — fonte única.
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: PUBLIC_MERCADOPAGO_PUBLIC_KEY
+            - name: MERCADOPAGO_NOTIFICATION_URL
+              value: "https://medusa.homolog.tyershop.com/hooks/payment/mercadopago"
             - name: STORE_CORS
               value: "https://homolog.tyershop.com"
             - name: ADMIN_CORS

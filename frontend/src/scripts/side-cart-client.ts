@@ -16,12 +16,10 @@ import {
   validateCartItems,
   maxOrderableUnits,
 } from '../lib/cart';
-import { createMedusaCartFromLocalCart } from '../lib/medusa-checkout-cart';
 declare global {
   interface Window {
     __closeSideCart?: () => void;
     __MEDUSA_URL__?: string;
-    __API_URL__?: string;
   }
 }
 
@@ -425,20 +423,9 @@ document.getElementById('side-cart-checkout')?.addEventListener('click', async (
   const orig = btn.textContent;
   btn.textContent = '...';
   try {
-    if (import.meta.env.PUBLIC_MERCADOPAGO_PUBLIC_KEY) {
-      window.location.href = '/checkout';
-      return;
-    }
-    const cartId = await createMedusaCartFromLocalCart();
-    const apiUrl = window.__API_URL__ || '/api/create-checkout';
-    const res = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cart_id: cartId }),
-    });
-    const data = await res.json();
-    if (data.init_point) window.location.href = data.init_point;
-    else throw new Error('No init_point');
+    // Página própria de checkout (transparente Mercado Pago) cria o carrinho
+    // Medusa de verdade lá — aqui só navega.
+    window.location.href = '/checkout';
   } catch {
     btn.disabled = false;
     btn.textContent = orig;

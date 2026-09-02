@@ -21,3 +21,13 @@ export function getMedusaStoreUrl(): string {
 export function getPublishableKey(): string {
   return process.env.PUBLIC_MEDUSA_PUBLISHABLE_KEY || '';
 }
+
+/**
+ * Public key do Mercado Pago (Secure Fields tokeniza cartão no browser com
+ * ela) — mesma lógica de runtime: `PUBLIC_*` do frontend é build-time no
+ * `astro build` do CI, então o valor setado só no Deployment k8s não teria
+ * efeito nenhum se essa função não existisse.
+ */
+export function getMercadoPagoPublicKey(): string {
+  return process.env.PUBLIC_MERCADOPAGO_PUBLIC_KEY || '';
+}

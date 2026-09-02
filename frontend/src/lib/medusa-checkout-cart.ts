@@ -5,7 +5,9 @@
 import { getAppliedPromoCode, getCart, type CartItem } from './cart';
 
 function publishableKey(): string {
-  const k = import.meta.env.PUBLIC_MEDUSA_PUBLISHABLE_KEY;
+  // Runtime, não build-time: window.__MEDUSA_PK__ é setado pelo Layout a
+  // cada request (ver frontend/src/lib/medusa-env.ts).
+  const k = typeof window !== 'undefined' ? (window as any).__MEDUSA_PK__ : '';
   return typeof k === 'string' && k.trim() ? k.trim() : '';
 }
 
