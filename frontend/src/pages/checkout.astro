@@ -35,7 +35,7 @@ const c = (key: string) => t(lang, 'checkout', key);
     </header>
 
     <div class="checkout-shell__body">
-      <main class="checkout-main">
+      <div class="checkout-main">
         <p id="checkout-empty" class="checkout-page__empty" hidden>{c('empty')}</p>
 
         <div id="checkout-form-section">
@@ -122,7 +122,7 @@ const c = (key: string) => t(lang, 'checkout', key);
           <p>{c('success_text')}</p>
           <a href={getPathForLang('/', lang)} class="btn btn-primary">{c('back_to_cart')}</a>
         </div>
-      </main>
+      </div>
 
       <aside class="checkout-summary" id="checkout-summary-panel">
         <button type="button" class="checkout-summary__toggle" id="checkout-summary-toggle" aria-expanded="false">
@@ -547,40 +547,55 @@ const c = (key: string) => t(lang, 'checkout', key);
     margin-bottom: 16px;
   }
   .checkout-summary__item {
-    display: flex;
-    gap: 12px;
-    align-items: center;
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
   }
-  .checkout-summary__item img {
-    width: 48px;
-    height: 48px;
-    object-fit: cover;
-    border-radius: 8px;
+  .checkout-summary__item-img-wrap {
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: #1a1a1a;
-    flex: 0 0 48px;
+    border-radius: var(--r-md, 8px);
+    overflow: hidden;
+    border: 1px solid #2a2a2a;
+  }
+  .checkout-summary__item-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+    display: block;
   }
   .checkout-summary__item-info {
     min-width: 0;
-    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
   }
   .checkout-summary__item-title {
     font-size: 13px;
+    font-weight: 500;
     color: #fff;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
-  .checkout-summary__item-meta {
-    font-size: 12px;
+  .checkout-summary__item-variant {
+    font-size: 11px;
     color: #999;
   }
   .checkout-summary__item-price {
     font-size: 13px;
-    color: #fff;
-    white-space: nowrap;
+    font-weight: 700;
+    color: var(--c-accent);
+    margin-top: 2px;
   }
   .checkout-summary__totals {
     display: flex;

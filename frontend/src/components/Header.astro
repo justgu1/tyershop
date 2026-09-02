@@ -1671,6 +1671,9 @@ const searchGroupPopular = t(lang, "search", "group_popular");
       bd.classList.add("is-active");
     }
     document.body.style.overflow = "hidden";
+    // Revalida estoque real toda vez que abre — carrinho pode ter ficado
+    // aberto/parado numa aba por horas com o estoque real já tendo mudado.
+    window.dispatchEvent(new CustomEvent("side-cart:open"));
   });
 
   // ── Search overlay ──
