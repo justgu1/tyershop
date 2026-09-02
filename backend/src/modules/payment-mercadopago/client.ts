@@ -23,7 +23,8 @@ export type CreateCardPaymentInput = {
   /** Token gerado no browser via SDK do Mercado Pago (nunca o número do cartão). */
   token: string;
   installments: number;
-  paymentMethodId: string;
+  /** Opcional — o Mercado Pago infere a bandeira a partir do token sozinho. */
+  paymentMethodId?: string;
   payer: { email: string; identification?: { type: string; number: string } };
   externalReference: string;
 };

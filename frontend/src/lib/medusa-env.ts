@@ -31,3 +31,12 @@ export function getPublishableKey(): string {
 export function getMercadoPagoPublicKey(): string {
   return process.env.PUBLIC_MERCADOPAGO_PUBLIC_KEY || '';
 }
+
+/**
+ * URL do gateway leve (newsletter/aviso de stock) — mesma lógica de runtime:
+ * `PUBLIC_*` do frontend é build-time no CI, então window.__API_URL__
+ * (lido pelo client) precisa ser setado a cada request, nunca fixo no bundle.
+ */
+export function getApiUrl(): string {
+  return (process.env.PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '');
+}

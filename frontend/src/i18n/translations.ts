@@ -203,6 +203,7 @@ export const translations = {
       title: 'Finalizar compra',
       empty: 'Sua bag está vazia.',
       back_to_cart: '← Voltar para a bag',
+      shipping: 'Frete',
       contact_title: 'Seus dados',
       email: 'E-mail',
       first_name: 'Nome',

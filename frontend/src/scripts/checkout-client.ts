@@ -56,6 +56,38 @@ async function medusaFetch(path: string, init: RequestInit = {}) {
   return data;
 }
 
+function renderSummary(items: CartItem[]) {
+  const list = qs('checkout-summary-items');
+  if (list) {
+    list.innerHTML = items
+      .map((item) => {
+        const img = item.thumbnail ? `<img src="${item.thumbnail}" alt="" loading="lazy" />` : '<span></span>';
+        const meta = [item.variantTitle, `x${item.quantity}`].filter(Boolean).join(' · ');
+        return `
+          <div class="checkout-summary__item">
+            ${img}
+            <div class="checkout-summary__item-info">
+              <span class="checkout-summary__item-title">${item.title}</span>
+              <span class="checkout-summary__item-meta">${meta}</span>
+            </div>
+            <span class="checkout-summary__item-price">${fmtBrl((item.price * item.quantity) / 100)}</span>
+          </div>`;
+      })
+      .join('');
+  }
+  const subtotalCents = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  setText('checkout-summary-subtotal', fmtBrl(subtotalCents / 100));
+  setText('checkout-summary-total', fmtBrl(subtotalCents / 100));
+}
+
+function setStep(step: 'address' | 'payment') {
+  const stepper = qs('checkout-stepper');
+  if (stepper) stepper.dataset.step = step;
+  document.querySelectorAll<HTMLElement>('[data-step-label]').forEach((el) => {
+    el.classList.toggle('is-active', el.dataset.stepLabel === step);
+  });
+}
+
 function init() {
   const root = qs('checkout-root');
   if (!root) return;
@@ -65,7 +97,20 @@ function init() {
   if (!items.length) {
     show('checkout-empty', true);
     show('checkout-form-section', false);
+    const panel = qs('checkout-summary-panel');
+    if (panel) panel.hidden = true;
     return;
+  }
+  renderSummary(items);
+
+  // Pré-preenche o CEP se o cliente já digitou na PDP (evita perguntar de
+  // novo — "Comprar agora" pula direto pra cá).
+  try {
+    const lastCep = localStorage.getItem('tyer_last_cep');
+    const zipInput = qs<HTMLInputElement>('ck-zip');
+    if (lastCep && zipInput && !zipInput.value) zipInput.value = lastCep;
+  } catch {
+    /* storage indisponível: segue sem pré-preencher */
   }
 
   let cartId = '';
@@ -187,7 +232,14 @@ function init() {
       }
 
       const cartRes = await medusaFetch(`/store/carts/${cartId}`);
-      const total = Number(cartRes?.cart?.total ?? 0);
+      const cart = cartRes?.cart ?? {};
+      const total = Number(cart.total ?? 0);
+      const shipping = Number(cart.shipping_total ?? 0);
+      setText('checkout-summary-total', fmtBrl(total));
+      if (shipping > 0) {
+        setText('checkout-summary-shipping', fmtBrl(shipping));
+        show('checkout-summary-shipping-row', true);
+      }
 
       const pcRes = await medusaFetch('/store/payment-collections', {
         method: 'POST',
@@ -208,6 +260,7 @@ function init() {
 
       show('checkout-contact-section', false);
       show('checkout-payment-section', true);
+      setStep('payment');
       initMercadoPagoSdk();
     } catch (err) {
       setText('checkout-contact-error', err instanceof Error ? err.message : t('errorGeneric'));
@@ -218,6 +271,12 @@ function init() {
         btn.textContent = t('continueToPayment');
       }
     }
+  });
+
+  qs('checkout-back-to-address')?.addEventListener('click', () => {
+    show('checkout-payment-section', false);
+    show('checkout-contact-section', true);
+    setStep('address');
   });
 
   // ---- Abas de método de pagamento ----
@@ -298,7 +357,9 @@ function init() {
         body: JSON.stringify({
           payment_session_id: paymentSessionId,
           token: tokenResult.id,
-          payment_method_id: detectedPaymentMethodId || tokenResult.payment_method_id,
+          // Opcional — o Mercado Pago infere a bandeira do token sozinho.
+          // `binChanged` é só um bônus quando dispara a tempo, nunca bloqueia o envio.
+          payment_method_id: detectedPaymentMethodId || undefined,
           installments,
           payer: { email: payer.email, cpf: payer.cpf },
         }),
