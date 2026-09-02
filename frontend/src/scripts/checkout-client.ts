@@ -303,8 +303,10 @@ function init() {
       'checkout-locked-address',
       `${addr.street_name}, ${addr.street_number} — ${addr.neighborhood}, ${addr.city}/${addr.federal_unit} · ${addr.zip_code}`
     );
-    show('checkout-contact-section', false);
-    show('checkout-address-locked', true);
+    // Formulário continua visível (só desabilitado por baixo do overlay) —
+    // não some, pra não passar a sensação de "sumiu tudo que preenchi".
+    show('checkout-address-overlay', true);
+    qs('checkout-step-wrap')?.classList.add('is-locked');
     show('checkout-payment-block', true);
     const lock = qs('checkout-lock-indicator');
     if (lock) lock.hidden = false;
@@ -314,9 +316,9 @@ function init() {
   }
 
   qs('checkout-edit-address')?.addEventListener('click', () => {
-    show('checkout-address-locked', false);
+    show('checkout-address-overlay', false);
+    qs('checkout-step-wrap')?.classList.remove('is-locked');
     show('checkout-payment-block', false);
-    show('checkout-contact-section', true);
     const lock = qs('checkout-lock-indicator');
     if (lock) lock.hidden = true;
     stage = 'address';
