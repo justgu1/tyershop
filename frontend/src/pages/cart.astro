@@ -362,5 +362,18 @@ const lang: Lang = getLangFromUrl(Astro.url);
   await syncCartState();
   render();
   void rehydrateAppliedCoupon();
-  window.addEventListener('cart:update', () => { render(); scheduleCouponResync(); });
+  window.addEventListener('cart:update', () => {
+    render();
+    scheduleCouponResync();
+  });
+  // bfcache restore ou outra aba mudando o carrinho: revalida estoque de verdade,
+  // não só reflete o que já tava (pode estar desatualizado há um tempo).
+  window.addEventListener('pageshow', (e) => {
+    if ((e as PageTransitionEvent).persisted) {
+      void (async () => {
+        await syncCartState();
+        render();
+      })();
+    }
+  });
 </script>

@@ -439,6 +439,12 @@ void (async () => {
   renderCart();
   void rehydrateAppliedCoupon();
 })();
+window.addEventListener('side-cart:open', () => {
+  void (async () => {
+    await syncCartState();
+    renderCart();
+  })();
+});
 window.addEventListener('cart:update', () => {
   renderCart();
   scheduleCouponResync();

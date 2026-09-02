@@ -69,16 +69,20 @@ function renderSummary(items: CartItem[]) {
   if (list) {
     list.innerHTML = items
       .map((item) => {
-        const img = item.thumbnail ? `<img src="${item.thumbnail}" alt="" loading="lazy" />` : '<span></span>';
-        const meta = [item.variantTitle, `x${item.quantity}`].filter(Boolean).join(' · ');
+        const img = item.thumbnail
+          ? `<img class="checkout-summary__item-img" src="${item.thumbnail}" alt="" loading="lazy" />`
+          : '';
+        const variantLine = [item.variantTitle ? `Tamanho: ${item.variantTitle}` : '', `x${item.quantity}`]
+          .filter(Boolean)
+          .join(' · ');
         return `
           <div class="checkout-summary__item">
-            ${img}
+            <div class="checkout-summary__item-img-wrap">${img}</div>
             <div class="checkout-summary__item-info">
               <span class="checkout-summary__item-title">${item.title}</span>
-              <span class="checkout-summary__item-meta">${meta}</span>
+              <span class="checkout-summary__item-variant">${variantLine}</span>
+              <span class="checkout-summary__item-price">${fmtBrl((item.price * item.quantity) / 100)}</span>
             </div>
-            <span class="checkout-summary__item-price">${fmtBrl((item.price * item.quantity) / 100)}</span>
           </div>`;
       })
       .join('');
