@@ -10,6 +10,7 @@ import { getMedusaStoreUrl, getPublishableKey } from '../../lib/medusa-env';
 export const prerender = false;
 
 const lang: Lang = getLangFromUrl(Astro.url);
+const showEmptyCheckoutToast = Astro.url.searchParams.get('empty_checkout') === '1';
 const pk = getPublishableKey();
 const headers = { 'x-publishable-api-key': pk };
 const base = getMedusaStoreUrl();
@@ -114,6 +115,30 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
   lang={lang}
   bodyClass="page-shop"
 >
+  {showEmptyCheckoutToast && (
+    <div class="shop-toast" id="shop-empty-toast" role="status" aria-live="polite">
+      <span>Adicione produtos para ir para o checkout.</span>
+      <button type="button" class="shop-toast__close" id="shop-empty-toast-close" aria-label="Fechar aviso">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <script is:inline>
+      (function () {
+        var toast = document.getElementById('shop-empty-toast');
+        if (!toast) return;
+        // Tira o ?empty_checkout=1 da URL — não deve voltar a aparecer num refresh.
+        try {
+          var url = new URL(window.location.href);
+          url.searchParams.delete('empty_checkout');
+          window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+        } catch (e) {}
+        var dismiss = function () { toast.remove(); };
+        document.getElementById('shop-empty-toast-close')?.addEventListener('click', dismiss);
+        window.setTimeout(dismiss, 6000);
+      })();
+    </script>
+  )}
+
   <div class="shop-layout" id="shop-top">
     <div
       class="shop-sidebar-backdrop"
@@ -407,6 +432,35 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
 </style>
 
 <style>
+.shop-toast {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 12px 20px;
+  background: #171717;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.shop-toast__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  background: none;
+  border: 0;
+  color: #b8b8b8;
+  cursor: pointer;
+  padding: 2px;
+}
+.shop-toast__close:hover {
+  color: #fff;
+}
+
 .shop-layout {
   display: grid;
   grid-template-columns: 240px 1fr;
