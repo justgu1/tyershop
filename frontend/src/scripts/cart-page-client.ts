@@ -75,16 +75,48 @@ async function applyPromoToMedusa(code: string, opts: { requirePositiveDiscount?
   if (requirePositiveDiscount && discountCents <= 0) throw new Error('no discount');
   return { discountCents };
 }
+/* true enquanto a validação de rede (syncCartState) ainda não rodou pela
+   primeira vez nesta carga de página — controla o spinner (nunca mostra
+   "vazio" nesse meio-tempo pra quem realmente tem item no carrinho). */
+let validating = false;
+
+/** Mostra/atualiza o botão "Ver mais" quando há mais de 3 itens — sanfona
+ * simples (expande e recolhe), os itens extras continuam no DOM. */
+function syncMoreToggle(body: HTMLElement, total: number) {
+  let toggle = document.getElementById('cart-more-toggle');
+  if (total <= 3) {
+    toggle?.remove();
+    body.classList.remove('sc-body--expanded');
+    return;
+  }
+  if (!(toggle instanceof HTMLButtonElement)) {
+    toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.id = 'cart-more-toggle';
+    toggle.className = 'sc__more-toggle';
+    toggle.addEventListener('click', () => {
+      const expanded = body.classList.toggle('sc-body--expanded');
+      toggle!.textContent = expanded ? 'Ver menos' : `Ver mais (${total - 3})`;
+    });
+    body.appendChild(toggle);
+  } else {
+    body.appendChild(toggle); // reordena pro fim (depois dos .sc-item recriados)
+  }
+  toggle.textContent = body.classList.contains('sc-body--expanded') ? 'Ver menos' : `Ver mais (${total - 3})`;
+}
+
 function render() {
   const body = document.getElementById('cart-items');
   const empty = document.getElementById('cart-empty');
+  const loading = document.getElementById('cart-loading');
   if (!(body instanceof HTMLElement) || !(empty instanceof HTMLElement)) return;
   body.querySelectorAll('.sc-item').forEach((el) => el.remove());
   const items = getCart();
-  empty.hidden = items.length > 0;
-  items.forEach((item) => {
+  if (loading instanceof HTMLElement) loading.hidden = !(validating && items.length > 0);
+  empty.hidden = validating || items.length > 0;
+  items.forEach((item, index) => {
     const el = document.createElement('div');
-    el.className = 'sc-item';
+    el.className = index >= 3 ? 'sc-item sc-item--extra' : 'sc-item';
     el.setAttribute('role', 'listitem');
     const titleH = escHtml(item.title || '');
     const variantH = item.variantTitle ? escHtml(formatVariantLabel(item.variantTitle)) : '';
@@ -95,6 +127,7 @@ function render() {
     el.innerHTML = `<div class="sc-item__head"><span class="sc-item__name">${titleH}</span></div><button class="sc-item__remove" type="button" data-id="${item.variantId}" data-action="remove" aria-label="Remover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button><div class="sc-item__body"><div class="sc-item__img-wrap"><img class="sc-item__img" src="${thumb}" alt="" width="88" height="88" loading="lazy" decoding="async" /></div><div class="sc-item__right">${isOutOfStock ? '<div class="sc-item__stock">Esgotado</div>' : ''}${variantH ? `<div class="sc-item__variant">${variantH}</div>` : ''}<div class="sc-item__footer"><span class="sc-item__price">${fmt((item.price || 0) * (item.quantity || 1))}</span><div class="sc-item__stepper" role="group" aria-label="Quantidade"><button class="sc-item__stepper-btn" data-id="${item.variantId}" data-action="dec" type="button" ${isOutOfStock ? 'disabled' : ''}>−</button><input class="sc-item__stepper-input" data-id="${item.variantId}" data-action="set" type="number" min="1" max="${maxQty}" value="${item.quantity}" ${isOutOfStock ? 'disabled' : ''}/><button class="sc-item__stepper-btn" data-id="${item.variantId}" data-action="inc" type="button" ${isOutOfStock ? 'disabled' : ''}>+</button></div></div></div></div>`;
     body.appendChild(el);
   });
+  syncMoreToggle(body, items.length);
   const subtotal = getTotal();
   const discount = Number(couponState.discountCents || 0);
   const total = Math.max(0, subtotal - discount);
@@ -105,12 +138,14 @@ function render() {
   setText('cart-taxes', fmt(0));
   setText('cart-shipping', fmt(0));
   setText('cart-total', fmt(total));
+  setText('cart-sticky-total', fmt(total));
   const saveTag = document.getElementById('cart-save-tag');
   if (saveTag) { saveTag.hidden = savePct <= 0; saveTag.textContent = `${savePct}% OFF`; }
+  const checkoutDisabled = items.length === 0 || hasOutOfStock(items);
   const checkoutBtn = document.getElementById('cart-checkout');
-  if (checkoutBtn instanceof HTMLButtonElement) {
-    checkoutBtn.disabled = items.length === 0 || hasOutOfStock(items);
-  }
+  if (checkoutBtn instanceof HTMLButtonElement) checkoutBtn.disabled = checkoutDisabled;
+  const stickyCheckoutBtn = document.getElementById('cart-sticky-checkout');
+  if (stickyCheckoutBtn instanceof HTMLButtonElement) stickyCheckoutBtn.disabled = checkoutDisabled;
   renderFeedback(hasOutOfStock(items) ? 'Remova itens esgotados para finalizar a compra.' : '', hasOutOfStock(items) ? 'error' : '');
 }
 function scheduleCouponResync() {
@@ -241,9 +276,70 @@ document.getElementById('cart-checkout')?.addEventListener('click', async () => 
     btn.textContent = orig;
   }
 });
-await syncCartState();
-render();
+validating = getCart().length > 0;
+render(); // pinta com o carrinho local na hora — nunca espera rede pro primeiro paint
+if (validating) {
+  await syncCartState();
+  validating = false;
+  render();
+}
 void rehydrateAppliedCoupon();
+
+// ---- Resumo minimizado sticky (mobile) — mesmo padrão do #pdp-sticky-bar ----
+document.getElementById('cart-sticky-checkout')?.addEventListener('click', () => {
+  document.getElementById('cart-checkout')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+});
+function ensureStickyDrawerClone() {
+  const mount = document.getElementById('cart-sticky-drawer');
+  const source = document.querySelector('.sc__footer.cart-footer');
+  if (!(mount instanceof HTMLElement) || !source || mount.dataset.ready === '1') return;
+  mount.appendChild(source.cloneNode(true));
+  mount.dataset.ready = '1';
+  // Clone é só apresentação — cliques nos botões/inputs dele disparam o
+  // mesmo evento no elemento real, sem duplicar handler nenhum (ids
+  // repetidos no clone nunca ficam "vivos": nada dentro dele tem listener
+  // próprio, delegamos tudo pro original por data-id/seletor).
+  mount.addEventListener('click', (ev) => {
+    const target = ev.target;
+    if (!(target instanceof Element)) return;
+    const cloneBtn = target.closest('button, a');
+    if (!cloneBtn) return;
+    const id = cloneBtn.id;
+    if (!id) return;
+    ev.preventDefault();
+    document.getElementById(id)?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+}
+const stickyMenuBtn = document.getElementById('cart-sticky-menu');
+stickyMenuBtn?.addEventListener('click', () => {
+  ensureStickyDrawerClone();
+  const drawer = document.getElementById('cart-sticky-drawer');
+  if (!(drawer instanceof HTMLElement)) return;
+  const willOpen = drawer.hasAttribute('hidden');
+  drawer.toggleAttribute('hidden', !willOpen);
+  stickyMenuBtn.setAttribute('aria-expanded', String(willOpen));
+  document.body.classList.toggle('cart-sticky-bar-expanded', willOpen);
+});
+const stickyBar = document.getElementById('cart-sticky-bar');
+const summaryAside = document.querySelector('.cart-shell__summary');
+if (stickyBar instanceof HTMLElement && summaryAside && 'IntersectionObserver' in window) {
+  const io = new IntersectionObserver(
+    ([entry]) => {
+      const dock = !entry.isIntersecting;
+      stickyBar.classList.toggle('cart-sticky-bar--docked', dock);
+      stickyBar.classList.toggle('cart-sticky-bar--offscreen', !dock);
+      stickyBar.setAttribute('aria-hidden', dock ? 'false' : 'true');
+      document.body.classList.toggle('cart-sticky-bar-visible', dock);
+      if (!dock) {
+        document.body.classList.remove('cart-sticky-bar-expanded');
+        document.getElementById('cart-sticky-drawer')?.setAttribute('hidden', '');
+        stickyMenuBtn?.setAttribute('aria-expanded', 'false');
+      }
+    },
+    { threshold: 0, rootMargin: '0px 0px -32px 0px' }
+  );
+  io.observe(summaryAside);
+}
 window.addEventListener('cart:update', () => {
   render();
   scheduleCouponResync();

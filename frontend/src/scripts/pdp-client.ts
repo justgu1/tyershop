@@ -258,6 +258,7 @@ if (root) {
     if (lightboxCounter) lightboxCounter.textContent = `${slideIndex + 1} / ${slides.length}`;
     renderLightboxThumbs(slides);
     syncLightboxThumbsActive();
+    refreshLightboxNavVisibility();
   }
 
   function syncLightboxIfOpen() {
@@ -265,10 +266,23 @@ if (root) {
     fillLightboxImage();
   }
 
+  /* Setas do lightbox somem no início/fim — sem loop infinito. O carousel
+     principal (autoplay + thumbs rail) continua com wraparound, aqui é só
+     a navegação manual dentro do fullscreen. */
   function refreshLightboxNavVisibility() {
-    const hide = slides.length <= 1;
-    lbPrev?.classList.toggle('is-hidden', hide);
-    lbNext?.classList.toggle('is-hidden', hide);
+    const multi = slides.length > 1;
+    lbPrev?.classList.toggle('is-hidden', !multi || slideIndex === 0);
+    lbNext?.classList.toggle('is-hidden', !multi || slideIndex === slides.length - 1);
+  }
+  function lbPrevStep() {
+    if (slideIndex <= 0) return;
+    prevSlide();
+    refreshLightboxNavVisibility();
+  }
+  function lbNextStep() {
+    if (slideIndex >= slides.length - 1) return;
+    nextSlide();
+    refreshLightboxNavVisibility();
   }
 
   function goToSlide(idx: number) {
@@ -629,6 +643,18 @@ if (root) {
     const next = formatCep(cur);
     applyCepToInputs(next);
   });
+  /* Não existe cálculo de frete real hoje (nenhum endpoint de shipping-rate
+     é chamado) — o botão só torna explícito o mesmo fluxo de validar/formatar
+     e salvar o CEP que já rodava sozinho ao digitar, pra não parecer que
+     "não faz nada" ao clicar. */
+  const cepCalcBtn = document.getElementById('pdp-cep-calc');
+  cepCalcBtn?.addEventListener('click', () => {
+    if (!cepInput) return;
+    const next = formatCep(cepInput.value);
+    applyCepToInputs(next);
+    const ok = next.replace(/\D/g, '').length === 8;
+    if (ok && cepHint) cepHint.textContent = 'Frete calculado no checkout.';
+  });
 
   document.querySelectorAll('[data-modal-target]').forEach((el) => {
     el.addEventListener('click', () => {
@@ -662,12 +688,12 @@ if (root) {
   lbPrev?.addEventListener('click', (e) => {
     e.stopPropagation();
     autoplayPaused = true;
-    prevSlide();
+    lbPrevStep();
   });
   lbNext?.addEventListener('click', (e) => {
     e.stopPropagation();
     autoplayPaused = true;
-    nextSlide();
+    lbNextStep();
   });
 
   lightbox?.addEventListener('keydown', (e) => {
@@ -675,11 +701,11 @@ if (root) {
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       autoplayPaused = true;
-      prevSlide();
+      lbPrevStep();
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
       autoplayPaused = true;
-      nextSlide();
+      lbNextStep();
     }
   });
 
@@ -744,26 +770,7 @@ if (root) {
     });
   });
 
-  const newestVp = document.getElementById('pdp-newest-viewport');
-  const newestPrev = document.getElementById('pdp-newest-nav-prev');
-  const newestNext = document.getElementById('pdp-newest-nav-next');
-  if (newestVp && newestPrev && newestNext) {
-    const newestStep = () => {
-      const track = newestVp.querySelector('.products-showcase');
-      const first = track?.firstElementChild;
-      if (first instanceof HTMLElement) {
-        const gap = 16;
-        return Math.round(first.getBoundingClientRect().width + gap);
-      }
-      return Math.round(newestVp.clientWidth * 0.92);
-    };
-    newestPrev.addEventListener('click', () => {
-      newestVp.scrollBy({ left: -newestStep(), behavior: 'smooth' });
-    });
-    newestNext.addEventListener('click', () => {
-      newestVp.scrollBy({ left: newestStep(), behavior: 'smooth' });
-    });
-  }
+  // «Mais novos» agora é <ProductCarousel> (product-carousel-client.ts).
 
   stickyBuy?.addEventListener('click', () => buyNowBtn?.click());
   stickyAtc?.addEventListener('click', () => atcBtn?.click());

@@ -437,9 +437,6 @@ const searchGroupPopular = t(lang, "search", "group_popular");
           class="mob-menu__link">{t(lang, "nav", "collections")}</a>
       </li>
     )}
-    <li>
-      <a href={getPathForLang("/#editorial", lang)} class="mob-menu__link">{t(lang, "nav", "editorial")}</a>
-    </li>
     {drops.length > 0 &&
       drops.map((d) => (
         <li>
@@ -452,11 +449,14 @@ const searchGroupPopular = t(lang, "search", "group_popular");
         </li>
       ))
     }
-    <li class="mob-menu__divider" role="separator"></li>
     <li>
       <a href={getPathForLang("/shop", lang)} class="mob-menu__link"
         >{t(lang, "nav", "shop")}</a>
     </li>
+    <li>
+      <a href={getPathForLang("/#editorial", lang)} class="mob-menu__link">{t(lang, "nav", "editorial")}</a>
+    </li>
+    <li class="mob-menu__divider" role="separator"></li>
     <li>
       <a href={getPathForLang("/faq", lang)} class="mob-menu__link">FAQ</a>
     </li>

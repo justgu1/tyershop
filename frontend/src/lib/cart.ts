@@ -2,6 +2,7 @@
 // Emits "cart:update" CustomEvent whenever the cart changes.
 
 import { getVariantMaxQty as getVariantMaxQtyFromProduct, isVariantSoldOut as isVariantSoldOutFromProduct } from './product-variants';
+import { getVariantPriceInfo } from './medusa-pricing';
 
 export interface CartItem {
   variantId: string;
@@ -155,20 +156,50 @@ type VariantSnapshot = {
 function getStoreConfig() {
   if (typeof window === 'undefined') {
     const key = process.env.PUBLIC_MEDUSA_PUBLISHABLE_KEY || '';
-    return { base: 'http://localhost:9003', key };
+    return { base: 'http://localhost:9003', key, regionId: '' };
   }
   // No browser: mesma origem (ex. http://localhost:4321/store/...). O `vite.server.proxy` em
   // astro.config.mjs encaminha /store (e /auth) ao Medusa — evita CORS. Não usar :9003 direto no cliente.
-  // Key vinda do Layout.astro (window.__MEDUSA_PK__), lida do `.env` em runtime — ver lib/medusa-env.ts.
+  // Key/region vindas do Layout.astro (window.__MEDUSA_PK__/__MEDUSA_REGION_ID__), lidas do `.env` em runtime — ver lib/medusa-env.ts.
   const key = (window as any).__MEDUSA_PK__ || '';
-  return { base: '', key };
+  const regionId = (window as any).__MEDUSA_REGION_ID__ || '';
+  return { base: '', key, regionId };
 }
+
+/**
+ * `/store/variants/:id` nunca existiu (nem no Medusa v2 core, nem em rota
+ * custom nossa) — 404 sempre. O endpoint nativo certo é
+ * `/store/product-variants/:id` (desde Medusa 2.11.2), que já devolve
+ * `{ variant }` no formato que o resto desta função espera; só falta pedir
+ * os campos extras (preço calculado, estoque, dados do produto) via
+ * `fields=`, do mesmo jeito que `medusa-pricing.ts` já faz pra listagem.
+ */
+const VARIANT_SNAPSHOT_FIELDS = [
+  'id',
+  'title',
+  'allow_backorder',
+  'inventory_quantity',
+  '*prices',
+  '*calculated_price',
+  '+inventory_items.inventory.location_levels.stocked_quantity',
+  'product.id',
+  'product.title',
+  'product.thumbnail',
+  '*product.images',
+].join(',');
 
 async function fetchVariantSnapshot(variantId: string): Promise<VariantSnapshot> {
   if (!variantId) return { exists: false, soldOut: true };
-  const { base, key } = getStoreConfig();
+  const { base, key, regionId } = getStoreConfig();
   try {
-    const res = await fetch(`${base}/store/variants/${variantId}`, {
+    /* `*calculated_price` sem region_id faz a Store API responder 400
+       ("Missing required pricing context") — sem region resolvida ainda
+       (ex.: window.__MEDUSA_REGION_ID__ não carregou), pede sem preço em
+       vez de perder a chamada inteira; `*prices` cobre o fallback de preço. */
+    const fields = regionId ? VARIANT_SNAPSHOT_FIELDS : VARIANT_SNAPSHOT_FIELDS.replace(',*calculated_price', '');
+    const qs = new URLSearchParams({ fields });
+    if (regionId) qs.set('region_id', regionId);
+    const res = await fetch(`${base}/store/product-variants/${variantId}?${qs.toString()}`, {
       headers: { 'x-publishable-api-key': key },
     });
     // 404 ou rota indisponível: não esvaziar o carrinho no F5 (localStorage).
@@ -181,7 +212,11 @@ async function fetchVariantSnapshot(variantId: string): Promise<VariantSnapshot>
     const thumb = product?.thumbnail || product?.images?.[0]?.url || undefined;
     const title = product?.title || undefined;
     const optionTitle = String(variant?.title || '').trim() || undefined;
-    const price = Number(variant?.calculated_price?.calculated_amount ?? variant?.prices?.[0]?.amount ?? 0);
+    // `calculated_amount`/`prices[].amount` não vêm garantidamente em centavos
+    // (depende de como o preço foi cadastrado) — mesma normalização usada na
+    // listagem de produtos (medusa-pricing.ts), pra não gravar preço 100x errado.
+    const priceInfo = getVariantPriceInfo(variant);
+    const price = priceInfo?.amountCents;
     const mq = getVariantMaxQtyFromProduct(variant);
     const maxQuantity = mq == null ? undefined : mq;
     return {
@@ -192,7 +227,7 @@ async function fetchVariantSnapshot(variantId: string): Promise<VariantSnapshot>
       title,
       variantTitle: optionTitle,
       thumbnail: thumb,
-      price: Number.isFinite(price) && price > 0 ? price : undefined,
+      price: typeof price === 'number' && price > 0 ? price : undefined,
     };
   } catch {
     return { exists: true, soldOut: false };

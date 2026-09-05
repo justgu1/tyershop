@@ -1,6 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import ProductCard from '../../components/ProductCard.astro';
+import ProductCarousel from '../../components/ProductCarousel.astro';
 import { getLangFromUrl, t, getPathForLang } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
 import { getMedusaStoreUrl, getPublishableKey } from '../../lib/medusa-env';
@@ -547,6 +547,9 @@ const jsonLd = productFound
               placeholder="00000-000"
               aria-describedby="pdp-cep-hint"
             />
+            <button type="button" class="btn btn-outline pdp-cep-btn" id="pdp-cep-calc">
+              {t(lang, 'pdp', 'calculate_shipping_cta')}
+            </button>
           </div>
           <p id="pdp-cep-hint" class="pdp-cep-hint" role="status"></p>
           <p class="pdp-cep-static">{t(lang, 'pdp', 'shipping_estimate_placeholder')}</p>
@@ -586,65 +589,14 @@ const jsonLd = productFound
     {related.length > 0 && (
       <section class="pdp-hero__drop-rail" aria-labelledby="pdp-drop-rail-title">
         <div class="pdp-hero__drop-rail-inner">
-          <h2 class="pdp-hero__drop-rail-title" id="pdp-drop-rail-title">
-            {t(lang, 'pdp', 'drop_section_title')}
-            {product.collection?.title && (
-              <span class="pdp-hero__drop-rail-sub"> — {product.collection.title}</span>
-            )}
-          </h2>
-          <div class="shop-col-carousel-wrap pdp-shop-carousel-wrap">
-            <button
-              type="button"
-              class="shop-col-carousel__nav shop-col-carousel__nav--prev"
-              data-col-nav="prev"
-              data-target="pdp-hero-drop-carousel"
-              aria-label={t(lang, 'pdp', 'prev_slide')}
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m15 18-6-6 6-6" />
-              </svg>
-            </button>
-            <div class="shop-col-carousel pdp-shop-carousel" id="pdp-hero-drop-carousel" role="region" tabindex="0">
-              <div class="shop-col-carousel__track" role="list">
-                {related.map((p) => (
-                  <div class="shop-col-carousel__cell" role="listitem">
-                    <ProductCard product={p} lang={lang} />
-                  </div>
-                ))}
-              </div>
-            </div>
-            <button
-              type="button"
-              class="shop-col-carousel__nav shop-col-carousel__nav--next"
-              data-col-nav="next"
-              data-target="pdp-hero-drop-carousel"
-              aria-label={t(lang, 'pdp', 'next_slide')}
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </button>
-          </div>
+          <ProductCarousel
+            products={related}
+            lang={lang}
+            title={product.collection?.title
+              ? `${t(lang, 'pdp', 'drop_section_title')} — ${product.collection.title}`
+              : t(lang, 'pdp', 'drop_section_title')}
+            headingId="pdp-drop-rail-title"
+          />
         </div>
       </section>
     )}
@@ -793,36 +745,7 @@ const jsonLd = productFound
   {newest.length > 0 && (
     <section class="pdp-related" aria-labelledby="newest-title">
       <div class="container">
-        <h2 class="section__title" id="newest-title">{t(lang, 'shop', 'section_novos')}</h2>
-        <div class="products-showcase-wrap pdp-related__showcase-wrap">
-          <button
-            type="button"
-            class="products-showcase-nav products-showcase-nav--prev"
-            id="pdp-newest-nav-prev"
-            aria-label={t(lang, 'pdp', 'prev_slide')}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"
-              ><path d="m15 18-6-6 6-6" /></svg
-            >
-          </button>
-          <div class="products-showcase-viewport" id="pdp-newest-viewport" role="region" aria-label={t(lang, 'shop', 'section_novos')}>
-            <div class="products-showcase" role="list">
-              {newest.map((p) => (
-                <ProductCard product={p} lang={lang} role="listitem" />
-              ))}
-            </div>
-          </div>
-          <button
-            type="button"
-            class="products-showcase-nav products-showcase-nav--next"
-            id="pdp-newest-nav-next"
-            aria-label={t(lang, 'pdp', 'next_slide')}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"
-              ><path d="m9 18 6-6-6-6" /></svg
-            >
-          </button>
-        </div>
+        <ProductCarousel products={newest} lang={lang} title={t(lang, 'shop', 'section_novos')} headingId="newest-title" />
       </div>
     </section>
   )}
@@ -965,8 +888,14 @@ const jsonLd = productFound
     max-width: 100%;
   }
   @media (max-width: 1024px) {
+    /* `.pdp-hero__fold` fica `height:auto` nesse breakpoint — um row `fr`
+       num grid de altura indefinida não garante expansão. Sem `height`
+       explícito aqui (só `max-height`), a cadeia até `.pdp-hero__main-carousel`
+       (que usa container query `cqmin`) resolvia contra altura ~zero e a
+       imagem principal saía minúscula. */
     .pdp-hero__media {
       min-height: 0;
+      height: min(52svh, 520px);
       max-height: min(52svh, 520px);
     }
     .pdp-hero__media-carousel-block {
@@ -992,274 +921,9 @@ const jsonLd = productFound
     min-width: 0;
     max-width: 100%;
   }
-  .pdp-hero__drop-rail-title {
-    font-family: var(--font-title);
-    font-size: clamp(14px, 1.4vw, 18px);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin: 0 0 12px;
-    color: var(--c-text);
-    overflow-wrap: anywhere;
-    word-break: break-word;
-    max-width: 100%;
-    line-height: 1.25;
-    padding-block: 2px;
-  }
-  .pdp-hero__drop-rail-sub {
-    font-weight: 500;
-    color: var(--c-muted);
-    text-transform: none;
-  }
-
-  /**
-   * Carrosséis “Colecione o drop” e “Mais novos”: mesmo padrão da loja
-   * (`shop-col-carousel-wrap` + track + células + nav).
-   */
-  .pdp-shop-carousel-wrap.shop-col-carousel-wrap {
-    position: relative;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    overflow: hidden;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-    padding: 0 44px 10px;
-    scrollbar-color: var(--c-border) transparent;
-    border-radius: 0;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel::-webkit-scrollbar {
-    height: 8px;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel::-webkit-scrollbar-thumb {
-    background: #2a2a2a;
-    border-radius: 999px;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__track {
-    display: flex;
-    gap: 20px;
-    align-items: stretch;
-    width: max-content;
-    min-width: 100%;
-    min-height: 1px;
-    padding: 2px 2px 4px;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell {
-    flex: 0 0 clamp(220px, 38vw, 400px);
-    min-width: 0;
-    scroll-snap-align: start;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc) {
-    min-height: 100%;
-    height: auto;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__img-wrap) {
-    aspect-ratio: 1;
-    width: 100%;
-    margin-bottom: 10px;
-    border: none;
-    border-radius: var(--r, 8px);
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__img) {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__body) {
-    flex: 1;
-    min-height: 0;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__name) {
-    font-size: 13px;
-    min-height: 0;
-    -webkit-line-clamp: 2;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__bottom) {
-    margin-top: 6px;
-    padding-bottom: 0;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__price-current) {
-    font-size: 13px;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__price-striked) {
-    font-size: 10px;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__quick-add) {
-    padding: 8px 12px;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__quick-add__label) {
-    font-size: 10px;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__variants) {
-    margin-top: 6px;
-    margin-bottom: 4px;
-    gap: 4px;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__variant-hit--size) {
-    height: 24px;
-    min-width: 28px;
-    font-size: 9px;
-    padding: 0 6px;
-    border-radius: 6px;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__variant-hit--swatch) {
-    width: 22px;
-    height: 22px;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__variant-swatch-inner) {
-    width: 16px;
-    height: 16px;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__cell :global(.pc__variant-heading) {
-    font-size: 10px;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__nav {
-    position: absolute;
-    top: 46%;
-    transform: translateY(-50%);
-    width: 44px;
-    height: 44px;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(6px);
-    color: #fff;
-    z-index: 2;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background var(--ease), border-color var(--ease), transform var(--ease);
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__nav:hover {
-    background: rgba(0, 0, 0, 0.9);
-    border-color: rgba(255, 255, 255, 0.32);
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__nav:active {
-    transform: translateY(-50%) scale(0.97);
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__nav--prev {
-    left: 8px;
-  }
-  .pdp-shop-carousel-wrap .shop-col-carousel__nav--next {
-    right: 8px;
-  }
-
-  /** «Mais novos»: mesmo carrossel que “Mais vendidos” na home (`products-showcase-*`). */
-  .pdp-related .pdp-related__showcase-wrap {
-    position: relative;
-    width: 100%;
-    min-width: 0;
-  }
-  .pdp-related .products-showcase-nav {
-    display: none;
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 4;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    background: rgba(0, 0, 0, 0.55);
-    color: #fff;
-    cursor: pointer;
-    transition: background 0.2s ease, border-color 0.2s ease;
-  }
-  @media (min-width: 561px) {
-    .pdp-related .products-showcase-nav {
-      display: flex;
-    }
-  }
-  .pdp-related .products-showcase-nav:hover {
-    background: rgba(0, 0, 0, 0.85);
-    border-color: var(--c-accent);
-  }
-  .pdp-related .products-showcase-nav--prev {
-    left: 4px;
-  }
-  .pdp-related .products-showcase-nav--next {
-    right: 4px;
-  }
-  .pdp-related .products-showcase-viewport {
-    width: 100%;
-    min-width: 0;
-  }
-  .pdp-related .products-showcase {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
-    align-items: stretch;
-  }
-  .pdp-related .products-showcase > :global(*) {
-    min-width: 0;
-  }
-  @media (max-width: 900px) {
-    .pdp-related .products-showcase {
-      grid-template-columns: repeat(2, 1fr);
-    }
-  }
-  @media (max-width: 560px) {
-    .pdp-related .products-showcase-nav {
-      display: flex;
-      position: relative;
-      top: auto;
-      transform: none;
-      align-self: center;
-      flex-shrink: 0;
-    }
-    .pdp-related .pdp-related__showcase-wrap {
-      display: flex;
-      flex-direction: row;
-      align-items: stretch;
-      gap: 8px;
-      margin-inline: -20px;
-      padding-inline: 20px;
-      min-width: 0;
-    }
-    .pdp-related .products-showcase-viewport {
-      flex: 1;
-      min-width: 0;
-      overflow-x: auto;
-      overflow-y: hidden;
-      scroll-snap-type: x mandatory;
-      -webkit-overflow-scrolling: touch;
-      padding-bottom: 10px;
-      scrollbar-width: thin;
-      container-type: inline-size;
-      container-name: pdp-newest;
-    }
-    .pdp-related .products-showcase {
-      display: flex;
-      flex-direction: row;
-      flex-wrap: nowrap;
-      gap: 16px;
-      align-items: stretch;
-      width: max-content;
-      min-width: 100%;
-    }
-    .pdp-related .products-showcase > :global(*) {
-      flex: 0 0 100cqi;
-      max-width: 100cqi;
-      scroll-snap-align: start;
-      scroll-snap-stop: always;
-      box-sizing: border-box;
-    }
-    @supports not (width: 1cqi) {
-      .pdp-related .products-showcase > :global(*) {
-        flex: 0 0 calc(100vw - 120px);
-        max-width: min(360px, calc(100vw - 120px));
-      }
-    }
-  }
+  /* «Colecione o drop» e «Mais novos» agora são <ProductCarousel>
+     (product-carousel-client.ts) — mesmo componente da Home/Loja,
+     CSS/setas/paginação vêm dele. */
 
   .pdp-hero__thumbs-rail-wrap {
     flex: 0 0 88px;
@@ -1897,6 +1561,11 @@ const jsonLd = productFound
     line-height: 1.25;
     text-align: center;
     hyphens: auto;
+    /* Decisão explícita (testada e escolhida pelo time, não a recomendação
+       de contraste que eu tinha aplicado antes): branco nos dois botões
+       desta linha. `.btn-primary` global continua preto (AA) — isso aqui
+       só sobrescreve pra este botão específico, não sitewide. */
+    color: #fff;
   }
   .pdp-atc-icon {
     flex: 0 0 auto;
@@ -1923,7 +1592,7 @@ const jsonLd = productFound
   }
   .pdp-atc-icon img {
     display: block;
-    filter: brightness(0) invert(1);
+    filter: brightness(0);
   }
   .pdp-atc-icon--labeled {
     width: auto;
@@ -1938,6 +1607,21 @@ const jsonLd = productFound
     letter-spacing: 0.05em;
     text-transform: uppercase;
     white-space: nowrap;
+  }
+  /* "Comprar agora" + "Adicionar à bag" (com label) numa fileira estreita
+     estouram/quebram linha. Some com o texto do botão de bag só no mobile
+     e volta pro tamanho icon-only — os dois cabem numa linha só. */
+  @media (max-width: 480px) {
+    .pdp-atc-icon__label {
+      display: none;
+    }
+    .pdp-atc-icon--labeled {
+      width: 52px;
+      max-width: 56px;
+      min-width: 48px;
+      padding: 0;
+      gap: 0;
+    }
   }
   .pdp-qty-btn {
     width: 36px;
@@ -1973,7 +1657,14 @@ const jsonLd = productFound
     display: flex;
     gap: 8px;
   }
+  .pdp-cep-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 10px 16px;
+    font-size: 12px;
+  }
   .pdp-cep-input {
+    flex: 1;
     width: 100%;
     max-width: 200px;
     padding: 10px 12px;

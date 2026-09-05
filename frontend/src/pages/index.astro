@@ -1,6 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import ProductCard from '../components/ProductCard.astro';
+import ProductCarousel from '../components/ProductCarousel.astro';
 import { t, getPathForLang, type Lang } from '../i18n/utils';
 import { getProductListQueryString, resolveDefaultRegionId } from '../lib/medusa-pricing';
 import { getMedusaStoreUrl, getPublishableKey } from '../lib/medusa-env';
@@ -100,96 +100,32 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
       <source src="/video/hero.compressed.mp4" type="video/mp4" />
     </video>
     <div class="hero__overlay" aria-hidden="true"></div>
-    {siteConfig?.countdown?.enabled && siteConfig?.countdown?.targetIso && (
-      <div class="hero__countdown" id="hero-countdown" data-target-iso={siteConfig.countdown.targetIso}>
-        <p class="hero__countdown-label">{siteConfig.countdown.label || 'Próximo Drop em'}</p>
-        <div class="hero__countdown-clock" role="timer" aria-live="off">
-          <div class="hero__countdown-unit"><span class="hero__countdown-num" data-cd="d">00</span><span class="hero__countdown-u">dias</span></div>
-          <div class="hero__countdown-unit"><span class="hero__countdown-num" data-cd="h">00</span><span class="hero__countdown-u">h</span></div>
-          <div class="hero__countdown-unit"><span class="hero__countdown-num" data-cd="m">00</span><span class="hero__countdown-u">min</span></div>
-          <div class="hero__countdown-unit"><span class="hero__countdown-num" data-cd="s">00</span><span class="hero__countdown-u">s</span></div>
-        </div>
-        {siteConfig?.countdown?.presaveEnabled && (
-          <form class="hero__presave" id="hero-presave-form" novalidate data-api-url={publicApiUrl}>
-            <input type="email" name="email" required class="hero__presave-input" placeholder="seu@email.com" aria-label="E-mail" autocomplete="email" />
-            <button type="submit" class="hero__presave-btn">{siteConfig.countdown.presaveCta || 'Pre-save o drop'}</button>
-          </form>
-        )}
-        <p class="hero__presave-feedback" id="hero-presave-feedback" hidden></p>
-      </div>
-    )}
-    <a href="#produtos-vendidos" class="hero__scroll" aria-label="Scroll para produtos">
-      <span class="hero__scroll-label">Desça para ver mais</span>
-      <svg width="20" height="28" viewBox="0 0 20 28" fill="none" aria-hidden="true">
-        <rect x="1" y="1" width="18" height="26" rx="9" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
-        <circle cx="10" cy="8" r="2.5" fill="rgba(255,255,255,0.7)" class="scroll-dot"/>
-      </svg>
-    </a>
-  </section>
-
-  <!-- MAIS VENDIDOS -->
-  <section id="produtos-vendidos" class="section products-section" aria-labelledby="products-title">
-    <div class="container section-content">
-      <header class="section__header section__header--centered">
-        <h2 class="section__title" id="products-title">Mais Vendidos</h2>
-      </header>
-      <div class="products-showcase-wrap">
-        <button
-          type="button"
-          class="products-showcase-nav products-showcase-nav--prev"
-          id="products-nav-prev"
-          aria-label="Produtos anteriores"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
-        </button>
-        <div class="products-showcase-viewport" id="products-showcase-viewport" role="region" aria-label="Mais vendidos">
-          <div class="products-showcase" role="list" id="products-grid">
-            {products.length > 0 ? products.map(p => (
-              <ProductCard product={p} lang={lang} role="listitem" />
-            )) : ([1,2,3,4].map(() => (
-              <div class="product-showcase-card psc--skeleton" role="listitem" aria-hidden="true">
-                <div class="psc__img-wrap">
-                  <div class="psc__img psc__img--skel" />
-                </div>
-                <div class="psc__info">
-                  <div class="skel-line skel-line--name" />
-                  <div class="skel-line skel-line--price" />
-                </div>
-              </div>
-            )))}
+    <div class="hero__bottom-stack">
+      {siteConfig?.countdown?.enabled && siteConfig?.countdown?.targetIso && (
+        <div class="hero__countdown" id="hero-countdown" data-target-iso={siteConfig.countdown.targetIso}>
+          <p class="hero__countdown-label">{siteConfig.countdown.label || 'Próximo Drop em'}</p>
+          <div class="hero__countdown-clock" role="timer" aria-live="off">
+            <div class="hero__countdown-unit"><span class="hero__countdown-num" data-cd="d">00</span><span class="hero__countdown-u">dias</span></div>
+            <div class="hero__countdown-unit"><span class="hero__countdown-num" data-cd="h">00</span><span class="hero__countdown-u">h</span></div>
+            <div class="hero__countdown-unit"><span class="hero__countdown-num" data-cd="m">00</span><span class="hero__countdown-u">min</span></div>
+            <div class="hero__countdown-unit"><span class="hero__countdown-num" data-cd="s">00</span><span class="hero__countdown-u">s</span></div>
           </div>
+          {siteConfig?.countdown?.presaveEnabled && (
+            <form class="hero__presave" id="hero-presave-form" novalidate data-api-url={publicApiUrl}>
+              <input type="email" name="email" required class="hero__presave-input" placeholder="seu@email.com" aria-label="E-mail" autocomplete="email" />
+              <button type="submit" class="hero__presave-btn">{siteConfig.countdown.presaveCta || 'Pre-save o drop'}</button>
+            </form>
+          )}
+          <p class="hero__presave-feedback" id="hero-presave-feedback" hidden></p>
         </div>
-        <button
-          type="button"
-          class="products-showcase-nav products-showcase-nav--next"
-          id="products-nav-next"
-          aria-label="Próximos produtos"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-        </button>
-      </div>
-      <p class="products-section__actions">
-        <a
-          class="btn btn-outline products-section__cta"
-          href={getPathForLang('/shop', lang)}
-        >
-          <span class="products-section__cta-txt">{t(lang, 'sections', 'view_all')}</span>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="lucide lucide-arrow-right products-section__cta-ico"
-            aria-hidden="true"
-            ><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg
-          >
-        </a>
-      </p>
+      )}
+      <a href="#produtos-vendidos" class="hero__scroll" aria-label="Scroll para produtos">
+        <span class="hero__scroll-label">Desça para ver mais</span>
+        <svg width="20" height="28" viewBox="0 0 20 28" fill="none" aria-hidden="true">
+          <rect x="1" y="1" width="18" height="26" rx="9" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+          <circle cx="10" cy="8" r="2.5" fill="rgba(255,255,255,0.7)" class="scroll-dot"/>
+        </svg>
+      </a>
     </div>
   </section>
 
@@ -347,6 +283,60 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
     </div>
   </section>
 
+  <!-- MAIS VENDIDOS -->
+  <section id="produtos-vendidos" class="section products-section" aria-labelledby="products-title">
+    <div class="container section-content">
+      {products.length > 0 ? (
+        <ProductCarousel products={products} lang={lang} title="Mais Vendidos" headingId="products-title" ariaLabel="Mais vendidos" align="center" />
+      ) : (
+        <>
+          <header class="section__header section__header--centered">
+            <h2 class="section__title" id="products-title">Mais Vendidos</h2>
+          </header>
+          <div class="products-showcase-wrap">
+            <div class="products-showcase-viewport">
+              <div class="products-showcase" role="list" aria-label="Mais vendidos">
+                {[1,2,3,4].map(() => (
+                  <div class="product-showcase-card psc--skeleton" role="listitem" aria-hidden="true">
+                    <div class="psc__img-wrap">
+                      <div class="psc__img psc__img--skel" />
+                    </div>
+                    <div class="psc__info">
+                      <div class="skel-line skel-line--name" />
+                      <div class="skel-line skel-line--price" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+      <p class="products-section__actions">
+        <a
+          class="btn btn-outline products-section__cta"
+          href={getPathForLang('/shop', lang)}
+        >
+          <span class="products-section__cta-txt">{t(lang, 'sections', 'view_all')}</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-arrow-right products-section__cta-ico"
+            aria-hidden="true"
+            ><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg
+          >
+        </a>
+      </p>
+    </div>
+  </section>
+
   <!-- HISTORY — no background image, uses site default bg -->
   <section id="historia" class="section history-section" aria-labelledby="history-title">
     <div class="section-content history-content">
@@ -420,12 +410,24 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
   visibility: visible;
 }
 .hero__overlay { position: absolute; inset: 0; z-index: 1; background: linear-gradient(to bottom, rgba(0,0,0,.75) 0%, transparent); }
-.hero__countdown {
+/* Countdown e "desça para ver mais" empilhados num único container em fluxo
+   normal — antes eram dois `position:absolute` com `bottom` fixo cada um,
+   e colidiam sempre que o countdown crescia (form de pre-save aparecendo)
+   ou a viewport encolhia. Assim, qualquer altura do countdown empurra o
+   scroll indicator, nunca sobrepõe. */
+.hero__bottom-stack {
   position: absolute;
   left: 50%;
-  bottom: 96px;
+  bottom: 28px;
   transform: translateX(-50%);
   z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: calc(100% - 32px);
+}
+.hero__countdown {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -456,8 +458,10 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 }
 .hero__presave-input::placeholder { color: rgba(255, 255, 255, 0.5); }
 .hero__presave-btn {
+  /* Branco em cima do laranja (#e77e23) fica ~2.8:1 — abaixo do 4.5:1 do
+     WCAG 2.1 AA pra texto normal. Preto no mesmo fundo dá ~7.4:1. */
   background: var(--c-accent, #e77e23);
-  color: #fff;
+  color: var(--c-black, #000);
   border: 1px solid var(--c-accent, #e77e23);
   border-radius: 8px;
   padding: 8px 16px;
@@ -473,12 +477,12 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 .hero__presave-feedback.is-ok { color: #7dffb2; }
 .hero__presave-feedback.is-err { color: #ff8a8a; }
 @media (max-width: 560px) {
-  .hero__countdown { bottom: 72px; padding: 12px 16px; }
+  .hero__bottom-stack { bottom: 16px; gap: 10px; }
+  .hero__countdown { padding: 12px 16px; }
   .hero__countdown-num { font-size: 22px; }
 }
 .hero__scroll {
-  position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
-  z-index: 2; color: rgba(255,255,255,0.6); transition: color var(--ease);
+  color: rgba(255,255,255,0.6); transition: color var(--ease);
   display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
 .hero__scroll:hover { color: rgba(255,255,255,0.9); }
@@ -520,91 +524,17 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
   transition: transform 0.2s ease;
 }
 
-/* ── Products (usa ProductCard; moldura suavizada via bloco :global abaixo) ── */
+/* ── Products (usa ProductCard) ── */
+/* Só sobra pro fallback de skeleton (products.length === 0) — a fileira
+   real usa <ProductCarousel>, que traz seu próprio CSS/scroll/setas. */
 .products-showcase-wrap {
-  position: relative;
   width: 100%;
   min-width: 0;
-}
-.products-showcase-nav {
-  display: none;
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 4;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
-}
-.products-showcase-nav:hover {
-  background: rgba(0, 0, 0, 0.85);
-  border-color: var(--c-accent);
-}
-.products-showcase-nav--prev {
-  left: 4px;
-}
-.products-showcase-nav--next {
-  right: 4px;
 }
 .products-showcase-viewport { width: 100%; min-width: 0; }
 .products-showcase { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; align-items: stretch; }
 .products-showcase > :global(*) { min-width: 0; }
 @media (max-width: 900px) { .products-showcase { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 560px) {
-  /* Arrows sobrepostas ao carrossel, simétricas (base já é absolute top:50%) */
-  .products-showcase-nav {
-    display: flex;
-  }
-  .products-showcase-nav--prev { left: 12px; }
-  .products-showcase-nav--next { right: 12px; }
-  /* Viewport full-bleed (sangra até as bordas da tela) */
-  .products-showcase-wrap {
-    margin-inline: -20px;
-    min-width: 0;
-  }
-  .products-showcase-viewport {
-    width: 100%;
-    min-width: 0;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    scroll-padding-inline: 20px;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 10px;
-    scrollbar-width: thin;
-    container-type: inline-size;
-    container-name: prod-show;
-  }
-  .products-showcase {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    gap: 16px;
-    align-items: stretch;
-    width: max-content;
-    padding-inline: 20px; /* card alinhado às margens de 20px da página */
-  }
-  .products-showcase > :global(*) {
-    flex: 0 0 calc(100cqi - 40px);
-    max-width: calc(100cqi - 40px);
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
-    box-sizing: border-box;
-  }
-  @supports not (width: 1cqi) {
-    .products-showcase > :global(*) {
-      flex: 0 0 calc(100vw - 80px);
-      max-width: min(360px, calc(100vw - 80px));
-    }
-  }
-}
 
 .product-showcase-card {
   transition: transform 0.3s ease;
@@ -864,8 +794,15 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 .history__image img { width: 100%; height: auto; border-radius: 8px; }
 </style>
 <style is:global>
+/* `height: 100%` (não `auto`) aqui reintroduzia o bug do stretch quebrado:
+   align-items:stretch do container (.products-showcase) só estica um item
+   cujo `height` especificado seja `auto` — com `100%` explícito o
+   navegador ignora o stretch e o card fica na altura do próprio conteúdo,
+   fazendo cards sem linha de cor terem botão/preço mais alto que os com
+   cor. `.pc` base (ProductCard.astro) já resolve `height:auto`; esse
+   `height:100%` tinha especificidade maior (#id .class) e vencia. */
 #products-grid .pc {
-  height: 100%;
+  height: auto;
 }
 #products-grid .pc__img-wrap {
   border-radius: 12px;
@@ -927,27 +864,9 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
       observer.observe(heroVideo);
     }
 
-    const prodViewport = document.getElementById('products-showcase-viewport');
-    const prodPrev = document.getElementById('products-nav-prev');
-    const prodNext = document.getElementById('products-nav-next');
-    if (prodViewport && prodPrev && prodNext) {
-      const step = () => {
-        const track = prodViewport.querySelector('.products-showcase');
-        const first = track?.firstElementChild;
-        if (first instanceof HTMLElement) {
-          const gap = 16;
-          return Math.round(first.getBoundingClientRect().width + gap);
-        }
-        return Math.round(prodViewport.clientWidth * 0.92);
-      };
-      prodPrev.addEventListener('click', () => {
-        prodViewport.scrollBy({ left: -step(), behavior: 'smooth' });
-      });
-      prodNext.addEventListener('click', () => {
-        prodViewport.scrollBy({ left: step(), behavior: 'smooth' });
-      });
-    }
-  
+    /* Mais Vendidos: setas/scroll agora são do <ProductCarousel>
+       (product-carousel-client.ts, importado globalmente no Layout). */
+
     /* ─────────────────────────────────────────────
        CAROUSEL (drops)
     ───────────────────────────────────────────── */
