@@ -4,6 +4,7 @@ import { getProductVariantData, getVariantMaxQty } from '../lib/product-variants
 import { getVariantPriceInfo } from '../lib/medusa-pricing';
 import { optionRowKind, swatchFillForValue } from '../lib/variant-option-ui';
 import { getVariantSlideUrls } from '../lib/product-variant-gallery';
+import VariantOptionRows from './VariantOptionRows.astro';
 
 interface Props {
   product: any;
@@ -13,8 +14,27 @@ interface Props {
 
 const { product, lang = 'pt', reverse = false } = Astro.props;
 
-const { normalizedVariants, optionRows, defaultVariant } = getProductVariantData(product);
+const {
+  stockReliable: stockSignalsAreReliable,
+  normalizedVariants: normalizedVariantsRaw,
+  optionRows,
+  defaultVariant,
+} = getProductVariantData(product);
 const colorRow = optionRows.find((row: { title: string }) => optionRowKind(row.title) === 'color');
+const sizeRows = optionRows.filter((row: { title: string }) => optionRowKind(row.title) === 'size');
+const otherOptRows = optionRows.filter(
+  (row: { title: string }) => optionRowKind(row.title) !== 'color' && optionRowKind(row.title) !== 'size'
+);
+
+/* Mesmo remapeamento de ProductCard.astro — `allow_backorder` não vem no
+   normalizado padrão, precisa cruzar com o variant raw pra saber se um
+   combo "esgotado" ainda pode ser vendido. Serializado como data-variants
+   pro client resolver a combinação cor+tamanho de verdade (não só cor). */
+const rawVariants = product.variants ?? [];
+const normalizedVariants = normalizedVariantsRaw.map((nv: any) => {
+  const raw = rawVariants.find((v: any) => String(v?.id) === String(nv.id));
+  return { ...nv, allowBackorder: raw?.allow_backorder === true };
+});
 
 const handle = product.handle ?? '';
 const title = product.title ?? '';
@@ -30,10 +50,17 @@ function pickVariantForColor(colorValue: string) {
 const defaultNormalized = normalizedVariants.find((v) => v.id === defaultVariant?.id);
 const activeColor = colorRow ? String(defaultNormalized?.options?.[colorRow.id] ?? '') : '';
 
+/* `v` aqui é o normalizado (options{} em mapa, sem metadata/thumbnail) —
+   `getVariantSlideUrls(v, product)` nesse shape só enxerga `v.images`
+   (o par primary+secondary do hover do ProductCard, sempre 2), nunca o
+   `variant_gallery` de verdade (que só existe no objeto raw). O próprio
+   normalizador já resolve isso certo a partir do raw e expõe pronto em
+   `v.slideUrls` — usar direto em vez de recalcular errado. Bug real:
+   toda cor vinha travada em 2 fotos mesmo tendo 7-8 no metadata. */
 const colorVariants = colorRow
   ? colorRow.values.map((val: string) => {
       const v = pickVariantForColor(val);
-      const slides = [...new Set(getVariantSlideUrls(v, product))].slice(0, 5);
+      const slides = [...new Set(v.slideUrls ?? [])].slice(0, 5);
       return { value: val, variant: v, slides: slides.length ? slides : ['/no-data.webp'] };
     })
   : [];
@@ -61,9 +88,26 @@ const descriptionText = String(product.description ?? '')
   .trim();
 const descriptionShort =
   descriptionText.length > 220 ? descriptionText.slice(0, 217).replace(/\s+\S*$/, '') + '…' : descriptionText;
+
+/* Cor já é resolvida pelo swatch (1 variante representante); tamanho/outros
+   precisam do mesmo mecanismo do ProductCard — mapa options->valor do
+   defaultVariant, e os dados completos serializados pro client cruzar a
+   combinação escolhida (cor + tamanho) com a variante de verdade. */
+const selectedByOption = Object.fromEntries(
+  (defaultVariant?.options ?? []).map((opt: any) => [String(opt.option_id ?? opt.id ?? ''), String(opt.value ?? '')])
+);
 ---
 
-<article class:list={['mosaic-item', { 'mosaic-item--reverse': reverse }]} data-mosaic-item>
+<article
+  class:list={['mosaic-item', { 'mosaic-item--reverse': reverse }]}
+  data-mosaic-item
+  data-stock-reliable={stockSignalsAreReliable ? 'true' : 'false'}
+  data-product-id={product.id ?? ''}
+  data-product-handle={handle}
+  data-product-title={title}
+  data-variants={encodeURIComponent(JSON.stringify(normalizedVariants))}
+  data-option-rows={encodeURIComponent(JSON.stringify(optionRows))}
+>
   <a
     href={getPathForLang(`/product/${handle}`, lang)}
     class="mosaic-item__gallery"
@@ -92,7 +136,7 @@ const descriptionShort =
     </a>
 
     {colorRow && colorRow.values.length > 0 && (
-      <div class="mosaic-item__colors" role="list" aria-label={colorRow.title} data-color-switch>
+      <div class="mosaic-item__colors" role="list" aria-label={colorRow.title} data-color-switch data-color-option-id={colorRow.id}>
         {colorVariants.map(({ value: val, variant: v, slides }) => {
           const { fill, isGradient } = swatchFillForValue(val);
           const style: { background?: string; backgroundColor?: string } = {};
@@ -122,6 +166,8 @@ const descriptionShort =
         })}
       </div>
     )}
+
+    <VariantOptionRows optionRows={[...sizeRows, ...otherOptRows]} selectedByOption={selectedByOption} idPrefix={handle} />
 
     {descriptionShort && <p class="mosaic-item__desc">{descriptionShort}</p>}
 
@@ -323,6 +369,10 @@ const descriptionShort =
   .mosaic-item__add:hover {
     background: var(--c-accent-d);
     border-color: var(--c-accent-d);
+  }
+  .mosaic-item__add:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .mosaic-item__add img {
     filter: brightness(0) invert(1);

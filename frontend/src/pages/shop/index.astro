@@ -1,6 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import ProductCard from '../../components/ProductCard.astro';
+import ProductCarousel from '../../components/ProductCarousel.astro';
 import { getLangFromUrl, getPathForLang, t } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
 import { getProductListQueryString, resolveDefaultRegionId } from '../../lib/medusa-pricing';
@@ -195,30 +195,37 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
         </button>
       </div>
       <section class="shop-block" id="shop-novos" aria-labelledby="shop-novos-title">
-        <h2 class="shop-block__title" id="shop-novos-title">{t(lang, 'shop', 'section_novos')}</h2>
-        <div class="shop-grid" role="list" aria-label={t(lang, 'shop', 'section_novos')}>
-          {newProducts.length > 0
-            ? newProducts.map((p) => (
-                <ProductCard product={p} lang={lang} role="listitem" badges={{ isNew: topNewIds.includes(p?.id) }} />
-              ))
-            : <p class="shop-block__empty">—</p>}
-        </div>
+        {newProducts.length > 0 ? (
+          <ProductCarousel
+            products={newProducts}
+            lang={lang}
+            title={t(lang, 'shop', 'section_novos')}
+            headingId="shop-novos-title"
+            cardBadges={(p) => ({ isNew: topNewIds.includes(p?.id) })}
+          />
+        ) : (
+          <>
+            <h2 class="shop-block__title" id="shop-novos-title">{t(lang, 'shop', 'section_novos')}</h2>
+            <p class="shop-block__empty">—</p>
+          </>
+        )}
       </section>
 
       <section class="shop-block" id="shop-populares" aria-labelledby="shop-populares-title">
-        <h2 class="shop-block__title" id="shop-populares-title">{t(lang, 'shop', 'section_famosos')}</h2>
-        <div class="shop-grid" role="list" aria-label={t(lang, 'shop', 'section_famosos')}>
-          {famousProducts.length > 0
-            ? famousProducts.map((p) => (
-                <ProductCard
-                  product={p}
-                  lang={lang}
-                  role="listitem"
-                  badges={{ isPopular: topPopularIds.includes(p?.id) }}
-                />
-              ))
-            : <p class="shop-block__empty">—</p>}
-        </div>
+        {famousProducts.length > 0 ? (
+          <ProductCarousel
+            products={famousProducts}
+            lang={lang}
+            title={t(lang, 'shop', 'section_famosos')}
+            headingId="shop-populares-title"
+            cardBadges={(p) => ({ isPopular: topPopularIds.includes(p?.id) })}
+          />
+        ) : (
+          <>
+            <h2 class="shop-block__title" id="shop-populares-title">{t(lang, 'shop', 'section_famosos')}</h2>
+            <p class="shop-block__empty">—</p>
+          </>
+        )}
       </section>
 
       {collections.map((c) => (
@@ -227,74 +234,23 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
           id={`shop-col-${c.id}`}
           aria-labelledby={`shop-col-title-${c.id}`}
         >
-          <div class="shop-col__head">
-            <h2 class="shop-block__title shop-block__title--row" id={`shop-col-title-${c.id}`}>
-              {c.title}
-            </h2>
-            <a
-              href={getPathForLang(`/collections/${c.handle}`, lang)}
-              class="shop-col__drop-link btn btn-outline btn-sm"
-            >
-              Ver drop
-            </a>
-          </div>
-          <div class="shop-col-carousel-wrap">
-            <button
-              type="button"
-              class="shop-col-carousel__nav shop-col-carousel__nav--prev"
-              data-col-nav="prev"
-              data-target={`shop-col-carousel-${c.id}`}
-              aria-label="Anterior"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m15 18-6-6 6-6"></path>
-              </svg>
-            </button>
-            <div class="shop-col-carousel" id={`shop-col-carousel-${c.id}`} role="region" aria-label={c.title} tabindex="0">
-              <div class="shop-col-carousel__track" role="list">
-                {c.products.length > 0
-                  ? c.products.map((p) => (
-                      <div class="shop-col-carousel__cell" role="listitem">
-                        <ProductCard product={p} lang={lang} role="listitem" />
-                      </div>
-                    ))
-                  : <p class="shop-block__empty">—</p>}
+          {c.products.length > 0 ? (
+            <ProductCarousel products={c.products} lang={lang} title={c.title} headingId={`shop-col-title-${c.id}`} ariaLabel={c.title}>
+              <a slot="actions" href={getPathForLang(`/collections/${c.handle}`, lang)} class="shop-col__drop-link btn btn-outline btn-sm">
+                Ver drop
+              </a>
+            </ProductCarousel>
+          ) : (
+            <>
+              <div class="shop-col__head">
+                <h2 class="shop-block__title shop-block__title--row" id={`shop-col-title-${c.id}`}>{c.title}</h2>
+                <a href={getPathForLang(`/collections/${c.handle}`, lang)} class="shop-col__drop-link btn btn-outline btn-sm">
+                  Ver drop
+                </a>
               </div>
-            </div>
-            <button
-              type="button"
-              class="shop-col-carousel__nav shop-col-carousel__nav--next"
-              data-col-nav="next"
-              data-target={`shop-col-carousel-${c.id}`}
-              aria-label="Próximo"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m9 18 6-6-6-6"></path>
-              </svg>
-            </button>
-          </div>
+              <p class="shop-block__empty">—</p>
+            </>
+          )}
         </section>
       ))}
 
@@ -398,18 +354,9 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
     background: var(--c-surface2);
     border-color: #b0b0b0;
   }
-  body.page-shop .shop-col-carousel__nav {
-    border-color: rgba(0, 0, 0, 0.12);
-    background: rgba(255, 255, 255, 0.94);
-    color: var(--c-text);
-  }
-  body.page-shop .shop-col-carousel__nav:hover {
-    background: #fff;
-    border-color: var(--c-accent);
-  }
-  body.page-shop .shop-col-carousel::-webkit-scrollbar-thumb {
-    background: #c4c4c4;
-  }
+  /* .shop-col-carousel* removido — <ProductCarousel> usa var(--c-border)/
+     var(--c-text), que já assumem os valores de tema claro definidos logo
+     acima (body.page-shop), sem precisar de override específico daqui. */
   body.page-shop .pc__variants-divider {
     border-top-color: rgba(0, 0, 0, 0.08);
   }
@@ -554,7 +501,21 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
   display: none; margin-bottom: 20px;
 }
 @media (max-width: 900px) {
-  .shop-mobile-bar { display: flex; align-items: center; }
+  /* Sem sticky, o botão só existe uma vez no topo de .shop-main e some
+     assim que rola pra baixo — obriga voltar ao topo pra abrir os
+     filtros. Mesma propriedade (`top: var(--header-h)`) que a sidebar de
+     desktop já usa pra grudar sob o header, unificando o critério em vez
+     de cada parte da página inventar seu próprio sticky. */
+  .shop-mobile-bar {
+    display: flex;
+    align-items: center;
+    position: sticky;
+    top: var(--header-h);
+    z-index: 30;
+    background: #f8f8f8;
+    padding-block: 12px;
+    margin-bottom: 8px;
+  }
 }
 .shop-col__head {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
@@ -562,68 +523,6 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
 }
 .shop-block__title--row { margin-bottom: 0; flex: 1; min-width: 0; }
 .shop-col__drop-link { flex-shrink: 0; white-space: nowrap; margin-left: auto; }
-.shop-col-carousel-wrap {
-  position: relative;
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow: hidden;
-}
-.shop-col-carousel {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-  padding: 0 52px 8px;
-  scrollbar-color: var(--c-border) transparent;
-  border-radius: 10px;
-}
-.shop-col-carousel::-webkit-scrollbar { height: 8px; }
-.shop-col-carousel::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 999px; }
-.shop-col-carousel__track {
-  display: flex;
-  gap: 20px;
-  align-items: stretch;
-  width: max-content;
-  min-width: 100%;
-  min-height: 1px;
-  padding: 2px 2px 4px;
-}
-.shop-col-carousel__cell {
-  flex: 0 0 clamp(200px, 22vw, 260px);
-  min-width: 0;
-  scroll-snap-align: start;
-}
-.shop-col-carousel__cell :global(.pc) { min-height: 100%; }
-.shop-col-carousel__nav {
-  position: absolute;
-  top: 46%;
-  transform: translateY(-50%);
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.15);
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(6px);
-  color: #fff;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background var(--ease), border-color var(--ease), transform var(--ease);
-}
-.shop-col-carousel__nav:hover {
-  background: rgba(0,0,0,0.9);
-  border-color: rgba(255,255,255,0.32);
-}
-.shop-col-carousel__nav:active { transform: translateY(-50%) scale(0.97); }
-.shop-col-carousel__nav--prev { left: 8px; }
-.shop-col-carousel__nav--next { right: 8px; }
-
 .shop-header { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
 .shop-header__title { font-family: var(--font-title); font-size: 48px; text-transform: uppercase; flex: 1; }
 .shop-header__filter-toggle { display: none; }
@@ -661,22 +560,6 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
   .shop-col__head { align-items: flex-start; flex-wrap: wrap; gap: 10px; }
   .shop-block__title--row { width: 100%; }
   .shop-col__drop-link { margin-left: 0; }
-  .shop-col-carousel {
-    padding-left: 12px;
-    padding-right: 12px;
-  }
-  .shop-col-carousel__cell { flex-basis: min(64vw, 250px); }
-  .shop-col-carousel__nav { display: none; }
-}
-@media (max-width: 560px) {
-  .shop-col-carousel__cell { flex-basis: min(78vw, 230px); }
-}
-@media (min-width: 901px) and (max-width: 1280px) {
-  .shop-col-carousel {
-    padding-left: 44px;
-    padding-right: 44px;
-  }
-  .shop-col-carousel__cell { flex-basis: clamp(190px, 28vw, 250px); }
 }
 </style>
 
@@ -686,8 +569,11 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
   display: flex;
   flex-direction: column;
   position: relative;
-  height: 100%;
-  min-height: 0;
+  /* height:auto (não 100%) — align-items:stretch do grid só estica um
+     item com height especificado como auto; mesma correção aplicada em
+     ProductCard.astro. */
+  height: auto;
+  min-height: 100%;
   transition: transform 0.3s ease;
 }
 #shop-infinite-grid .pc:hover { transform: translateY(-4px); }
@@ -1861,16 +1747,7 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
       shopSidebarBackdrop.addEventListener("click", function () { setShopSidebarOpen(false); });
     }
 
-    document.querySelectorAll("[data-col-nav]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var targetId = btn.getAttribute("data-target");
-        if (!targetId) return;
-        var target = document.getElementById(targetId);
-        if (!target) return;
-        var direction = btn.getAttribute("data-col-nav") === "prev" ? -1 : 1;
-        var step = Math.max(220, Math.floor(target.clientWidth * 0.75));
-        target.scrollBy({ left: direction * step, behavior: "smooth" });
-      });
-    });
+    // Setas/scroll das fileiras de coleção agora são do <ProductCarousel>
+    // (product-carousel-client.ts, importado globalmente no Layout).
   })();
 </script>

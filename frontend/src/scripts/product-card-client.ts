@@ -4,23 +4,15 @@
  * (o que quebrava o browser com TS/`import` em linha).
  */
 import { addItem } from '../lib/cart';
-
-type VariantMap = {
-  id: string;
-  title: string;
-  price: number;
-  soldOut: boolean;
-  allowBackorder?: boolean;
-  maxQty?: number | null;
-  options: Record<string, string>;
-  images?: string[];
-  slideUrls?: string[];
-  priceDisplay?: string;
-  originalDisplay?: string | null;
-  discountPercent?: number;
-};
-type OptionRow = { id: string; title: string; values: string[] };
-type SelectedMap = Record<string, string>;
+import {
+  variantMatches,
+  variantIsOutOfStock,
+  getFirstAvailable,
+  resolveVariant,
+  type VariantMap,
+  type OptionRow,
+  type SelectedMap,
+} from '../lib/variant-selection';
 
 if (document.documentElement.dataset.pcInitDone === 'true') {
   /* já carregado (HMR / navegação) */
@@ -35,10 +27,6 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
     } catch {
       return null;
     }
-  }
-
-  function variantMatches(variant: VariantMap, selected: SelectedMap): boolean {
-    return Object.entries(selected).every(([k, v]) => !v || variant.options?.[k] === v);
   }
 
   function initCard(card: Element) {
@@ -82,37 +70,9 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
     const fallbackGallery = [quickBtn.dataset.thumbnail || PLACEHOLDER].filter(Boolean);
     const allowedOptionIds = new Set(optionRows.map((row) => row.id));
 
-    function variantIsOutOfStock(v: VariantMap) {
-      if (v.allowBackorder) return false;
-      if (v.soldOut) return true;
-      if (stockReliable) {
-        const mq = v.maxQty;
-        return mq != null && Number.isFinite(Number(mq)) && Number(mq) <= 0;
-      }
-      return false;
-    }
-
-    function getFirstAvailable(variants: VariantMap[], selected: SelectedMap): VariantMap | null {
-      return variants.find((v) => variantMatches(v, selected) && !variantIsOutOfStock(v)) || null;
-    }
-
-    const selectionComplete = (sel: SelectedMap) =>
-      optionRows.length > 0 && optionRows.every((row) => String(sel[row.id] ?? '').trim().length > 0);
-
-    const findExactVariantForSelection = (sel: SelectedMap): VariantMap | null => {
-      if (!selectionComplete(sel)) return null;
-      return (
-        variants.find((v) =>
-          optionRows.every(
-            (row) => String(v.options?.[row.id] ?? '').trim() === String(sel[row.id] ?? '').trim()
-          )
-        ) || null
-      );
-    };
-
     const selected: SelectedMap = {};
     const currentId = quickBtn.dataset.variantId || '';
-    const current = variants.find((v) => v.id === currentId) || getFirstAvailable(variants, {}) || variants[0];
+    const current = variants.find((v) => v.id === currentId) || getFirstAvailable(variants, {}, stockReliable) || variants[0];
     if (current?.options) {
       Object.entries(current.options).forEach(([k, v]) => {
         if (!allowedOptionIds.has(k)) return;
@@ -157,6 +117,15 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
       }
     };
 
+    /* Setas somem no início/fim — sem loop infinito (decisão: simplicidade
+       em vez de carousel infinito). */
+    const updateArrowVisibility = () => {
+      const multi = galleryUrls.length > 1;
+      if (galleryPrevBtn instanceof HTMLElement) galleryPrevBtn.hidden = !multi || galleryIndex === 0;
+      if (galleryNextBtn instanceof HTMLElement)
+        galleryNextBtn.hidden = !multi || galleryIndex === galleryUrls.length - 1;
+    };
+
     /* Galeria completa só entra no card (data-variants) como texto — nenhuma
        imagem extra é baixada até a seta (ou o hover) trocar o `src`. */
     const setupGallery = (urls: string[]) => {
@@ -165,34 +134,37 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
       manualNavUsed = false;
       hoverPreviewActive = false;
       const multi = galleryUrls.length > 1;
-      if (galleryPrevBtn instanceof HTMLElement) galleryPrevBtn.hidden = !multi;
-      if (galleryNextBtn instanceof HTMLElement) galleryNextBtn.hidden = !multi;
       if (galleryDots instanceof HTMLElement) {
         galleryDots.hidden = !multi;
         galleryDots.innerHTML = multi
           ? galleryUrls.map((_, i) => `<span class="${i === 0 ? 'is-active' : ''}"></span>`).join('')
           : '';
       }
+      updateArrowVisibility();
       renderGallerySlide();
+    };
+
+    const goToGallerySlide = (nextIndex: number) => {
+      const clamped = Math.max(0, Math.min(nextIndex, galleryUrls.length - 1));
+      if (clamped === galleryIndex) return;
+      manualNavUsed = true;
+      hoverPreviewActive = false;
+      galleryIndex = clamped;
+      renderGallerySlide();
+      updateArrowVisibility();
     };
 
     galleryPrevBtn?.addEventListener('click', (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
-      if (galleryUrls.length < 2) return;
-      manualNavUsed = true;
-      hoverPreviewActive = false;
-      galleryIndex = (galleryIndex - 1 + galleryUrls.length) % galleryUrls.length;
-      renderGallerySlide();
+      if (galleryIndex <= 0) return;
+      goToGallerySlide(galleryIndex - 1);
     });
     galleryNextBtn?.addEventListener('click', (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
-      if (galleryUrls.length < 2) return;
-      manualNavUsed = true;
-      hoverPreviewActive = false;
-      galleryIndex = (galleryIndex + 1) % galleryUrls.length;
-      renderGallerySlide();
+      if (galleryIndex >= galleryUrls.length - 1) return;
+      goToGallerySlide(galleryIndex + 1);
     });
 
     /* Preview no hover: mostra a 2ª foto (não empilha por cima — troca o
@@ -204,12 +176,59 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
         galleryIndex = 1;
         hoverPreviewActive = true;
         renderGallerySlide();
+        updateArrowVisibility();
       });
       imgWrap.addEventListener('mouseleave', () => {
         if (!hoverPreviewActive) return;
         hoverPreviewActive = false;
         galleryIndex = 0;
         renderGallerySlide();
+        updateArrowVisibility();
+      });
+
+      /* Swipe em touch: arrastar horizontal DENTRO da imagem troca a foto
+         da galeria e consome o gesto (preventDefault/stopPropagation), sem
+         deixar o carousel externo (produto→produto, scroll nativo) também
+         rolar. Arrasto iniciado fora da imagem nunca passa por aqui — segue
+         rolando o carousel externo como sempre. `touch-action:pan-y` (CSS)
+         mantém o scroll vertical da página livre; só o horizontal é pego. */
+      let dragStartX = 0;
+      let dragStartY = 0;
+      let dragging = false;
+      let dragHandled = false;
+      const DRAG_THRESHOLD = 45;
+
+      imgWrap.addEventListener('pointerdown', (ev: PointerEvent) => {
+        if (ev.pointerType !== 'touch' || galleryUrls.length < 2) return;
+        dragStartX = ev.clientX;
+        dragStartY = ev.clientY;
+        dragging = true;
+        dragHandled = false;
+      });
+      imgWrap.addEventListener('pointermove', (ev: PointerEvent) => {
+        if (!dragging || ev.pointerType !== 'touch') return;
+        const dx = ev.clientX - dragStartX;
+        const dy = ev.clientY - dragStartY;
+        if (!dragHandled && Math.abs(dx) > DRAG_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          dragHandled = true;
+          if (dx < 0) goToGallerySlide(galleryIndex + 1);
+          else goToGallerySlide(galleryIndex - 1);
+        }
+      });
+      const endDrag = () => {
+        dragging = false;
+      };
+      imgWrap.addEventListener('pointerup', endDrag);
+      imgWrap.addEventListener('pointercancel', endDrag);
+
+      /* Clique na imagem navega pro produto (padrão pedido de volta) — só
+         não navega se o clique veio logo depois de um swipe que já trocou
+         a foto (senão vira "arrastar = navegar"). */
+      const pcLink = card.querySelector('.pc__link');
+      pcLink?.addEventListener('click', (ev) => {
+        if (dragHandled) ev.preventDefault();
       });
     }
 
@@ -229,7 +248,7 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
         .filter((s) => s.length > 0)
         .join(' | ');
       quickBtn.dataset.variantTitle = optionTitle || variant.title || '';
-      const oos = variantIsOutOfStock(variant);
+      const oos = variantIsOutOfStock(variant, stockReliable);
       quickBtn.disabled = oos;
       if (bottomRow instanceof HTMLElement) bottomRow.classList.toggle('pc__bottom--oos', oos);
       if (soldoutTag instanceof HTMLElement) soldoutTag.hidden = !oos;
@@ -292,13 +311,7 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
           btn.setAttribute('aria-checked', selected[row.id] === value ? 'true' : 'false');
         });
       });
-      const exactForSelection = findExactVariantForSelection(selected);
-      const chosen =
-        exactForSelection ||
-        getFirstAvailable(variants, selected) ||
-        variants.find((v) => variantMatches(v, selected)) ||
-        variants.find((v) => !variantIsOutOfStock(v)) ||
-        variants[0];
+      const chosen = resolveVariant(variants, optionRows, selected, stockReliable) || variants[0];
       syncHeadings();
       if (chosen) setFromVariant(chosen);
     };

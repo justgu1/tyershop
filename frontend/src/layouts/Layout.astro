@@ -5,12 +5,19 @@ import SideCart from "../components/SideCart.astro";
 import PromoPopup from "../components/PromoPopup.astro";
 import { getLangFromUrl, hreflangMap, type Lang } from "../i18n/utils";
 import { getMedusaStoreUrl, getPublishableKey, getMercadoPagoPublicKey, getApiUrl } from "../lib/medusa-env";
+import { resolveDefaultRegionId } from "../lib/medusa-pricing";
 
 const medusaInternal = getMedusaStoreUrl();
 const storePk = getPublishableKey();
 const mpPk = getMercadoPagoPublicKey();
 const apiUrl = getApiUrl();
 const storeHeaders = { "x-publishable-api-key": storePk };
+/* Precisa de region_id pra calcular preço (`calculated_price`) em rotas da
+   Store API chamadas pelo client (ex.: revalidação de variant no carrinho,
+   lib/cart.ts) — sem isso a Store API responde 400 ("Missing required
+   pricing context to calculate prices"). Resolvido uma vez aqui (SSR) e
+   exposto via window, mesmo padrão de __MEDUSA_PK__ abaixo. */
+const storeRegionId = (await resolveDefaultRegionId(medusaInternal, storeHeaders, 3000).catch(() => null)) || '';
 let navDrops: { handle: string; name: string; num: string; img: string }[] = [];
 try {
   const cRes = await fetch(`${medusaInternal}/store/collections?limit=50`, {
@@ -115,10 +122,11 @@ const schemas: object[] = [
       ))
     }
     <meta name="theme-color" content="#0a0a0a" />
-    <script is:inline define:vars={{ storePk, mpPk, apiUrl }}>
+    <script is:inline define:vars={{ storePk, mpPk, apiUrl, storeRegionId }}>
       window.__MEDUSA_PK__ = storePk;
       window.__MERCADOPAGO_PK__ = mpPk;
       window.__API_URL__ = apiUrl;
+      window.__MEDUSA_REGION_ID__ = storeRegionId;
     </script>
     <script is:inline>
       // Voltar pelo browser (ex.: checkout -> bag) pode restaurar um snapshot
@@ -141,6 +149,7 @@ const schemas: object[] = [
     {!bare && <Footer lang={lang} showCollectionsLink={showCollectionsInNav} />}
     <script>
       import "../scripts/product-card-client";
+      import "../scripts/product-carousel-client";
       import "../scripts/side-cart-client";
       import "../scripts/mosaic-item-client";
     </script>

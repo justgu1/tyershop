@@ -154,6 +154,7 @@ export const translations = {
       qty_dec: 'Diminuir quantidade',
       qty_inc: 'Aumentar quantidade',
       shipping_cep: 'Calcular frete (CEP)',
+      calculate_shipping_cta: 'Calcular',
       shipping_estimate_placeholder:
         'Prazos e valores finais são confirmados no checkout. Envio padrão em geral de 10 a 15 dias úteis no Brasil.',
       differentials: 'Composição e diferenciais',

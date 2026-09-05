@@ -11,6 +11,7 @@ const c = (key: string) => t(lang, 'checkout', key);
 
 <Layout title={c('title')} lang={lang} noindex bodyClass="checkout-page" bare>
   <div class="checkout-shell" id="checkout-root"
+    data-mobile-step="contact"
     data-error-fields={c('error_fields')}
     data-error-generic={c('error_generic')}
     data-preparing={c('preparing')}
@@ -38,60 +39,123 @@ const c = (key: string) => t(lang, 'checkout', key);
       <div class="checkout-main">
         <p id="checkout-empty" class="checkout-page__empty" hidden>{c('empty')}</p>
 
+        <!-- Wizard por passo só no mobile (≤860px) — no desktop fica vazio
+             visualmente (display:none fora do media query) e não afeta nada. -->
+        <div class="checkout-mobile-stepper" id="checkout-mobile-stepper">
+          <div class="checkout-mobile-stepper__bar">
+            <div class="checkout-mobile-stepper__fill" id="checkout-mobile-stepper-fill"></div>
+          </div>
+          <div class="checkout-mobile-stepper__meta">
+            <p id="checkout-mobile-step-label" class="checkout-mobile-step-label" aria-live="polite">
+              Passo 1 de 4 — Seus dados
+            </p>
+            <span class="checkout-mobile-stepper__pct" id="checkout-mobile-stepper-pct">25%</span>
+          </div>
+        </div>
+
         <div id="checkout-form-section">
           <div class="checkout-step-wrap" id="checkout-step-wrap">
-            <section id="checkout-contact-section" class="checkout-step">
-              <form id="checkout-contact-form">
+            <form id="checkout-contact-form">
+              <section id="checkout-contact-section" class="checkout-step">
                 <h2 class="checkout-step__title">{c('contact_title')}</h2>
-                <div class="checkout-grid">
-                  <label class="checkout-field checkout-field--full">
-                    <span>{c('email')}</span>
-                    <input id="ck-email" name="email" type="email" required autocomplete="email" />
-                  </label>
-                  <label class="checkout-field">
-                    <span>{c('first_name')}</span>
-                    <input id="ck-first-name" name="given-name" type="text" required autocomplete="given-name" />
-                  </label>
-                  <label class="checkout-field">
-                    <span>{c('last_name')}</span>
-                    <input id="ck-last-name" name="family-name" type="text" required autocomplete="family-name" />
-                  </label>
-                  <label class="checkout-field">
-                    <span>{c('cpf')}</span>
-                    <input id="ck-cpf" name="cpf" type="text" inputmode="numeric" placeholder="000.000.000-00" required autocomplete="off" />
-                  </label>
-                  <label class="checkout-field">
-                    <span>{c('phone')}</span>
-                    <input id="ck-phone" name="tel" type="tel" autocomplete="tel" />
-                  </label>
+
+                <!-- Cliente logado com dados já conhecidos: cartão-resumo em
+                     vez do form cru, só "Avançar" (ou "Editar" pra corrigir
+                     algo antes de seguir). Inputs abaixo continuam no DOM
+                     (preenchidos via JS) — payerFromForm()/validação não mudam. -->
+                <div id="checkout-contact-summary" class="checkout-account-card" hidden>
+                  <div class="checkout-account-card__info">
+                    <p class="checkout-account-card__name" id="checkout-contact-summary-name"></p>
+                    <p class="checkout-account-card__detail" id="checkout-contact-summary-email"></p>
+                  </div>
+                  <button type="button" id="checkout-contact-summary-edit" class="checkout-address-overlay__edit">
+                    Editar
+                  </button>
                 </div>
 
+                <div id="checkout-contact-fields">
+                  <div class="checkout-grid">
+                    <label class="checkout-field checkout-field--full">
+                      <span>{c('email')} <em class="checkout-field__required">*</em></span>
+                      <input id="ck-email" name="email" type="email" required autocomplete="email" />
+                      <span class="checkout-field__error" data-error-for="ck-email" hidden></span>
+                    </label>
+                    <label class="checkout-field">
+                      <span>{c('first_name')} <em class="checkout-field__required">*</em></span>
+                      <input id="ck-first-name" name="given-name" type="text" required autocomplete="given-name" />
+                      <span class="checkout-field__error" data-error-for="ck-first-name" hidden></span>
+                    </label>
+                    <label class="checkout-field">
+                      <span>{c('last_name')} <em class="checkout-field__required">*</em></span>
+                      <input id="ck-last-name" name="family-name" type="text" required autocomplete="family-name" />
+                      <span class="checkout-field__error" data-error-for="ck-last-name" hidden></span>
+                    </label>
+                    <label class="checkout-field">
+                      <span>{c('cpf')} <em class="checkout-field__required">*</em></span>
+                      <input id="ck-cpf" name="cpf" type="text" inputmode="numeric" placeholder="000.000.000-00" required autocomplete="off" />
+                      <span class="checkout-field__error" data-error-for="ck-cpf" hidden></span>
+                    </label>
+                    <label class="checkout-field">
+                      <span>{c('phone')}</span>
+                      <input id="ck-phone" name="tel" type="tel" placeholder="(00) 00000-0000" autocomplete="tel" />
+                    </label>
+                  </div>
+                  <p id="checkout-personal-error" class="checkout-error" hidden></p>
+                </div>
+                <button type="button" id="checkout-contact-continue" class="checkout-step__continue">
+                  Continuar
+                </button>
+              </section>
+
+              <section id="checkout-address-section" class="checkout-step">
+                <button type="button" id="checkout-address-back" class="checkout-step__back">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                  Voltar
+                </button>
                 <h2 class="checkout-step__title">{c('address_title')}</h2>
-                <div class="checkout-grid">
-                  <label class="checkout-field">
-                    <span>{c('zip_code')}</span>
-                    <input id="ck-zip" name="postal-code" type="text" inputmode="numeric" placeholder="00000-000" required autocomplete="postal-code" />
-                  </label>
-                  <label class="checkout-field checkout-field--full">
-                    <span>{c('street_name')}</span>
-                    <input id="ck-street" name="address-line1" type="text" required autocomplete="address-line1" />
-                  </label>
-                  <label class="checkout-field">
-                    <span>{c('street_number')}</span>
-                    <input id="ck-number" name="address-line2" type="text" required autocomplete="address-line2" />
-                  </label>
-                  <label class="checkout-field">
-                    <span>{c('neighborhood')}</span>
-                    <input id="ck-neighborhood" name="neighborhood" type="text" required autocomplete="off" />
-                  </label>
-                  <label class="checkout-field">
-                    <span>{c('city')}</span>
-                    <input id="ck-city" name="address-level2" type="text" required autocomplete="address-level2" />
-                  </label>
-                  <label class="checkout-field">
-                    <span>{c('province')}</span>
-                    <input id="ck-province" name="address-level1" type="text" maxlength="2" placeholder="SP" required autocomplete="address-level1" />
-                  </label>
+
+                <!-- Cliente logado com endereço(s) já salvos: cartão por
+                     endereço (escolhe um, clique seleciona) em vez do form
+                     cru, com "Avançar" e uma saída pra cadastrar um novo. -->
+                <div id="checkout-address-summary" class="checkout-account-card checkout-account-card--addresses" hidden>
+                  <div class="checkout-address-cards" id="checkout-address-cards"></div>
+                  <button type="button" id="checkout-address-summary-new" class="checkout-link-btn">
+                    Usar outro endereço
+                  </button>
+                </div>
+
+                <div id="checkout-address-fields">
+                  <div class="checkout-grid">
+                    <label class="checkout-field">
+                      <span>{c('zip_code')} <em class="checkout-field__required">*</em></span>
+                      <input id="ck-zip" name="postal-code" type="text" inputmode="numeric" placeholder="00000-000" required autocomplete="postal-code" />
+                      <span class="checkout-field__error" data-error-for="ck-zip" hidden></span>
+                    </label>
+                    <label class="checkout-field checkout-field--full">
+                      <span>{c('street_name')} <em class="checkout-field__required">*</em></span>
+                      <input id="ck-street" name="address-line1" type="text" required autocomplete="address-line1" />
+                      <span class="checkout-field__error" data-error-for="ck-street" hidden></span>
+                    </label>
+                    <label class="checkout-field">
+                      <span>{c('street_number')} <em class="checkout-field__required">*</em></span>
+                      <input id="ck-number" name="address-line2" type="text" required autocomplete="address-line2" />
+                      <span class="checkout-field__error" data-error-for="ck-number" hidden></span>
+                    </label>
+                    <label class="checkout-field">
+                      <span>{c('neighborhood')}</span>
+                      <input id="ck-neighborhood" name="neighborhood" type="text" autocomplete="off" />
+                    </label>
+                    <label class="checkout-field">
+                      <span>{c('city')} <em class="checkout-field__required">*</em></span>
+                      <input id="ck-city" name="address-level2" type="text" required autocomplete="address-level2" />
+                      <span class="checkout-field__error" data-error-for="ck-city" hidden></span>
+                    </label>
+                    <label class="checkout-field">
+                      <span>{c('province')} <em class="checkout-field__required">*</em></span>
+                      <input id="ck-province" name="address-level1" type="text" maxlength="2" placeholder="SP" required autocomplete="address-level1" />
+                      <span class="checkout-field__error" data-error-for="ck-province" hidden></span>
+                    </label>
+                  </div>
                 </div>
 
                 <div id="checkout-login-needed" class="checkout-login-needed" hidden>
@@ -100,11 +164,13 @@ const c = (key: string) => t(lang, 'checkout', key);
                     <span>Senha</span>
                     <input id="ck-login-password" type="password" autocomplete="current-password" />
                   </label>
+                  <button type="button" id="ck-forgot-password" class="checkout-link-btn">Esqueci minha senha</button>
+                  <p id="ck-forgot-status" class="checkout-hint" hidden></p>
                 </div>
 
                 <p id="checkout-contact-error" class="checkout-error" hidden></p>
-              </form>
-            </section>
+              </section>
+            </form>
 
             <!-- Depois de confirmado: overlay trava a esquerda por cima do formulário
                  (continua visível por baixo, só desabilitado) — pagamento libera à direita. -->
@@ -141,24 +207,45 @@ const c = (key: string) => t(lang, 'checkout', key);
 
         <div class="checkout-summary__body" id="checkout-summary-body">
           <div class="checkout-summary__items" id="checkout-summary-items"></div>
-          <div class="checkout-summary__totals">
-            <div class="checkout-summary__row">
-              <span>{t(lang, 'cart', 'subtotal')}</span>
-              <span id="checkout-summary-subtotal">—</span>
-            </div>
-            <div class="checkout-summary__row" id="checkout-summary-shipping-row" hidden>
-              <span>{c('shipping')}</span>
-              <span id="checkout-summary-shipping">—</span>
-            </div>
+        </div>
+
+        <!-- Fora da área com scroll de propósito: subtotal/frete/desconto
+             precisam ficar visíveis junto com o Total, sem depender de rolar
+             a lista de itens até o fim pra ver os valores. -->
+        <div class="checkout-summary__totals">
+          <div class="checkout-summary__row">
+            <span>{t(lang, 'cart', 'subtotal')}</span>
+            <span id="checkout-summary-subtotal">—</span>
+          </div>
+          <div class="checkout-summary__row" id="checkout-summary-discount-row" hidden>
+            <span>Desconto</span>
+            <span id="checkout-summary-discount">—</span>
+          </div>
+          <div class="checkout-summary__row" id="checkout-summary-shipping-row" hidden>
+            <span>{c('shipping')}</span>
+            <span id="checkout-summary-shipping">—</span>
           </div>
         </div>
 
         <!-- Pagamento: só aparece depois que endereço trava -->
         <div id="checkout-payment-block" class="checkout-payment-block" hidden>
+          <button type="button" id="checkout-payment-back" class="checkout-payment-block__back">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            Voltar
+          </button>
           <div class="checkout-tabs" role="tablist">
-            <button type="button" class="checkout-tab is-active" data-payment-tab="card">{c('method_card')}</button>
-            <button type="button" class="checkout-tab" data-payment-tab="pix">{c('method_pix')}</button>
-            <button type="button" class="checkout-tab" data-payment-tab="boleto">{c('method_boleto')}</button>
+            <button type="button" class="checkout-tab is-active" data-payment-tab="card">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+              {c('method_card')}
+            </button>
+            <button type="button" class="checkout-tab" data-payment-tab="pix">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3.5c.6 0 1.2.24 1.6.66l3.2 3.2c.3.3.8.3 1.1 0l3.19-3.2a2.3 2.3 0 0 1 1.6-.66h.5l-5.1 5.1a2.3 2.3 0 0 1-3.3 0L5.7 3.5H8Z"/><path d="M8 20.5c.6 0 1.2-.24 1.6-.66l3.2-3.2c.3-.3.8-.3 1.1 0l3.19 3.2c.43.42.99.66 1.6.66h.5l-5.1-5.1a2.3 2.3 0 0 0-3.3 0L5.7 20.5H8Z"/><path d="M3.5 8c0-.6.24-1.2.66-1.6l3.2-3.2M20.5 8a2.3 2.3 0 0 0-.66-1.6l-3.2-3.2M3.5 16c0 .6.24 1.2.66 1.6l3.2 3.2M20.5 16a2.3 2.3 0 0 1-.66 1.6l-3.2 3.2"/></svg>
+              {c('method_pix')}
+            </button>
+            <button type="button" class="checkout-tab" data-payment-tab="boleto">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4v16M8 4v16M11 4v16M14 4v16M16 4v16M20 4v16"/></svg>
+              {c('method_boleto')}
+            </button>
           </div>
 
           <div data-payment-panel="card">
@@ -181,15 +268,34 @@ const c = (key: string) => t(lang, 'checkout', key);
                 <span>{c('card_holder_name')}</span>
                 <input id="ck-card-holder" type="text" required />
               </label>
-              <label class="checkout-field">
-                <span>{c('installments')}</span>
-                <select id="ck-installments">
-                  <option value="1">1x</option>
-                  <option value="2">2x</option>
-                  <option value="3">3x</option>
-                  <option value="6">6x</option>
-                </select>
-              </label>
+              <div class="checkout-field">
+                <span id="ck-installments-label">{c('installments')}</span>
+                <!-- Dropdown custom (não é <select> nativo, mas mantém o
+                     mesmo padrão de combobox/listbox acessível: botão com
+                     aria-haspopup/expanded, lista role=listbox/option,
+                     teclado — o valor de verdade fica no input hidden,
+                     lido do mesmo jeito de antes por checkout-client.ts). -->
+                <div class="ck-select" id="ck-installments-select">
+                  <button
+                    type="button"
+                    class="ck-select__btn"
+                    id="ck-installments-btn"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-labelledby="ck-installments-label ck-installments-btn"
+                  >
+                    <span class="ck-select__value" id="ck-installments-value">1x</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                  <ul class="ck-select__list" id="ck-installments-list" role="listbox" aria-labelledby="ck-installments-label" tabindex="-1" hidden>
+                    <li role="option" data-value="1" aria-selected="true" class="is-selected">1x</li>
+                    <li role="option" data-value="2" aria-selected="false">2x</li>
+                    <li role="option" data-value="3" aria-selected="false">3x</li>
+                    <li role="option" data-value="6" aria-selected="false">6x</li>
+                  </ul>
+                </div>
+                <input type="hidden" id="ck-installments" value="1" />
+              </div>
               <p id="checkout-card-error" class="checkout-error" hidden></p>
             </form>
           </div>
@@ -248,6 +354,11 @@ const c = (key: string) => t(lang, 'checkout', key);
   :global(body.checkout-page #main-content) {
     height: 100vh;
     background: #0a0a0a;
+    /* `main{padding-top:var(--header-h)}` (Layout.astro) reserva espaço pro
+       Header fixo do site — checkout usa `bare` (sem Header), então essa
+       reserva sobrava como um vão vazio em cima do topbar, e ainda dava
+       scroll de sobra (altura real = 100vh + esse padding). */
+    padding-top: 0;
   }
   .checkout-shell {
     height: 100vh;
@@ -262,10 +373,14 @@ const c = (key: string) => t(lang, 'checkout', key);
     grid-template-columns: 1fr 400px;
   }
 
+  /* Grid de 3 colunas em vez de flex + margin-inline:auto: a logo fica no
+     centro de verdade da barra, não só no espaço livre entre os vizinhos
+     (que mudam de largura quando o cadeado aparece/some). */
   .checkout-topbar {
     flex: 0 0 auto;
     height: 64px;
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
     gap: 20px;
     padding-inline: 24px;
@@ -279,6 +394,7 @@ const c = (key: string) => t(lang, 'checkout', key);
     text-decoration: none;
     font-size: 13px;
     white-space: nowrap;
+    justify-self: start;
   }
   .checkout-topbar__back:hover {
     color: #fff;
@@ -289,7 +405,7 @@ const c = (key: string) => t(lang, 'checkout', key);
     letter-spacing: 0.04em;
     color: #fff;
     text-decoration: none;
-    margin-inline: auto;
+    justify-self: center;
   }
   .checkout-topbar__lock {
     display: flex;
@@ -298,11 +414,26 @@ const c = (key: string) => t(lang, 'checkout', key);
     font-size: 12px;
     color: #7dd88a;
     white-space: nowrap;
+    justify-self: end;
+  }
+  /* `display:flex` acima é regra de autor e ganha do `[hidden]` da UA
+     stylesheet — sem isso o cadeado fica sempre visível mesmo com o
+     atributo `hidden` setado. */
+  .checkout-topbar__lock[hidden] {
+    display: none !important;
   }
 
   .checkout-main {
     overflow-y: auto;
     padding: 32px 40px 60px;
+  }
+  /* Indicador de passo e botão "Voltar" do pagamento só existem pro wizard
+     mobile — no desktop as 2 colunas já mostram tudo, sem passo a passo. */
+  .checkout-mobile-stepper {
+    display: none;
+  }
+  .checkout-payment-block__back {
+    display: none;
   }
   .checkout-page__empty {
     color: #b8b8b8;
@@ -320,6 +451,14 @@ const c = (key: string) => t(lang, 'checkout', key);
   }
   .checkout-step__title:not(:first-child) {
     margin-top: 24px;
+  }
+  /* "Continuar"/"Voltar" entre os passos de dados/endereço só existem no
+     wizard mobile — no desktop as 2 seções ficam sempre visíveis juntas. */
+  .checkout-step__continue {
+    display: none;
+  }
+  .checkout-step__back {
+    display: none;
   }
   .checkout-grid {
     display: grid;
@@ -353,6 +492,89 @@ const c = (key: string) => t(lang, 'checkout', key);
     outline: none;
     border-color: var(--c-accent);
   }
+  .checkout-field__required {
+    color: var(--c-accent);
+    font-style: normal;
+  }
+  .checkout-field__error {
+    font-size: 11px;
+    color: #fca5a5;
+  }
+  .checkout-field__error[hidden] {
+    display: none !important;
+  }
+  .checkout-field.is-invalid input {
+    border-color: #f87171;
+  }
+  /* Dropdown de parcelas — mesmo visual dos outros campos (`.checkout-field
+     input/select`) só que combobox custom em vez de <select> nativo. */
+  .ck-select {
+    position: relative;
+  }
+  .ck-select__btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: #171717;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: var(--r-md, 8px);
+    padding: 10px 12px;
+    color: #fff;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color var(--ease);
+  }
+  .ck-select__btn:focus-visible,
+  .ck-select__btn[aria-expanded="true"] {
+    outline: none;
+    border-color: var(--c-accent);
+  }
+  .ck-select__btn svg {
+    flex-shrink: 0;
+    color: #999;
+    transition: transform 0.15s ease;
+  }
+  .ck-select__btn[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+  }
+  .ck-select__list {
+    position: absolute;
+    z-index: 5;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+    background: #1c1c1c;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: var(--r-md, 8px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .ck-select__list[hidden] {
+    display: none !important;
+  }
+  .ck-select__list [role="option"] {
+    padding: 9px 10px;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #ddd;
+    cursor: pointer;
+  }
+  .ck-select__list [role="option"]:hover,
+  .ck-select__list [role="option"].is-active {
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+  }
+  .ck-select__list [role="option"].is-selected {
+    color: var(--c-accent);
+    font-weight: 700;
+  }
   .checkout-secure-field {
     background: #171717;
     border: 1px solid rgba(255, 255, 255, 0.18);
@@ -380,6 +602,25 @@ const c = (key: string) => t(lang, 'checkout', key);
   .checkout-login-needed .checkout-field {
     max-width: 260px;
   }
+  .checkout-link-btn {
+    margin-top: 10px;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: var(--c-accent);
+    font-size: 12px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .checkout-link-btn:hover {
+    color: #fff;
+  }
+  .checkout-hint {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: #b8b8b8;
+  }
 
   /* ── Endereço travado (esquerda, depois de confirmado): overlay por cima
        do formulário preenchido — continua visível, só fica desabilitado. ── */
@@ -404,6 +645,13 @@ const c = (key: string) => t(lang, 'checkout', key);
     backdrop-filter: blur(2px);
     border-radius: var(--r-lg, 12px);
     z-index: 2;
+  }
+  /* `display:flex` acima é regra de autor e ganha do `[hidden]` da UA
+     stylesheet — sem essa guarda o overlay fica sempre visível mesmo com o
+     atributo `hidden` setado depois do clique em "Editar" (o handler já
+     tava certo, só o CSS que nunca escondia de fato). */
+  .checkout-address-overlay[hidden] {
+    display: none !important;
   }
   .checkout-address-overlay__card {
     width: 100%;
@@ -451,6 +699,92 @@ const c = (key: string) => t(lang, 'checkout', key);
     color: var(--c-accent);
   }
 
+  /* ── Cliente logado: cartão-resumo (passo 1) / cards de endereço (passo 2)
+       no lugar do form cru — mesmo visual do card de endereço travado acima. ── */
+  .checkout-account-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 18px;
+    margin-bottom: 20px;
+    background: #171717;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: var(--r-lg, 12px);
+  }
+  .checkout-account-card[hidden] {
+    display: none !important;
+  }
+  .checkout-account-card--addresses {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .checkout-account-card__info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .checkout-account-card__name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+  }
+  .checkout-account-card__detail {
+    font-size: 13px;
+    color: #b8b8b8;
+    margin: 0;
+  }
+  .checkout-address-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .checkout-address-card {
+    position: relative;
+    text-align: left;
+    padding: 14px 16px;
+    background: #1c1c1c;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: var(--r-md, 8px);
+    cursor: pointer;
+    transition: border-color var(--ease);
+  }
+  .checkout-address-card:hover {
+    border-color: rgba(255, 255, 255, 0.32);
+  }
+  .checkout-address-card.is-selected {
+    border-color: var(--c-accent);
+    background: rgba(231, 126, 35, 0.08);
+  }
+  .checkout-address-card__badge {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--c-accent);
+    background: rgba(231, 126, 35, 0.14);
+    padding: 3px 8px;
+    border-radius: 999px;
+  }
+  .checkout-address-card__name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 4px;
+  }
+  .checkout-address-card__lines {
+    font-size: 12px;
+    color: #b8b8b8;
+    margin: 0;
+    line-height: 1.5;
+  }
+
   .checkout-tabs {
     display: flex;
     gap: 8px;
@@ -458,6 +792,10 @@ const c = (key: string) => t(lang, 'checkout', key);
   }
   .checkout-tab {
     flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     padding: 10px;
     border-radius: var(--r-md, 8px);
     border: 1px solid rgba(255, 255, 255, 0.18);
@@ -467,6 +805,9 @@ const c = (key: string) => t(lang, 'checkout', key);
     font-weight: 700;
     text-transform: uppercase;
     cursor: pointer;
+  }
+  .checkout-tab svg {
+    flex-shrink: 0;
   }
   .checkout-tab.is-active {
     border-color: var(--c-accent);
@@ -538,6 +879,12 @@ const c = (key: string) => t(lang, 'checkout', key);
     display: flex;
     flex-direction: column;
     min-height: 0;
+  }
+  /* `display:flex` acima é regra de autor e ganha do `[hidden]` da UA —
+     sem essa guarda o painel de resumo/pagamento fica visível mesmo depois
+     de completeCart() esconder ele (`panel.hidden = true`). */
+  .checkout-summary[hidden] {
+    display: none !important;
   }
   .checkout-summary__toggle {
     flex: 0 0 auto;
@@ -641,15 +988,23 @@ const c = (key: string) => t(lang, 'checkout', key);
     margin-top: 2px;
   }
   .checkout-summary__totals {
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     gap: 6px;
+    margin-bottom: 12px;
   }
   .checkout-summary__row {
     display: flex;
     justify-content: space-between;
     font-size: 13px;
     color: #999;
+  }
+  /* Sem essa guarda a linha de frete ("Frete —") aparecia antes do frete
+     ser calculado — o elemento nasce `hidden` no markup, mas o `display`
+     de autor acima ignorava o atributo. */
+  .checkout-summary__row[hidden] {
+    display: none !important;
   }
   .checkout-payment-block {
     flex: 0 0 auto;
@@ -707,6 +1062,140 @@ const c = (key: string) => t(lang, 'checkout', key);
     .checkout-grid,
     .checkout-grid--card {
       grid-template-columns: 1fr;
+    }
+
+    /* Wizard por passo (mobile só): cada passo mostra só o bloco dele —
+       formulário de endereço, resumo/revisão, ou pagamento — nunca os três
+       juntos. Total + botão de ação (fora desses blocos) ficam sempre
+       visíveis. Estado vem de `data-mobile-step` em #checkout-root, setado
+       pelo checkout-client.ts. */
+    .checkout-mobile-stepper {
+      display: block;
+      margin: 0 0 20px;
+    }
+    .checkout-mobile-stepper__bar {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      overflow: hidden;
+    }
+    .checkout-mobile-stepper__fill {
+      height: 100%;
+      width: 25%;
+      border-radius: 999px;
+      background: var(--c-accent, #e77e23);
+      transition: width 0.3s ease;
+    }
+    .checkout-mobile-stepper__meta {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .checkout-mobile-step-label {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--c-accent, #e77e23);
+    }
+    .checkout-mobile-stepper__pct {
+      flex-shrink: 0;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--c-accent, #e77e23);
+      background: rgba(231, 126, 35, 0.14);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    /* Passo 1 — Seus dados: só o form de contato + "Continuar". */
+    #checkout-root[data-mobile-step="contact"] #checkout-address-section,
+    #checkout-root[data-mobile-step="contact"] .checkout-summary__toggle,
+    #checkout-root[data-mobile-step="contact"] #checkout-summary-body,
+    #checkout-root[data-mobile-step="contact"] .checkout-summary__totals,
+    #checkout-root[data-mobile-step="contact"] #checkout-payment-block {
+      display: none;
+    }
+    #checkout-root[data-mobile-step="contact"] .checkout-step__continue {
+      display: block;
+      width: 100%;
+      margin-top: 20px;
+      padding: 14px;
+      border: 1px solid var(--c-accent);
+      border-radius: var(--r-md, 8px);
+      background: transparent;
+      color: var(--c-accent);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    /* Passo 2 — Endereço: só o form de endereço + "Voltar". */
+    #checkout-root[data-mobile-step="address"] #checkout-contact-section,
+    #checkout-root[data-mobile-step="address"] .checkout-summary__toggle,
+    #checkout-root[data-mobile-step="address"] #checkout-summary-body,
+    #checkout-root[data-mobile-step="address"] .checkout-summary__totals,
+    #checkout-root[data-mobile-step="address"] #checkout-payment-block {
+      display: none;
+    }
+    #checkout-root[data-mobile-step="address"] .checkout-step__back {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 16px;
+      background: none;
+      border: 0;
+      color: #b8b8b8;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    #checkout-root[data-mobile-step="address"] .checkout-step__back:hover {
+      color: #fff;
+    }
+
+    /* Passo 3 — Revisão: nem contato nem endereço, resumo do pedido +
+       recap do endereço (overlay reaproveitado como card normal — sem o
+       form embaixo, não precisa mais parecer overlay). */
+    #checkout-root[data-mobile-step="review"] #checkout-contact-section,
+    #checkout-root[data-mobile-step="review"] #checkout-address-section,
+    #checkout-root[data-mobile-step="review"] #checkout-payment-block {
+      display: none;
+    }
+    #checkout-root[data-mobile-step="review"] .checkout-address-overlay {
+      position: static;
+      inset: auto;
+      padding: 0;
+      background: none;
+      backdrop-filter: none;
+      margin-bottom: 20px;
+    }
+
+    /* Passo 4 — Pagamento. */
+    #checkout-root[data-mobile-step="payment"] #checkout-contact-section,
+    #checkout-root[data-mobile-step="payment"] #checkout-address-section,
+    #checkout-root[data-mobile-step="payment"] .checkout-address-overlay,
+    #checkout-root[data-mobile-step="payment"] .checkout-summary__toggle,
+    #checkout-root[data-mobile-step="payment"] #checkout-summary-body,
+    #checkout-root[data-mobile-step="payment"] .checkout-summary__totals {
+      display: none;
+    }
+    #checkout-root[data-mobile-step="payment"] .checkout-payment-block__back {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: 0;
+      color: #b8b8b8;
+      font-size: 13px;
+      padding: 0 0 14px;
+      cursor: pointer;
+    }
+    #checkout-root[data-mobile-step="payment"] .checkout-payment-block__back:hover {
+      color: #fff;
     }
   }
 </style>
