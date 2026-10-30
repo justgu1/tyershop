@@ -1,3 +1,5 @@
+declare const __BASE__: string | undefined
+
 export async function adminFetch<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
     credentials: "include",
@@ -5,7 +7,7 @@ export async function adminFetch<T = any>(path: string, init: RequestInit = {}):
     headers: { "Content-Type": "application/json", ...(init.headers || {}) },
   })
   if (res.status === 401 || res.status === 403) {
-    window.location.href = "/app/login"
+    window.location.href = `${typeof __BASE__ === "string" ? __BASE__.replace(/\/$/, "") : "/app"}/login`
     throw new Error("unauthorized")
   }
   const body = await res.json().catch(() => ({}))

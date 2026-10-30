@@ -19,6 +19,9 @@ module.exports = defineConfig({
   },
   admin: {
       disable: false,
+      // No container de dev o código fica em /app: o mesmo prefixo do admin faz o
+      // Vite descartar a base dos imports absolutos e não achar as páginas custom.
+      path: process.env.MEDUSA_ADMIN_PATH || "/app",
       maxUploadFileSize: 20 * 1024 * 1024,
     },
   modules: {
