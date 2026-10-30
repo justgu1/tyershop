@@ -1,0 +1,37 @@
+---
+import Layout from '../layouts/Layout.astro';
+import DropDefault from '../components/drop/DropDefault.astro';
+import LeadForm from '../components/drop/LeadForm.astro';
+import { fetchDrops } from '../lib/drop';
+
+export const prerender = false;
+
+const customPages = import.meta.glob('../components/drop-pages/*.astro', { eager: true }) as Record<
+  string,
+  { default: any }
+>;
+
+const { drop } = await fetchDrops();
+const Custom = drop?.component_key
+  ? customPages[`../components/drop-pages/${drop.component_key}.astro`]?.default
+  : null;
+const Page = Custom ?? DropDefault;
+---
+
+<Layout title={drop ? drop.title : 'Drop'} description="O drop atual da Tyer." lang="pt" bodyClass="page-drop">
+  {drop ? (
+    <Page drop={drop} />
+  ) : (
+    <section class="empty">
+      <h1>Próximo drop em breve</h1>
+      <p>Entre na lista para ser avisado quando abrir.</p>
+      <LeadForm source="signup" cta="Entrar na lista" successMessage="Você está na lista!" />
+    </section>
+  )}
+</Layout>
+
+<style>
+  .empty { min-height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 120px 20px 80px; text-align: center; background: #0b0b0b; color: #fff; }
+  .empty h1 { margin: 0; font-family: var(--font-title); font-size: clamp(36px, 8vw, 64px); text-transform: uppercase; }
+  .empty p { margin: 0; color: rgba(255, 255, 255, 0.75); }
+</style>

@@ -1,0 +1,73 @@
+---
+import Countdown from './Countdown.astro';
+import LeadForm from './LeadForm.astro';
+import { PHASE_LABEL, type PublicDrop } from '../../lib/drop';
+
+interface Props {
+  drop: PublicDrop;
+}
+const { drop } = Astro.props;
+const { phase } = drop;
+---
+
+<section class={`drop drop--${phase}`}>
+  <div class="drop__inner">
+    <p class="drop__phase">{PHASE_LABEL[phase]}</p>
+    <h1 class="drop__title">{drop.title}</h1>
+    {drop.subtitle && <p class="drop__subtitle">{drop.subtitle}</p>}
+
+    {phase === 'coming_soon' && (
+      <>
+        <Countdown targetIso={drop.preorder_starts_at} label="Pré-venda abre em" />
+        <p class="drop__text">A pré-venda é só para convidados. Entre na lista para ser avisado quando abrir.</p>
+        <LeadForm source="presave" cta="Quero ser avisado" successMessage="Anotado! Avisamos por e-mail." />
+      </>
+    )}
+
+    {phase === 'presale' && (
+      <>
+        <Countdown targetIso={drop.general_starts_at ?? drop.preorder_ends_at} label="Pré-venda termina em" />
+        <p class="drop__text">
+          Pré-venda exclusiva para convidados: até 2 peças de cada produto por pessoa. Produção em até {drop.production_days} dias,
+          mais o prazo da transportadora.
+        </p>
+        <p class="drop__text drop__text--muted">Sem convite? Peça acesso e avisamos se liberarmos.</p>
+        <LeadForm source="pedir_acesso" cta="Pedir acesso" successMessage="Pedido enviado! Avisamos por e-mail." />
+      </>
+    )}
+
+    {phase === 'general' && (
+      <>
+        <Countdown targetIso={drop.general_ends_at} label="Venda geral termina em" />
+        <p class="drop__text">
+          Venda geral aberta para todos, enquanto durar o lote. Produção em até {drop.production_days} dias, mais o prazo da
+          transportadora.
+        </p>
+      </>
+    )}
+
+    {phase === 'ended' && (
+      <>
+        <p class="drop__text">Este drop encerrou. Entre na lista e seja o primeiro a saber do próximo.</p>
+        <LeadForm source="signup" cta="Entrar na lista" successMessage="Você está na lista do próximo drop!" />
+        <div class="drop__links">
+          {drop.instagram_url && <a href={drop.instagram_url} target="_blank" rel="noopener">Instagram</a>}
+          {drop.whatsapp_url && <a href={drop.whatsapp_url} target="_blank" rel="noopener">Grupo do WhatsApp</a>}
+        </div>
+      </>
+    )}
+  </div>
+</section>
+
+<style>
+  .drop { min-height: 70vh; display: grid; place-items: center; padding: 120px 20px 80px; text-align: center; background: #0b0b0b; color: #fff; }
+  .drop__inner { display: flex; flex-direction: column; align-items: center; gap: 22px; max-width: 640px; }
+  .drop__phase { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-accent, #e77e23); }
+  .drop__title { margin: 0; font-family: var(--font-title); font-size: clamp(48px, 10vw, 96px); line-height: 0.95; text-transform: uppercase; }
+  .drop__subtitle { margin: 0; font-size: 18px; color: rgba(255, 255, 255, 0.75); }
+  .drop__text { margin: 0; font-size: 15px; line-height: 1.6; color: rgba(255, 255, 255, 0.8); }
+  .drop__text--muted { color: rgba(255, 255, 255, 0.55); font-size: 13px; }
+  .drop__links { display: flex; gap: 20px; }
+  .drop__links a { color: var(--c-accent, #e77e23); font-weight: 700; text-decoration: none; }
+  .drop__links a:hover { text-decoration: underline; }
+</style>

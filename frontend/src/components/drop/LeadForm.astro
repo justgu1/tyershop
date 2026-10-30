@@ -1,0 +1,67 @@
+---
+interface Props {
+  source: 'popup' | 'presave' | 'pedir_acesso' | 'avise_me' | 'signup';
+  cta: string;
+  placeholder?: string;
+  successMessage?: string;
+}
+const { source, cta, placeholder = 'Seu e-mail', successMessage = 'Pronto! Você está na lista.' } = Astro.props;
+---
+
+<form class="lead" data-lead-form data-source={source} data-success={successMessage} novalidate>
+  <div class="lead__row">
+    <input class="lead__input" type="email" name="email" placeholder={placeholder} required autocomplete="email" aria-label={placeholder} />
+    <button class="lead__btn" type="submit">{cta}</button>
+  </div>
+  <p class="lead__msg" role="status" aria-live="polite"></p>
+</form>
+
+<style>
+  .lead { width: 100%; max-width: 440px; }
+  .lead__row { display: flex; gap: 8px; }
+  .lead__input { flex: 1; min-width: 0; padding: 14px 16px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.06); color: #fff; font-size: 15px; }
+  .lead__btn { padding: 14px 20px; border: 0; border-radius: 8px; background: var(--c-accent, #e77e23); color: #fff; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; font-size: 13px; cursor: pointer; white-space: nowrap; }
+  .lead__btn:disabled { opacity: 0.6; cursor: wait; }
+  .lead__msg { min-height: 20px; margin: 8px 0 0; font-size: 13px; color: rgba(255, 255, 255, 0.75); }
+  .lead__msg.is-error { color: #f87171; }
+  .lead__msg.is-success { color: #4ade80; }
+  @media (max-width: 480px) { .lead__row { flex-direction: column; } }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLFormElement>('[data-lead-form]').forEach((form) => {
+    const input = form.querySelector<HTMLInputElement>('input[name="email"]')!;
+    const btn = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    const msg = form.querySelector<HTMLElement>('.lead__msg')!;
+    const say = (text: string, tone: 'error' | 'success') => {
+      msg.textContent = text;
+      msg.classList.toggle('is-error', tone === 'error');
+      msg.classList.toggle('is-success', tone === 'success');
+    };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = input.value.trim();
+      if (!/^\S+@\S+\.\S+$/.test(email)) return say('Digite um e-mail válido.', 'error');
+
+      btn.disabled = true;
+      try {
+        const res = await fetch('/store/leads', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-publishable-api-key': (window as any).__MEDUSA_PK__ || '',
+          },
+          body: JSON.stringify({ email, source: form.dataset.source }),
+        });
+        if (!res.ok) throw new Error('fail');
+        input.value = '';
+        say(form.dataset.success || 'Pronto!', 'success');
+      } catch {
+        say('Não consegui enviar agora. Tente de novo.', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+</script>
