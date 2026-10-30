@@ -1,0 +1,57 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+export const prerender = false;
+---
+
+<Layout title="Entrando" description="Entrando na pré-venda." lang="pt" noindex bodyClass="page-drop">
+  <section class="enter">
+    <p class="enter__msg" id="enter-msg" role="status">Entrando na sua conta…</p>
+    <a class="enter__back" id="enter-back" href="/drop" hidden>Ir para a página do drop</a>
+  </section>
+</Layout>
+
+<style>
+  .enter { min-height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 120px 20px 80px; text-align: center; background: #0b0b0b; color: #fff; }
+  .enter__msg { margin: 0; font-size: 18px; }
+  .enter__msg.is-error { color: #f87171; }
+  .enter__back { color: var(--c-accent, #e77e23); font-weight: 700; }
+</style>
+
+<script>
+  import { syncSessionCookie } from '../../lib/session';
+
+  const msg = document.getElementById('enter-msg')!;
+  const back = document.getElementById('enter-back')!;
+  const code = new URLSearchParams(location.search).get('c') || '';
+
+  function fail(text: string) {
+    msg.textContent = text;
+    msg.classList.add('is-error');
+    back.hidden = false;
+  }
+
+  (async () => {
+    if (!code) return fail('Link de convite incompleto.');
+    try {
+      const res = await fetch('/store/tickets/redeem', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-publishable-api-key': (window as any).__MEDUSA_PK__ || '',
+        },
+        body: JSON.stringify({ code }),
+      });
+      if (res.status === 404) return fail('Convite inválido ou expirado.');
+      const data = await res.json();
+      if (!res.ok || !data.token) throw new Error('fail');
+
+      localStorage.setItem('tyer_token', data.token);
+      localStorage.removeItem('tyer_customer');
+      syncSessionCookie();
+      location.replace('/drop');
+    } catch {
+      fail('Não consegui entrar agora. Tente de novo em instantes.');
+    }
+  })();
+</script>

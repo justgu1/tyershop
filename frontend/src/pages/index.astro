@@ -2,8 +2,9 @@
 import Layout from '../layouts/Layout.astro';
 import ProductCarousel from '../components/ProductCarousel.astro';
 import { t, getPathForLang, type Lang } from '../i18n/utils';
-import { getProductListQueryString, resolveDefaultRegionId } from '../lib/medusa-pricing';
+import Countdown from '../components/drop/Countdown.astro';
 import { getMedusaStoreUrl, getPublishableKey } from '../lib/medusa-env';
+import { fetchDrops, fetchStarterProducts, PHASE_LABEL } from '../lib/drop';
 
 // Home busca catálogo no Medusa: precisa renderizar por requisição —
 // pré-renderizada o HTML congelaria com o estado do build (sem backend).
@@ -13,49 +14,40 @@ const lang: Lang = 'pt';
 const pk = getPublishableKey();
 const publicApiUrl = (import.meta.env.PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '');
 
-let products: any[] = [];
-let collections: any[] = [];
 let siteConfig: any = null;
 
 try {
-  const url = getMedusaStoreUrl();
-  const headers = { 'x-publishable-api-key': pk };
-  const regionId = await resolveDefaultRegionId(url, headers);
-  const pq = getProductListQueryString(regionId);
-  const [pRes, cRes, scRes] = await Promise.all([
-    fetch(`${url}/store/products?${pq}&limit=8`, { headers, signal: AbortSignal.timeout(5000) }),
-    fetch(`${url}/store/collections?limit=50`, { headers, signal: AbortSignal.timeout(5000) }),
-    fetch(`${url}/store/site-config`, { headers, signal: AbortSignal.timeout(5000) }),
-  ]);
-  if (pRes.ok) products = ((await pRes.json()).products ?? []).slice(0, 4);
+  const scRes = await fetch(`${getMedusaStoreUrl()}/store/site-config`, {
+    headers: { 'x-publishable-api-key': pk },
+    signal: AbortSignal.timeout(5000),
+  });
   if (scRes.ok) siteConfig = (await scRes.json()).site_config ?? null;
-  if (cRes.ok) {
-    collections = (await cRes.json()).collections ?? [];
-    const countPromises = collections.map(c =>
-      fetch(`${url}/store/products?collection_id[]=${c.id}&limit=1`, { headers, signal: AbortSignal.timeout(3000) })
-        .then(r => r.json())
-        .then(d => d.count || 0)
-        .catch(() => 0)
-    );
-    const counts = await Promise.all(countPromises);
-    collections.forEach((c, i) => c.products_count = counts[i]);
-  }
 } catch {}
+
+const [{ drop, previous }, starter] = await Promise.all([fetchDrops(), fetchStarterProducts()]);
+
+const heroVideoUrl = drop && drop.hero_kind !== 'banner' ? drop.hero_url : null;
+const heroBannerUrl = drop && drop.hero_kind === 'banner' ? drop.hero_url : null;
+const dropCountdownTarget = !drop
+  ? null
+  : drop.phase === 'coming_soon'
+    ? drop.preorder_starts_at
+    : drop.phase === 'presale'
+      ? (drop.general_starts_at ?? drop.preorder_ends_at)
+      : drop.phase === 'general'
+        ? drop.general_ends_at
+        : null;
+const dropCountdownLabel = drop
+  ? { coming_soon: 'Pré-venda abre em', presale: 'Pré-venda termina em', general: 'Venda geral termina em', ended: '' }[drop.phase]
+  : '';
+const dropCta = drop?.phase === 'ended' ? 'Entrar na lista do próximo' : drop?.phase === 'coming_soon' ? 'Quero ser avisado' : 'Ver o drop';
 
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebSite',
   name: 'Tyer',
   url: 'https://tyer.com.br',
-  potentialAction: { '@type': 'SearchAction', target: 'https://tyer.com.br/shop?q={search_term_string}', 'query-input': 'required name=search_term_string' },
 };
-
-function getCollectionImage(col: any): string {
-  return `/collections/${col.handle || 'no-data'}.webp`;
-}
-function getCount(col: any): number {
-  return col.products_count ?? 0;
-}
 
 const YOUTUBE_URL = 'https://www.youtube.com/@tyer_br';
 const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
@@ -74,31 +66,31 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 
   <!-- HERO -->
   <section class="hero" aria-label="Hero">
-    <picture class="hero__picture">
-      <source srcset="/hero.avif" type="image/avif" />
-      <source srcset="/hero.webp" type="image/webp" />
-      <source srcset="/hero.jpg" type="image/jpeg" />
-  
-      <img
-        src="/hero.jpg"
-        alt="Hero"
-        class="hero__image"
-        loading="eager"
-        decoding="async"
-      />
-    </picture>
-  
-    <video
-      class="hero__video"
-      muted
-      loop
-      playsinline
-      preload="auto"
-      aria-hidden="true"
-    >
-      <source src="/video/hero.webm" type="video/webm" />
-      <source src="/video/hero.compressed.mp4" type="video/mp4" />
-    </video>
+    {heroBannerUrl ? (
+      <picture class="hero__picture">
+        <img src={heroBannerUrl} alt={drop?.title ?? 'Tyer'} class="hero__image" loading="eager" decoding="async" />
+      </picture>
+    ) : (
+      <>
+        <picture class="hero__picture">
+          <source srcset="/hero.avif" type="image/avif" />
+          <source srcset="/hero.webp" type="image/webp" />
+          <source srcset="/hero.jpg" type="image/jpeg" />
+          <img src="/hero.jpg" alt="Hero" class="hero__image" loading="eager" decoding="async" />
+        </picture>
+
+        <video class="hero__video" muted loop playsinline preload="auto" aria-hidden="true">
+          {heroVideoUrl ? (
+            <source src={heroVideoUrl} />
+          ) : (
+            <>
+              <source src="/video/hero.webm" type="video/webm" />
+              <source src="/video/hero.compressed.mp4" type="video/mp4" />
+            </>
+          )}
+        </video>
+      </>
+    )}
     <div class="hero__overlay" aria-hidden="true"></div>
     <div class="hero__bottom-stack">
       {siteConfig?.countdown?.enabled && siteConfig?.countdown?.targetIso && (
@@ -119,7 +111,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
           <p class="hero__presave-feedback" id="hero-presave-feedback" hidden></p>
         </div>
       )}
-      <a href="#produtos-vendidos" class="hero__scroll" aria-label="Scroll para produtos">
+      <a href="#drop-atual" class="hero__scroll" aria-label="Scroll para o drop atual">
         <span class="hero__scroll-label">Desça para ver mais</span>
         <svg width="20" height="28" viewBox="0 0 20 28" fill="none" aria-hidden="true">
           <rect x="1" y="1" width="18" height="26" rx="9" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
@@ -129,65 +121,88 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
     </div>
   </section>
 
-  {collections.length > 0 && (
-  <section id="collection" class="section collections-section" aria-labelledby="collections-title">
-    <div class="section-content collections-wrap">
-      <h2 class="collections-title section__title" id="collections-title">Drops</h2>
-      <div
-        class:list={['carousel-stage', { 'carousel-stage--single': collections.length === 1 }]}
-        id="carousel-stage"
-        role="region"
-        aria-label="Collections"
-      >
-        <div class="carousel-track" id="carousel-track">
-          {collections.map((col, i) => (
-            <article
-              class={`col-card${i === 0 ? ' is-active' : ''}`}
-              data-index={i}
-              role="listitem"
-            >
-              <a href={`/collections/${col.handle}`} class="col-card__link">
-                <img
-                  src={getCollectionImage(col)}
-                  alt={col.title}
-                  onerror="this.src='/no-data.webp'"
-                  class="col-card__img"
-                  width="260" height="400"
-                  loading={i === 0 ? 'eager' : 'lazy'}
-                  decoding="async"
-                />
-                {col.products_count === 0 && (
-                  <div class="col-card__ribbon"><span>ESGOTADO</span></div>
-                )}
-                <div class="col-card__content">
-                  <h3 class="col-card__name">{col.title}</h3>
-                  <p class="col-card__count">{getCount(col)} itens disponíveis</p>
-                  <span class="col-card__cta">Ver coleção →</span>
-                </div>
-              </a>
-            </article>
-          ))}
+  <!-- DROP ATUAL -->
+  <section id="drop-atual" class="section drop-now" aria-labelledby="drop-now-title">
+    <div class="container section-content">
+      {drop ? (
+        <a class="drop-now__card" href="/drop">
+          <div class="drop-now__media">
+            <img
+              src={drop.cover_url || '/no-data.webp'}
+              alt=""
+              width="640"
+              height="800"
+              loading="lazy"
+              decoding="async"
+              onerror="this.src='/no-data.webp'"
+            />
+          </div>
+          <div class="drop-now__body">
+            <p class="drop-now__phase">{PHASE_LABEL[drop.phase]}</p>
+            <h2 class="drop-now__title" id="drop-now-title">{drop.title}</h2>
+            {drop.subtitle && <p class="drop-now__subtitle">{drop.subtitle}</p>}
+            {dropCountdownTarget && <Countdown targetIso={dropCountdownTarget} label={dropCountdownLabel} align="start" />}
+            <span class="drop-now__cta">{dropCta} →</span>
+          </div>
+        </a>
+      ) : (
+        <div class="drop-now__empty">
+          <h2 class="drop-now__title" id="drop-now-title">Próximo drop em breve</h2>
+          <p class="drop-now__subtitle">Entre na lista para ser avisado quando abrir.</p>
+          <a class="drop-now__cta" href="/drop">Entrar na lista →</a>
         </div>
-        <button class="carousel-nav carousel-nav--prev" id="col-prev" aria-label="Anterior" type="button">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
-        </button>
-        <button class="carousel-nav carousel-nav--next" id="col-next" aria-label="Próximo" type="button">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
-        </button>
-        <div class="carousel-dots" id="carousel-dots" role="tablist">
-          {collections.map((_, i) => (
-            <button
-              class={`carousel-dot${i === 0 ? ' is-active' : ''}`}
-              aria-label={`Coleção ${i + 1}`}
-              data-idx={i}
-              role="tab"
-              aria-selected={i === 0 ? 'true' : 'false'}
-            ></button>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   </section>
+
+  <!-- STARTER -->
+  <section id="starter" class="section starter-section" aria-labelledby="starter-title">
+    <div class="container section-content">
+      {starter.length > 0 ? (
+        <ProductCarousel products={starter} lang={lang} title="Starter" headingId="starter-title" ariaLabel="Linha Starter" align="center" />
+      ) : (
+        <header class="section__header section__header--centered">
+          <h2 class="section__title" id="starter-title">Starter</h2>
+        </header>
+      )}
+      <p class="starter__note">Linha fixa com estoque pronto: sem prazo de produção.</p>
+    </div>
+  </section>
+
+  <!-- DROPS ANTERIORES -->
+  {previous.length > 0 && (
+    <section id="drops-anteriores" class="section past-section" aria-labelledby="past-title">
+      <div class="container section-content">
+        <header class="section__header section__header--centered">
+          <h2 class="section__title" id="past-title">Drops anteriores</h2>
+        </header>
+        <ul class="past__list" role="list">
+          {previous.map((p) => {
+            const Tag = p.instagram_url ? 'a' : 'div';
+            return (
+              <li>
+                <Tag
+                  class="past__card"
+                  {...(p.instagram_url ? { href: p.instagram_url, target: '_blank', rel: 'noopener noreferrer' } : {})}
+                >
+                  <img
+                    src={p.cover_url || `/collections/${p.handle}.webp`}
+                    alt=""
+                    width="320"
+                    height="400"
+                    loading="lazy"
+                    decoding="async"
+                    onerror="this.src='/no-data.webp'"
+                  />
+                  <span class="past__name">{p.title}</span>
+                  {p.instagram_url && <span class="past__cta">Ver no Instagram →</span>}
+                </Tag>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </section>
   )}
 
   <!-- EDITORIAL -->
@@ -280,60 +295,6 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
           </ul>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- MAIS VENDIDOS -->
-  <section id="produtos-vendidos" class="section products-section" aria-labelledby="products-title">
-    <div class="container section-content">
-      {products.length > 0 ? (
-        <ProductCarousel products={products} lang={lang} title="Mais Vendidos" headingId="products-title" ariaLabel="Mais vendidos" align="center" />
-      ) : (
-        <>
-          <header class="section__header section__header--centered">
-            <h2 class="section__title" id="products-title">Mais Vendidos</h2>
-          </header>
-          <div class="products-showcase-wrap">
-            <div class="products-showcase-viewport">
-              <div class="products-showcase" role="list" aria-label="Mais vendidos">
-                {[1,2,3,4].map(() => (
-                  <div class="product-showcase-card psc--skeleton" role="listitem" aria-hidden="true">
-                    <div class="psc__img-wrap">
-                      <div class="psc__img psc__img--skel" />
-                    </div>
-                    <div class="psc__info">
-                      <div class="skel-line skel-line--name" />
-                      <div class="skel-line skel-line--price" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-      <p class="products-section__actions">
-        <a
-          class="btn btn-outline products-section__cta"
-          href={getPathForLang('/shop', lang)}
-        >
-          <span class="products-section__cta-txt">{t(lang, 'sections', 'view_all')}</span>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="lucide lucide-arrow-right products-section__cta-ico"
-            aria-hidden="true"
-            ><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg
-          >
-        </a>
-      </p>
     </div>
   </section>
 
@@ -808,6 +769,30 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.04);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+}
+</style>
+
+<style>
+.drop-now__card { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 40px; align-items: center; color: #fff; text-decoration: none; background: #111; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; overflow: hidden; }
+.drop-now__media img { display: block; width: 100%; height: 100%; max-height: 520px; object-fit: cover; }
+.drop-now__body { display: flex; flex-direction: column; align-items: flex-start; gap: 18px; padding: 32px 40px 32px 0; }
+.drop-now__phase { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-accent, #e77e23); }
+.drop-now__title { margin: 0; font-family: var(--font-title); font-size: clamp(40px, 7vw, 76px); line-height: 0.95; text-transform: uppercase; }
+.drop-now__subtitle { margin: 0; font-size: 17px; color: rgba(255, 255, 255, 0.75); }
+.drop-now__cta { font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; font-size: 13px; color: var(--c-accent, #e77e23); }
+.drop-now__empty { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 48px 20px; text-align: center; background: #111; border-radius: 16px; }
+.drop-now__empty .drop-now__cta { text-decoration: none; }
+.starter__note { margin: 20px 0 0; text-align: center; font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+.past__list { list-style: none; margin: 24px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+.past__card { display: flex; flex-direction: column; gap: 8px; color: #fff; text-decoration: none; }
+.past__card img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.past__name { font-family: var(--font-title); font-size: 22px; text-transform: uppercase; }
+.past__cta { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-accent, #e77e23); }
+a.past__card:hover img { border-color: var(--c-accent, #e77e23); }
+@media (max-width: 760px) {
+  .drop-now__card { grid-template-columns: 1fr; gap: 0; }
+  .drop-now__media img { max-height: 360px; }
+  .drop-now__body { padding: 24px 20px 28px; }
 }
 </style>
 

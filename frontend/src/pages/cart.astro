@@ -55,7 +55,7 @@ const lang: Lang = getLangFromUrl(Astro.url);
           </div>
           <button class="btn btn-primary sc__checkout" id="cart-checkout" type="button">{t(lang, 'cart', 'checkout')}</button>
           <button class="sc__view-cart" id="cart-clear-all" type="button">Limpar bag</button>
-          <a href={getPathForLang('/shop', lang)} class="sc__view-cart">{t(lang, 'cart', 'continue_shopping')}</a>
+          <a href={getPathForLang('/drop', lang)} class="sc__view-cart">{t(lang, 'cart', 'continue_shopping')}</a>
         </div>
       </aside>
     </div>

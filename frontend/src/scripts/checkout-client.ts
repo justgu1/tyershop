@@ -213,7 +213,7 @@ function init() {
   if (!items.length) {
     // Bag vazia não tem o que fazer no checkout — manda pra loja com um
     // aviso, em vez de deixar a pessoa presa numa página em branco.
-    window.location.href = '/shop?empty_checkout=1';
+    window.location.href = '/drop';
     return;
   }
   renderSummary(items);

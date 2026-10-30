@@ -118,8 +118,11 @@ const searchGroupPopular = t(lang, "search", "group_popular");
         </div>
       )}
 
-      <a href={getPathForLang("/shop", lang)} class="hdr__nav-link"
-        >{t(lang, "nav", "shop")}</a
+      <a href={getPathForLang("/drop", lang)} class="hdr__nav-link">Drop</a>
+      <a
+        href={`${getPathForLang("/", lang)}#starter`}
+        class="hdr__nav-link"
+        data-scroll-anchor="true">Starter</a
       >
       <a
         href={`${getPathForLang("/", lang)}#historia`}
@@ -450,8 +453,10 @@ const searchGroupPopular = t(lang, "search", "group_popular");
       ))
     }
     <li>
-      <a href={getPathForLang("/shop", lang)} class="mob-menu__link"
-        >{t(lang, "nav", "shop")}</a>
+      <a href={getPathForLang("/drop", lang)} class="mob-menu__link">Drop</a>
+    </li>
+    <li>
+      <a href={getPathForLang("/#starter", lang)} class="mob-menu__link">Starter</a>
     </li>
     <li>
       <a href={getPathForLang("/#editorial", lang)} class="mob-menu__link">{t(lang, "nav", "editorial")}</a>
@@ -1559,6 +1564,7 @@ const searchGroupPopular = t(lang, "search", "group_popular");
         const token = data.token;
         if (!token) throw new Error("Resposta inválida");
         localStorage.setItem("tyer_token", token);
+        window.dispatchEvent(new Event("tyer:auth"));
         await syncAccountFromToken();
         if (hdrLoginStatus) hdrLoginStatus.textContent = "";
         if (hdrLoginStatus) hdrLoginStatus.hidden = true;
@@ -1610,6 +1616,7 @@ const searchGroupPopular = t(lang, "search", "group_popular");
         const loginData = await readJsonSafe(loginRes);
         if (!loginRes.ok || !loginData.token) throw new Error("Conta criada; faça login");
         localStorage.setItem("tyer_token", loginData.token);
+        window.dispatchEvent(new Event("tyer:auth"));
         await syncAccountFromToken();
         if (hdrRegStatus) hdrRegStatus.textContent = "";
         if (hdrRegStatus) hdrRegStatus.hidden = true;

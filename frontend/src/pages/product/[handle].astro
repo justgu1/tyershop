@@ -336,25 +336,11 @@ const jsonLd = productFound
           <ol class="pdp-breadcrumb__list">
             <li><a href={getPathForLang('/', lang)}>Tyer</a></li>
             <li aria-hidden="true">/</li>
-            {product.collection?.handle ? (
-              <>
-                <li>
-                  <a href={getPathForLang(`/collections/${product.collection.handle}`, lang)}>
-                    {product.collection.title ?? product.collection.handle}
-                  </a>
-                </li>
-                <li aria-hidden="true">/</li>
-                <li aria-current="page">{product.title}</li>
-              </>
-            ) : (
-              <>
-                <li>
-                  <a href={getPathForLang('/shop', lang)}>{t(lang, 'nav', 'shop')}</a>
-                </li>
-                <li aria-hidden="true">/</li>
-                <li aria-current="page">{product.title}</li>
-              </>
-            )}
+            <li>
+              <a href={getPathForLang('/drop', lang)}>Drop</a>
+            </li>
+            <li aria-hidden="true">/</li>
+            <li aria-current="page">{product.title}</li>
           </ol>
         </nav>
 
@@ -816,7 +802,7 @@ const jsonLd = productFound
       <p class="nf__sub">{t(lang, 'pdp', 'product_not_found_sub')}</p>
       <div class="nf__actions">
         <a href={getPathForLang('/', lang)} class="btn btn-primary">{t(lang, 'pdp', 'product_not_found_home')}</a>
-        <a href={getPathForLang('/shop', lang)} class="btn btn-outline">{t(lang, 'pdp', 'product_not_found_shop')}</a>
+        <a href={getPathForLang('/drop', lang)} class="btn btn-outline">{t(lang, 'pdp', 'product_not_found_shop')}</a>
       </div>
     </section>
   )}

@@ -18,25 +18,9 @@ const storeHeaders = { "x-publishable-api-key": storePk };
    pricing context to calculate prices"). Resolvido uma vez aqui (SSR) e
    exposto via window, mesmo padrão de __MEDUSA_PK__ abaixo. */
 const storeRegionId = (await resolveDefaultRegionId(medusaInternal, storeHeaders, 3000).catch(() => null)) || '';
-let navDrops: { handle: string; name: string; num: string; img: string }[] = [];
-try {
-  const cRes = await fetch(`${medusaInternal}/store/collections?limit=50`, {
-    headers: storeHeaders,
-    signal: AbortSignal.timeout(3000),
-  });
-  if (cRes.ok) {
-    const data = await cRes.json();
-    navDrops = (data.collections || []).map(
-      (c: { handle: string; title: string }, i: number) => ({
-        handle: c.handle,
-        name: c.title,
-        num: String(i + 1).padStart(2, "0"),
-        img: `/collections/${c.handle}.webp`,
-      }),
-    );
-  }
-} catch {}
-const showCollectionsInNav = navDrops.length > 0;
+/* Só existem o drop atual (/drop) e a linha Starter: o menu não lista mais coleções. */
+const navDrops: { handle: string; name: string; num: string; img: string }[] = [];
+const showCollectionsInNav = false;
 
 interface Props {
   title: string;

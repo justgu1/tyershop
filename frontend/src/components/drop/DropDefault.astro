@@ -1,13 +1,17 @@
 ---
 import Countdown from './Countdown.astro';
 import LeadForm from './LeadForm.astro';
-import { PHASE_LABEL, type PublicDrop } from '../../lib/drop';
+import ProductCard from '../ProductCard.astro';
+import { PHASE_LABEL, type DropAccess, type PublicDrop } from '../../lib/drop';
 
 interface Props {
   drop: PublicDrop;
+  access?: DropAccess;
+  products?: any[];
 }
-const { drop } = Astro.props;
+const { drop, access = 'none', products = [] } = Astro.props;
 const { phase } = drop;
+const showProducts = access === 'granted' && products.length > 0;
 ---
 
 <section class={`drop drop--${phase}`}>
@@ -31,8 +35,18 @@ const { phase } = drop;
           Pré-venda exclusiva para convidados: até 2 peças de cada produto por pessoa. Produção em até {drop.production_days} dias,
           mais o prazo da transportadora.
         </p>
-        <p class="drop__text drop__text--muted">Sem convite? Peça acesso e avisamos se liberarmos.</p>
-        <LeadForm source="pedir_acesso" cta="Pedir acesso" successMessage="Pedido enviado! Avisamos por e-mail." />
+        {access === 'login' && (
+          <>
+            <p class="drop__text drop__text--muted">Recebeu um convite? Entre na sua conta para ver as peças.</p>
+            <button type="button" class="drop__btn" data-open-login>Entrar na minha conta</button>
+          </>
+        )}
+        {access === 'locked' && (
+          <p class="drop__text drop__text--muted">Esta conta ainda não tem convite para este drop. Peça acesso e avisamos se liberarmos.</p>
+        )}
+        {(access === 'login' || access === 'locked') && (
+          <LeadForm source="pedir_acesso" cta="Pedir acesso" successMessage="Pedido enviado! Avisamos por e-mail." />
+        )}
       </>
     )}
 
@@ -59,15 +73,42 @@ const { phase } = drop;
   </div>
 </section>
 
+{showProducts && (
+  <section class="drop-products" aria-label={`Produtos do drop ${drop.title}`}>
+    <div class="drop-products__grid" role="list">
+      {products.map((p) => <ProductCard product={p} lang="pt" role="listitem" />)}
+    </div>
+  </section>
+)}
+
 <style>
   .drop { min-height: 70vh; display: grid; place-items: center; padding: 120px 20px 80px; text-align: center; background: #0b0b0b; color: #fff; }
+  .drop--presale, .drop--general { min-height: 0; padding-bottom: 56px; }
   .drop__inner { display: flex; flex-direction: column; align-items: center; gap: 22px; max-width: 640px; }
   .drop__phase { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-accent, #e77e23); }
   .drop__title { margin: 0; font-family: var(--font-title); font-size: clamp(48px, 10vw, 96px); line-height: 0.95; text-transform: uppercase; }
   .drop__subtitle { margin: 0; font-size: 18px; color: rgba(255, 255, 255, 0.75); }
   .drop__text { margin: 0; font-size: 15px; line-height: 1.6; color: rgba(255, 255, 255, 0.8); }
   .drop__text--muted { color: rgba(255, 255, 255, 0.55); font-size: 13px; }
+  .drop__inner .drop__btn { padding: 14px 24px; border: 0; border-radius: 8px; background: var(--c-accent, #e77e23); color: #fff; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; font-size: 13px; cursor: pointer; }
   .drop__links { display: flex; gap: 20px; }
   .drop__links a { color: var(--c-accent, #e77e23); font-weight: 700; text-decoration: none; }
   .drop__links a:hover { text-decoration: underline; }
+  .drop-products { background: #0b0b0b; padding: 0 20px 96px; }
+  .drop-products__grid { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
 </style>
+
+<script>
+  import { syncSessionCookie } from '../../lib/session';
+
+  document.querySelectorAll('[data-open-login]').forEach((btn) =>
+    btn.addEventListener('click', () => document.getElementById('hdr-account-btn')?.click())
+  );
+
+  // O servidor só enxerga a sessão pelo cookie: se o login/logout mudou o token, espelha e recarrega uma vez.
+  const resync = () => {
+    if (syncSessionCookie()) location.reload();
+  };
+  resync();
+  window.addEventListener('tyer:auth', resync);
+</script>

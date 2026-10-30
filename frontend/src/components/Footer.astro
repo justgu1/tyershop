@@ -30,13 +30,11 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
           <li>
             <a href={getPathForLang('/', lang)} class="footer__col-link">{t(lang, 'footer', 'inicio')}</a>
           </li>
-          {showCollectionsLink && (
-            <li>
-              <a href={`${getPathForLang('/', lang)}#collection`} class="footer__col-link">{t(lang, 'nav', 'collections')}</a>
-            </li>
-          )}
           <li>
-            <a href={getPathForLang('/shop', lang)} class="footer__col-link">{t(lang, 'nav', 'shop')}</a>
+            <a href={getPathForLang('/drop', lang)} class="footer__col-link">Drop</a>
+          </li>
+          <li>
+            <a href={`${getPathForLang('/', lang)}#starter`} class="footer__col-link">Starter</a>
           </li>
           <li>
             <a href={WHATSAPP_GROUP_URL} class="footer__col-link" target="_blank" rel="noopener noreferrer"

@@ -2,7 +2,8 @@
 import Layout from '../layouts/Layout.astro';
 import DropDefault from '../components/drop/DropDefault.astro';
 import LeadForm from '../components/drop/LeadForm.astro';
-import { fetchDrops } from '../lib/drop';
+import { fetchDrops, fetchProductsByIds } from '../lib/drop';
+import { readSessionToken } from '../lib/session';
 
 export const prerender = false;
 
@@ -11,16 +12,21 @@ const customPages = import.meta.glob('../components/drop-pages/*.astro', { eager
   { default: any }
 >;
 
-const { drop } = await fetchDrops();
+const token = readSessionToken(Astro.request.headers.get('cookie'));
+const { drop, access, product_ids } = await fetchDrops(token);
+const products = await fetchProductsByIds(product_ids);
+
 const Custom = drop?.component_key
   ? customPages[`../components/drop-pages/${drop.component_key}.astro`]?.default
   : null;
 const Page = Custom ?? DropDefault;
+
+Astro.response.headers.set('cache-control', 'private, no-store');
 ---
 
 <Layout title={drop ? drop.title : 'Drop'} description="O drop atual da Tyer." lang="pt" bodyClass="page-drop">
   {drop ? (
-    <Page drop={drop} />
+    <Page drop={drop} access={access} products={products} />
   ) : (
     <section class="empty">
       <h1>Próximo drop em breve</h1>
