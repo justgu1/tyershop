@@ -71,7 +71,7 @@ export async function issueTickets(scope: MedusaContainer, dropId: string) {
 
   const pending = ticketsToSend([...tickets, ...created])
   const notifications = scope.resolve(Modules.NOTIFICATION) as any
-  const dropUrl = `${(process.env.SITE_URL || "http://localhost:4321").replace(/\/$/, "")}/drop`
+  const siteUrl = (process.env.SITE_URL || "http://localhost:4321").replace(/\/$/, "")
 
   let sent = 0
   const failed: { email: string; error: string }[] = []
@@ -87,7 +87,7 @@ export async function issueTickets(scope: MedusaContainer, dropId: string) {
           email: lead.email,
           name: lead.name,
           drop_title: drop.title,
-          drop_url: dropUrl,
+          login_url: `${siteUrl}/drop/entrar?c=${encodeURIComponent(ticket.code)}`,
           presale_ends_at: drop.general_starts_at ?? drop.preorder_ends_at,
           production_days: drop.production_days,
         },

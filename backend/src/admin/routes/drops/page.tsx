@@ -1,5 +1,6 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { useCallback, useEffect, useState } from "react"
+import { ProductsPanel } from "../../components/products-panel"
 import { TicketsPanel } from "../../components/tickets-panel"
 import { adminFetch, fromLocalInput, toLocalInput, ui } from "../../lib/api"
 
@@ -45,6 +46,7 @@ const DropsPage = () => {
   const [drops, setDrops] = useState<Drop[]>([])
   const [editing, setEditing] = useState<Partial<Drop> | null>(null)
   const [ticketsFor, setTicketsFor] = useState<Drop | null>(null)
+  const [productsFor, setProductsFor] = useState<Drop | null>(null)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
 
@@ -203,6 +205,9 @@ const DropsPage = () => {
         </div>
       )}
 
+      {productsFor && (
+        <ProductsPanel dropId={productsFor.id} title={productsFor.title} onClose={() => setProductsFor(null)} />
+      )}
       {ticketsFor && (
         <TicketsPanel dropId={ticketsFor.id} title={ticketsFor.title} onClose={() => setTicketsFor(null)} />
       )}
@@ -225,6 +230,9 @@ const DropsPage = () => {
                 Tornar atual
               </button>
             )}
+            <button style={ui.ghost} onClick={() => setProductsFor(d)}>
+              Produtos
+            </button>
             <button style={ui.ghost} onClick={() => setTicketsFor(d)}>
               Ingressos
             </button>

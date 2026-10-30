@@ -1,7 +1,8 @@
 import { AbstractNotificationProviderService, MedusaError } from "@medusajs/framework/utils"
 import type { Logger, ProviderSendNotificationDTO, ProviderSendNotificationResultsDTO } from "@medusajs/framework/types"
 import nodemailer, { Transporter } from "nodemailer"
-import { renderTemplate } from "./templates"
+import { LOGO_PNG_BASE64 } from "./logo"
+import { LOGO_CID, renderTemplate } from "./templates"
 import { readTestMode, resolveRecipient } from "./test-mode"
 
 type Options = {
@@ -51,6 +52,14 @@ class SmtpNotificationProviderService extends AbstractNotificationProviderServic
       subject,
       html: rendered.html,
       text: rendered.text,
+      attachments: [
+        {
+          filename: "tyer.png",
+          content: Buffer.from(LOGO_PNG_BASE64, "base64"),
+          cid: LOGO_CID,
+          contentType: "image/png",
+        },
+      ],
     })
     this.logger_.info(`[smtp] ${notification.template} → ${to} (${info.messageId})`)
     return { id: info.messageId }
