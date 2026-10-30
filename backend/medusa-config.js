@@ -22,6 +22,9 @@ module.exports = defineConfig({
       maxUploadFileSize: 20 * 1024 * 1024,
     },
   modules: {
+    drop: { resolve: "./src/modules/drop" },
+    lead: { resolve: "./src/modules/lead" },
+    ticket: { resolve: "./src/modules/ticket" },
     payment: {
       resolve: "@medusajs/payment",
       options: {
