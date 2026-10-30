@@ -56,6 +56,12 @@ const { source, cta, placeholder = 'Seu e-mail', successMessage = 'Pronto! Você
         });
         if (!res.ok) throw new Error('fail');
         input.value = '';
+        try {
+          // Quem já está na lista não precisa do popup de cadastro nas outras páginas.
+          sessionStorage.setItem('tyer_promo_dismissed_v1', '1');
+        } catch {
+          /* storage indisponível */
+        }
         say(form.dataset.success || 'Pronto!', 'success');
       } catch {
         say('Não consegui enviar agora. Tente de novo.', 'error');

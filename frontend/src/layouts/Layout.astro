@@ -68,7 +68,7 @@ const siteName = "Tyer";
 const fullTitle = title === siteName ? siteName : `${title} | ${siteName}`;
 const canonPath = Astro.url.pathname;
 /** Popup de drop atrapalha o fluxo de compra — não mostra no carrinho/checkout. */
-const hidePromoPopup = /^\/(cart|checkout)(\/|$)/.test(canonPath);
+const hidePromoPopup = /^\/(cart|checkout|drop)(\/|$)/.test(canonPath);
 const hreflangs = hreflangMap(canonPath);
 
 const schemas: object[] = [
