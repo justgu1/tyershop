@@ -1,5 +1,6 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { useCallback, useEffect, useState } from "react"
+import { TicketsPanel } from "../../components/tickets-panel"
 import { adminFetch, fromLocalInput, toLocalInput, ui } from "../../lib/api"
 
 type Drop = {
@@ -43,6 +44,7 @@ const EMPTY: Partial<Drop> = {
 const DropsPage = () => {
   const [drops, setDrops] = useState<Drop[]>([])
   const [editing, setEditing] = useState<Partial<Drop> | null>(null)
+  const [ticketsFor, setTicketsFor] = useState<Drop | null>(null)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
 
@@ -201,6 +203,10 @@ const DropsPage = () => {
         </div>
       )}
 
+      {ticketsFor && (
+        <TicketsPanel dropId={ticketsFor.id} title={ticketsFor.title} onClose={() => setTicketsFor(null)} />
+      )}
+
       {drops.map((d) => (
         <div key={d.id} style={{ ...ui.card, display: "flex", justifyContent: "space-between", gap: 12 }}>
           <div>
@@ -219,6 +225,9 @@ const DropsPage = () => {
                 Tornar atual
               </button>
             )}
+            <button style={ui.ghost} onClick={() => setTicketsFor(d)}>
+              Ingressos
+            </button>
             <button style={ui.ghost} onClick={() => setEditing(d)}>
               Editar
             </button>

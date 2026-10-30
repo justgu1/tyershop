@@ -28,6 +28,31 @@ module.exports = defineConfig({
     drop: { resolve: "./src/modules/drop" },
     lead: { resolve: "./src/modules/lead" },
     ticket: { resolve: "./src/modules/ticket" },
+    // Sem SMTP configurado o provider não é registrado (a validação das opções derrubaria o boot).
+    ...(process.env.SMTP_HOST
+      ? {
+          notification: {
+            resolve: "@medusajs/notification",
+            options: {
+              providers: [
+                {
+                  resolve: "./src/modules/notification-smtp",
+                  id: "smtp",
+                  options: {
+                    channels: ["email"],
+                    host: process.env.SMTP_HOST,
+                    port: Number(process.env.SMTP_PORT) || undefined,
+                    secure: process.env.SMTP_SECURE === "true",
+                    user: process.env.SMTP_USER,
+                    password: process.env.SMTP_PASSWORD,
+                    from: process.env.SMTP_FROM,
+                  },
+                },
+              ],
+            },
+          },
+        }
+      : {}),
     payment: {
       resolve: "@medusajs/payment",
       options: {
