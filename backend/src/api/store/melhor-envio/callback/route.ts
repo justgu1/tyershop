@@ -15,7 +15,9 @@ export async function POST(req: MedusaRequest<{ code?: string; state?: string }>
   }
   try {
     await req.scope.resolve<MelhorEnvioModuleService>(MELHOR_ENVIO_MODULE).connect(code)
-  } catch {
+  } catch (err) {
+    // O motivo (ex.: cliente recusado, redirect diferente) vai ao log; ao navegador só a mensagem genérica.
+    req.scope.resolve("logger").error(`[melhor-envio] autorização recusada: ${(err as Error).message}`)
     return res.status(502).json({ message: "O Melhor Envio recusou a autorização. Tente de novo pelo painel." })
   }
   res.json({ ok: true })
