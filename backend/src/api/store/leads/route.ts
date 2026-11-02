@@ -25,15 +25,15 @@ export async function POST(req: MedusaRequest<StoreCreateLeadBody>, res: MedusaR
 
   const [existing] = await leads.listLeads({ email }, { take: 1 })
   const isNew = !existing
-  // Quem se descadastrou e volta a se cadastrar está pedindo de novo: a linha (o e-mail é único) é reaproveitada.
-  const returning = existing?.status === "descadastrado"
   if (isNew) {
     await leads.createLeads({ email, name: name ?? null, status: statusOnCapture(null, phase), source })
-  } else if (returning || existing.status === "pendente") {
+  } else if (existing.status === "pendente") {
     const next = statusOnCapture(existing.status, phase)
     if (next !== existing.status) await leads.updateLeads({ id: existing.id, status: next })
   }
-  if (existing?.status !== "negado") {
+  // Quem saiu da lista (ou foi negado) não é reativado nem recebe e-mail por um cadastro público: qualquer um poderia
+  // reinscrever o endereço de outra pessoa. Voltar é decisão do admin.
+  if (existing?.status !== "negado" && existing?.status !== "descadastrado") {
     try {
       await ensureAccount(req.scope, email, name)
     } catch (err) {
@@ -41,9 +41,9 @@ export async function POST(req: MedusaRequest<StoreCreateLeadBody>, res: MedusaR
     }
   }
 
-  // Só o primeiro cadastro (ou a volta de quem saiu) recebe e-mail (reenviar a cada envio serviria de spam contra qualquer endereço).
+  // Só o primeiro cadastro recebe e-mail (reenviar a cada envio serviria de spam contra qualquer endereço).
   // A resposta é igual para todos, para não revelar quem já está na lista nem o status.
-  if (isNew || returning) {
+  if (isNew) {
     try {
       await req.scope.resolve(Modules.NOTIFICATION).createNotifications({
         to: email,

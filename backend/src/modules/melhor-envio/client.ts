@@ -84,10 +84,10 @@ export async function calculate(accessToken: string, input: { fromZip: string; t
 }
 
 
-/** Token sem permissão: costuma ser a autorização antiga, que só calcula frete. */
+/** Acesso recusado pelo Melhor Envio (token sem o escopo da operação, conta bloqueada, etc.); guarda o motivo devolvido. */
 export class UnauthorizedError extends Error {
-  constructor() {
-    super("Melhor Envio recusou o acesso")
+  constructor(public detail: string) {
+    super(`Melhor Envio recusou o acesso${detail ? `: ${detail}` : ""}`)
   }
 }
 
@@ -104,9 +104,9 @@ async function meRequest<T>(accessToken: string, path: string, body: unknown): P
     signal: AbortSignal.timeout(20_000),
   })
   const data = (await res.json().catch(() => ({}))) as any
-  if (res.status === 401 || res.status === 403) throw new UnauthorizedError()
+  const detail = String(data?.message || (data?.errors ? JSON.stringify(data.errors).slice(0, 300) : "")).slice(0, 300)
+  if (res.status === 401 || res.status === 403) throw new UnauthorizedError(detail)
   if (!res.ok) {
-    const detail = data?.message || (data?.errors ? JSON.stringify(data.errors).slice(0, 300) : "")
     throw new Error(`Melhor Envio respondeu ${res.status}${detail ? `: ${detail}` : ""}`)
   }
   return data as T
