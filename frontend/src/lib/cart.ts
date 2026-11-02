@@ -200,7 +200,7 @@ async function fetchVariantSnapshot(variantId: string): Promise<VariantSnapshot>
     const qs = new URLSearchParams({ fields });
     if (regionId) qs.set('region_id', regionId);
     const res = await fetch(`${base}/store/product-variants/${variantId}?${qs.toString()}`, {
-      headers: { 'x-publishable-api-key': key },
+      headers: { 'x-publishable-api-key': key, ...(storedToken() ? { authorization: `Bearer ${storedToken()}` } : {}) },
     });
     // 404 ou rota indisponível: não esvaziar o carrinho no F5 (localStorage).
     if (res.status === 404) return { exists: true, soldOut: false };
@@ -234,6 +234,27 @@ async function fetchVariantSnapshot(variantId: string): Promise<VariantSnapshot>
   }
 }
 
+/** Variantes de drop fora de venda (ou sem ingresso na pré-venda). Falha de rede não esvazia a bag. */
+async function fetchBlockedByDrop(variantIds: string[]): Promise<Set<string>> {
+  try {
+    const { base, key } = getStoreConfig();
+    const token = localStorage.getItem('tyer_token');
+    const res = await fetch(`${base}/store/drop/gate`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-publishable-api-key': key,
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ variant_ids: variantIds }),
+    });
+    if (!res.ok) return new Set();
+    return new Set((await res.json()).blocked_variant_ids ?? []);
+  } catch {
+    return new Set();
+  }
+}
+
 export async function validateCartItems(): Promise<{
   items: CartItem[];
   removedVariantIds: string[];
@@ -250,8 +271,10 @@ export async function validateCartItems(): Promise<{
   const removedVariantIds: string[] = [];
   const outOfStockVariantIds: string[] = [];
 
+  const blocked = await fetchBlockedByDrop(current.map((i) => i.variantId));
+
   snapshots.forEach(({ item, snapshot }) => {
-    if (!snapshot.exists) {
+    if (!snapshot.exists || snapshot.soldOut || blocked.has(item.variantId)) {
       removedVariantIds.push(item.variantId);
       return;
     }
@@ -284,4 +307,12 @@ export async function validateCartItems(): Promise<{
 
 export function hasOutOfStockItems(items: CartItem[] = read()): boolean {
   return items.some((item) => item.stockState === 'out_of_stock');
+}
+
+function storedToken(): string {
+  try {
+    return localStorage.getItem('tyer_token') || '';
+  } catch {
+    return '';
+  }
 }

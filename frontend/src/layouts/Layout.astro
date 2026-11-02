@@ -6,6 +6,8 @@ import PromoPopup from "../components/PromoPopup.astro";
 import { getLangFromUrl, hreflangMap, type Lang } from "../i18n/utils";
 import { getMedusaStoreUrl, getPublishableKey, getMercadoPagoPublicKey, getApiUrl } from "../lib/medusa-env";
 import { resolveDefaultRegionId } from "../lib/medusa-pricing";
+import { fetchVisibleCollections } from "../lib/collections";
+import { fetchDrops, dropCountdown } from "../lib/drop";
 
 const medusaInternal = getMedusaStoreUrl();
 const storePk = getPublishableKey();
@@ -18,9 +20,15 @@ const storeHeaders = { "x-publishable-api-key": storePk };
    pricing context to calculate prices"). Resolvido uma vez aqui (SSR) e
    exposto via window, mesmo padrão de __MEDUSA_PK__ abaixo. */
 const storeRegionId = (await resolveDefaultRegionId(medusaInternal, storeHeaders, 3000).catch(() => null)) || '';
-/* Só existem o drop atual (/drop) e a linha Starter: o menu não lista mais coleções. */
-const navDrops: { handle: string; name: string; num: string; img: string }[] = [];
-const showCollectionsInNav = false;
+const navDrops = (await fetchVisibleCollections()).map((c, i) => ({
+  handle: c.handle,
+  name: c.title,
+  num: String(i + 1).padStart(2, "0"),
+  img: `/collections/${c.handle}.webp`,
+}));
+const showCollectionsInNav = navDrops.length > 0;
+const { drop: currentDrop } = await fetchDrops();
+const navCountdown = currentDrop ? { ...dropCountdown(currentDrop), title: currentDrop.title, phase: currentDrop.phase } : null;
 
 interface Props {
   title: string;
@@ -124,7 +132,7 @@ const schemas: object[] = [
   </head>
   <body class={bodyClass} data-lang={lang}>
     <a class="skip-link" href="#main-content">Skip to content</a>
-    {!bare && <Header lang={lang} drops={navDrops} />}
+    {!bare && <Header lang={lang} drops={navDrops} countdown={navCountdown} />}
     {!bare && <SideCart lang={lang} />}
     {!bare && !hidePromoPopup && <PromoPopup lang={lang} />}
     <main id="main-content" tabindex="-1">

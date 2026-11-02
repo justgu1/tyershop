@@ -4,6 +4,8 @@ import ProductCarousel from '../../components/ProductCarousel.astro';
 import { getLangFromUrl, t, getPathForLang } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
 import { getMedusaStoreUrl, getPublishableKey } from '../../lib/medusa-env';
+import { readSessionToken } from '../../lib/session';
+import { isHiddenCollection } from '../../lib/collections';
 import { getProductListQueryString, getVariantPriceInfo, resolveDefaultRegionId } from '../../lib/medusa-pricing';
 import { getVariantSlideUrls } from '../../lib/product-variant-gallery';
 import { formatVariationValuesOnly, getProductVariantData } from '../../lib/product-variants';
@@ -24,7 +26,11 @@ const lang: Lang = getLangFromUrl(Astro.url);
 
 const { handle } = Astro.params;
 const pk = getPublishableKey();
-const medusaHeaders = { 'x-publishable-api-key': pk };
+const sessionToken = readSessionToken(Astro.request.headers.get('cookie'));
+const medusaHeaders: Record<string, string> = {
+  'x-publishable-api-key': pk,
+  ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}),
+};
 let product: any = null;
 let related: any[] = [];
 let newest: any[] = [];
@@ -50,14 +56,14 @@ try {
         related = (rp ?? []).filter((p: any) => p.handle !== handle).slice(0, 8);
       }
     }
-    const newestRes = await fetch(`${url}/store/products?${q}&limit=16`, {
+    const newestRes = await fetch(`${url}/store/products?${q}&order=-created_at&limit=24`, {
       headers: medusaHeaders,
       signal: AbortSignal.timeout(5000),
     });
     if (newestRes.ok) {
       const { products: np } = await newestRes.json();
       newest = [...(np ?? [])]
-        .filter((p: any) => p?.handle && p.handle !== handle)
+        .filter((p: any) => p?.handle && p.handle !== handle && !isHiddenCollection(p.collection ?? {}))
         .sort(
           (a: any, b: any) =>
             new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime()
@@ -1576,9 +1582,12 @@ const jsonLd = productFound
     opacity: 0.45;
     cursor: not-allowed;
   }
+  .btn-primary.pdp-buy-now,
+  .btn-primary.pdp-sticky-bar__buy {
+    color: #fff;
+  }
   .pdp-atc-icon img {
     display: block;
-    filter: brightness(0);
   }
   .pdp-atc-icon--labeled {
     width: auto;

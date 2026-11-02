@@ -1,7 +1,8 @@
 ---
 import Countdown from './Countdown.astro';
 import LeadForm from './LeadForm.astro';
-import ProductCard from '../ProductCard.astro';
+import AccessForm from './AccessForm.astro';
+import CollectionMosaicItem from '../CollectionMosaicItem.astro';
 import { PHASE_LABEL, type DropAccess, type PublicDrop } from '../../lib/drop';
 
 interface Props {
@@ -11,10 +12,38 @@ interface Props {
 }
 const { drop, access = 'none', products = [] } = Astro.props;
 const { phase } = drop;
+const heroBanner = drop.hero_kind === 'banner' ? drop.hero_url : null;
+const heroVideo = drop.hero_kind !== 'banner' ? drop.hero_url : null;
 const showProducts = access === 'granted' && products.length > 0;
 ---
 
+{showProducts ? (
+  <main class="dc">
+    <section class="dc-banner">
+      {heroBanner && <img class="dc-banner__img" src={heroBanner} alt="" loading="eager" decoding="async" />}
+      {heroVideo && <video class="dc-banner__img" src={heroVideo} autoplay muted loop playsinline aria-hidden="true"></video>}
+      <div class="dc-banner__overlay" aria-hidden="true"></div>
+      <div class="dc-banner__content container">
+        <p class="dc-banner__eyebrow">{PHASE_LABEL[phase]}</p>
+        <h1 class="dc-banner__title">{drop.title}</h1>
+        {drop.subtitle && <p class="dc-banner__desc">{drop.subtitle}</p>}
+        <p class="dc-banner__desc">
+          Até 2 peças de cada produto por pessoa. Produção em até {drop.production_days} dias, mais o prazo da transportadora.
+        </p>
+        <p class="dc-banner__count">{products.length} {products.length === 1 ? 'peça' : 'peças'}</p>
+      </div>
+    </section>
+    <div class="container">
+      <div class="dc-mosaic" role="list" aria-label={drop.title}>
+        {products.map((p, i) => <CollectionMosaicItem product={p} lang="pt" reverse={i % 2 === 1} />)}
+      </div>
+    </div>
+  </main>
+) : (
 <section class={`drop drop--${phase}`}>
+  {heroBanner && <img class="drop__bg" src={heroBanner} alt="" loading="eager" decoding="async" />}
+  {heroVideo && <video class="drop__bg" src={heroVideo} autoplay muted loop playsinline aria-hidden="true"></video>}
+  {(heroBanner || heroVideo) && <div class="drop__shade" aria-hidden="true"></div>}
   <div class="drop__inner">
     <p class="drop__phase">{PHASE_LABEL[phase]}</p>
     <h1 class="drop__title">{drop.title}</h1>
@@ -37,15 +66,15 @@ const showProducts = access === 'granted' && products.length > 0;
         </p>
         {access === 'login' && (
           <>
-            <p class="drop__text drop__text--muted">Recebeu um convite? Entre na sua conta para ver as peças.</p>
-            <button type="button" class="drop__btn" data-open-login>Entrar na minha conta</button>
+            <p class="drop__text drop__text--muted">Recebeu um convite? Digite seu e-mail para entrar ou criar sua senha.</p>
+            <AccessForm cta="Continuar" />
           </>
         )}
         {access === 'locked' && (
-          <p class="drop__text drop__text--muted">Esta conta ainda não tem convite para este drop. Peça acesso e avisamos se liberarmos.</p>
-        )}
-        {(access === 'login' || access === 'locked') && (
-          <LeadForm source="pedir_acesso" cta="Pedir acesso" successMessage="Pedido enviado! Avisamos por e-mail." />
+          <>
+            <p class="drop__text drop__text--muted">Esta conta ainda não tem convite para este drop. Peça acesso e avisamos se liberarmos.</p>
+            <LeadForm source="pedir_acesso" cta="Pedir acesso" successMessage="Pedido enviado! Avisamos por e-mail." />
+          </>
         )}
       </>
     )}
@@ -72,19 +101,25 @@ const showProducts = access === 'granted' && products.length > 0;
     )}
   </div>
 </section>
-
-{showProducts && (
-  <section class="drop-products" aria-label={`Produtos do drop ${drop.title}`}>
-    <div class="drop-products__grid" role="list">
-      {products.map((p) => <ProductCard product={p} lang="pt" role="listitem" />)}
-    </div>
-  </section>
 )}
 
 <style>
-  .drop { min-height: 70vh; display: grid; place-items: center; padding: 120px 20px 80px; text-align: center; background: #0b0b0b; color: #fff; }
+  .dc { padding-bottom: 64px; background: #0b0b0b; color: #fff; }
+  .dc .container { max-width: var(--max-w, 1200px); margin-inline: auto; width: 100%; box-sizing: border-box; }
+  .dc-banner { position: relative; min-height: min(56vh, 520px); display: flex; align-items: flex-end; overflow: hidden; margin-bottom: 48px; background: #111; }
+  .dc-banner__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 25%; }
+  .dc-banner__overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0, 0, 0, 0.88) 0%, rgba(0, 0, 0, 0.35) 55%, rgba(0, 0, 0, 0.15) 100%); }
+  .dc-banner__content { position: relative; z-index: 1; padding-top: calc(var(--header-h) + 24px); padding-bottom: 40px; }
+  .dc-banner__eyebrow { font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c-accent); margin: 0 0 8px; }
+  .dc-banner__title { font-family: var(--font-title); font-size: clamp(40px, 7vw, 84px); text-transform: uppercase; line-height: 0.95; margin: 0 0 14px; max-width: 16ch; }
+  .dc-banner__desc { max-width: 56ch; font-size: 15px; line-height: 1.55; color: rgba(255, 255, 255, 0.82); margin: 0 0 12px; }
+  .dc-banner__count { margin: 0; font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.7); }
+  .dc-mosaic { display: flex; flex-direction: column; }
+  .drop { position: relative; overflow: hidden; min-height: 70vh; display: grid; place-items: center; padding: 120px 20px 80px; text-align: center; background: #0b0b0b; color: #fff; }
   .drop--presale, .drop--general { min-height: 0; padding-bottom: 56px; }
-  .drop__inner { display: flex; flex-direction: column; align-items: center; gap: 22px; max-width: 640px; }
+  .drop__bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .drop__shade { position: absolute; inset: 0; background: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.75)); }
+  .drop__inner { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 22px; max-width: 640px; }
   .drop__phase { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-accent, #e77e23); }
   .drop__title { margin: 0; font-family: var(--font-title); font-size: clamp(48px, 10vw, 96px); line-height: 0.95; text-transform: uppercase; }
   .drop__subtitle { margin: 0; font-size: 18px; color: rgba(255, 255, 255, 0.75); }
@@ -94,16 +129,10 @@ const showProducts = access === 'granted' && products.length > 0;
   .drop__links { display: flex; gap: 20px; }
   .drop__links a { color: var(--c-accent, #e77e23); font-weight: 700; text-decoration: none; }
   .drop__links a:hover { text-decoration: underline; }
-  .drop-products { background: #0b0b0b; padding: 0 20px 96px; }
-  .drop-products__grid { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
 </style>
 
 <script>
   import { syncSessionCookie } from '../../lib/session';
-
-  document.querySelectorAll('[data-open-login]').forEach((btn) =>
-    btn.addEventListener('click', () => document.getElementById('hdr-account-btn')?.click())
-  );
 
   // O servidor só enxerga a sessão pelo cookie: se o login/logout mudou o token, espelha e recarrega uma vez.
   const resync = () => {

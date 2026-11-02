@@ -14,12 +14,14 @@ const customPages = import.meta.glob('../components/drop-pages/*.astro', { eager
 
 const token = readSessionToken(Astro.request.headers.get('cookie'));
 const { drop, access, product_ids } = await fetchDrops(token);
-const products = await fetchProductsByIds(product_ids);
+const products = await fetchProductsByIds(product_ids, token);
 
 const Custom = drop?.component_key
   ? customPages[`../components/drop-pages/${drop.component_key}.astro`]?.default
   : null;
 const Page = Custom ?? DropDefault;
+
+if (!drop) return Astro.redirect('/');
 
 Astro.response.headers.set('cache-control', 'private, no-store');
 ---

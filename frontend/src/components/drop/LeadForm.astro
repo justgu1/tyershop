@@ -63,6 +63,7 @@ const { source, cta, placeholder = 'Seu e-mail', successMessage = 'Pronto! Você
           /* storage indisponível */
         }
         say(form.dataset.success || 'Pronto!', 'success');
+        if (form.dataset.source !== 'popup') location.assign('/drop/obrigado');
       } catch {
         say('Não consegui enviar agora. Tente de novo.', 'error');
       } finally {

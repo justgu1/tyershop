@@ -22,7 +22,7 @@ export function syncSessionCookie(): boolean {
   const current = readSessionToken(document.cookie);
   if (token === current) return false;
   document.cookie = token
-    ? `${COOKIE}=${encodeURIComponent(token)}; path=/; max-age=86400; SameSite=Lax`
-    : `${COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+    ? `${COOKIE}=${encodeURIComponent(token)}; path=/; max-age=86400; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`
+    : `${COOKIE}=; path=/; max-age=0; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
   return true;
 }

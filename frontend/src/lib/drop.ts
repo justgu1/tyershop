@@ -58,11 +58,14 @@ export async function fetchDrops(token?: string): Promise<DropPayload> {
 }
 
 /** Produtos completos (preço, variantes, estoque) na ordem em que foram pedidos. */
-export async function fetchProductsByIds(ids: string[]): Promise<any[]> {
+export async function fetchProductsByIds(ids: string[], token?: string): Promise<any[]> {
   if (!ids.length) return [];
   try {
     const url = getMedusaStoreUrl();
-    const headers = { 'x-publishable-api-key': getPublishableKey() };
+    const headers: Record<string, string> = {
+      'x-publishable-api-key': getPublishableKey(),
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    };
     const regionId = await resolveDefaultRegionId(url, headers);
     const query = `${ids.map((id) => `id[]=${encodeURIComponent(id)}`).join('&')}&${getProductListQueryString(regionId)}&limit=${ids.length}`;
     const res = await fetch(`${url}/store/products?${query}`, { headers, signal: AbortSignal.timeout(8000) });
@@ -75,24 +78,21 @@ export async function fetchProductsByIds(ids: string[]): Promise<any[]> {
   }
 }
 
-/** Linha fixa Starter: produtos da coleção configurada, sempre à venda (esgotado aparece como esgotado). */
-export async function fetchStarterProducts(limit = 12): Promise<any[]> {
+/** Linha fixa Starter, na ordem do catálogo: sempre à venda (esgotado aparece como esgotado). */
+const STARTER_HANDLES = ['regata-savage-mode', 'shorts-tyer-pro', 'camiseta-tyer-starter-dry-fit', 'pulseira-tyer'];
+
+export async function fetchStarterProducts(): Promise<any[]> {
   try {
-    const handle = process.env.STARTER_COLLECTION_HANDLE || 'tyer-starter';
     const url = getMedusaStoreUrl();
     const headers = { 'x-publishable-api-key': getPublishableKey() };
-    const cRes = await fetch(`${url}/store/collections?handle=${encodeURIComponent(handle)}`, {
-      headers,
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!cRes.ok) return [];
-    const collection = (await cRes.json()).collections?.[0];
-    if (!collection) return [];
-
     const regionId = await resolveDefaultRegionId(url, headers);
-    const query = `collection_id[]=${collection.id}&${getProductListQueryString(regionId)}&limit=${limit}`;
-    const pRes = await fetch(`${url}/store/products?${query}`, { headers, signal: AbortSignal.timeout(8000) });
-    return pRes.ok ? ((await pRes.json()).products ?? []) : [];
+    const handles = STARTER_HANDLES.map((h) => `handle[]=${encodeURIComponent(h)}`).join('&');
+    const query = `${handles}&${getProductListQueryString(regionId)}&limit=${STARTER_HANDLES.length}`;
+    const res = await fetch(`${url}/store/products?${query}`, { headers, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return [];
+    const { products = [] } = await res.json();
+    const byHandle = new Map<string, any>(products.map((p: any) => [p.handle, p]));
+    return STARTER_HANDLES.map((h) => byHandle.get(h)).filter(Boolean);
   } catch {
     return [];
   }
@@ -104,3 +104,18 @@ export const PHASE_LABEL: Record<DropPhase, string> = {
   general: 'Venda geral',
   ended: 'Encerrado',
 };
+
+/** Alvo, rótulo e CTA do cronômetro de cada fase; `target` é null quando não há contagem. */
+export function dropCountdown(drop: PublicDrop) {
+  const target =
+    drop.phase === 'coming_soon'
+      ? drop.preorder_starts_at
+      : drop.phase === 'presale'
+        ? (drop.general_starts_at ?? drop.preorder_ends_at)
+        : drop.phase === 'general'
+          ? drop.general_ends_at
+          : null;
+  const label = { coming_soon: 'Pré-venda abre em', presale: 'Pré-venda termina em', general: 'Venda geral termina em', ended: '' }[drop.phase];
+  const cta = drop.phase === 'ended' ? 'Entrar na lista do próximo' : drop.phase === 'coming_soon' ? 'Quero ser avisado' : 'Ver o drop';
+  return { target, label, cta };
+}

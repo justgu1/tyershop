@@ -1,6 +1,7 @@
 ---
 import { t, getPathForLang, type Lang } from "../i18n/utils";
 import { getMedusaStoreUrl, getPublishableKey } from "../lib/medusa-env";
+import Countdown from "./drop/Countdown.astro";
 
 interface NavDrop {
   handle: string;
@@ -9,12 +10,22 @@ interface NavDrop {
   img: string;
 }
 
+interface NavCountdown {
+  target: string | null;
+  title: string;
+  label: string;
+  cta: string;
+  phase: string;
+}
+
 interface Props {
   lang?: Lang;
   drops: NavDrop[];
+  countdown?: NavCountdown | null;
 }
 const lang: Lang = Astro.props.lang ?? "pt";
 const drops: NavDrop[] = Array.isArray(Astro.props.drops) ? Astro.props.drops : [];
+const countdown = Astro.props.countdown ?? null;
 
 const url = getMedusaStoreUrl();
 const medusaBase = (
@@ -43,6 +54,18 @@ const searchGroupPopular = t(lang, "search", "group_popular");
 
     <!-- Nav -->
     <nav class="hdr__nav" aria-label="Main navigation">
+      <div class="hdr__drop-wrap">
+        <a href={getPathForLang("/drop", lang)} class="hdr__nav-link">{countdown?.title ?? "Drop"}</a>
+        {countdown?.target && (
+          <a href={getPathForLang("/drop", lang)} class="hdr__drop-tag" aria-label={`${countdown.title}: ${countdown.label}`}>
+            <span class="hdr__drop-tag__edge">
+              <span class="hdr__drop-tag__in">
+                <Countdown targetIso={countdown.target} label={countdown.label} compact />
+              </span>
+            </span>
+          </a>
+        )}
+      </div>
       {drops.length > 0 && (
         <div class="hdr__nav-item hdr__nav-item--mega" id="nav-collections-wrap">
           <a
@@ -118,12 +141,6 @@ const searchGroupPopular = t(lang, "search", "group_popular");
         </div>
       )}
 
-      <a href={getPathForLang("/drop", lang)} class="hdr__nav-link">Drop</a>
-      <a
-        href={`${getPathForLang("/", lang)}#starter`}
-        class="hdr__nav-link"
-        data-scroll-anchor="true">Starter</a
-      >
       <a
         href={`${getPathForLang("/", lang)}#historia`}
         class="hdr__nav-link"
@@ -453,10 +470,10 @@ const searchGroupPopular = t(lang, "search", "group_popular");
       ))
     }
     <li>
-      <a href={getPathForLang("/drop", lang)} class="mob-menu__link">Drop</a>
-    </li>
-    <li>
-      <a href={getPathForLang("/#starter", lang)} class="mob-menu__link">Starter</a>
+      <a href={getPathForLang("/drop", lang)} class="mob-menu__link">
+        {countdown?.title ?? "Drop"}
+        {countdown?.target && <Countdown targetIso={countdown.target} label={countdown.label} compact />}
+      </a>
     </li>
     <li>
       <a href={getPathForLang("/#editorial", lang)} class="mob-menu__link">{t(lang, "nav", "editorial")}</a>
@@ -541,6 +558,69 @@ const searchGroupPopular = t(lang, "search", "group_popular");
   .hdr__nav-item {
     position: relative;
   }
+  .hdr__nav { align-self: stretch; }
+  .hdr__drop-wrap {
+    position: relative;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+  }
+  /* Plaquinha de etiqueta: cordão reto saindo da barra, centralizada no link do drop. */
+  .hdr__drop-tag {
+    --tag-clip: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%, 0 14px);
+    position: absolute;
+    top: calc(100% + 14px);
+    left: 50%;
+    z-index: 5;
+    transform: translateX(-50%);
+    filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.5));
+    text-decoration: none;
+  }
+  .hdr__drop-tag__edge {
+    display: block;
+    padding: 2px;
+    background: var(--c-accent, #e77e23);
+    clip-path: var(--tag-clip);
+  }
+  .hdr__drop-tag__in {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 18px 16px 9px;
+    background: #101010;
+    clip-path: var(--tag-clip);
+    white-space: nowrap;
+  }
+  .hdr__drop-tag__in::before {
+    content: "";
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    width: 7px;
+    height: 7px;
+    margin-left: -3.5px;
+    border-radius: 50%;
+    border: 1.5px solid var(--c-accent, #e77e23);
+    background: #000;
+  }
+  .hdr__drop-tag::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: -14px;
+    width: 2px;
+    height: 20px;
+    margin-left: -1px;
+    background: var(--c-accent, #e77e23);
+  }
+  .hdr__drop-tag :global(.cd--compact) { flex-direction: column; gap: 3px; align-items: center; }
+  .hdr__drop-tag :global(.cd--compact .cd__label) { font-size: 9px; letter-spacing: 0.14em; color: var(--c-accent, #e77e23); }
+  .hdr__drop-tag :global(.cd--compact .cd__clock) { gap: 8px; font-variant-numeric: tabular-nums; }
+  .hdr__drop-tag :global(.cd--compact .cd__num) { font-size: 15px; }
+  .hdr__drop-tag :global(.cd--compact .cd__unit) { gap: 2px; }
+  .hdr__drop-tag :global(.cd--compact .cd__u) { color: rgba(255, 255, 255, 0.6); }
   .hdr__nav-link {
     display: inline-flex;
     align-items: center;

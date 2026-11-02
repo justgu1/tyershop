@@ -17,6 +17,17 @@ async function fetchRegionId(base: string, pk: string): Promise<string | null> {
   return j?.regions?.[0]?.id ?? null;
 }
 
+/** Carrinho nasce na conta logada: é ela que o servidor usa para acesso ao drop e limite por pessoa. */
+function authHeaders(pk: string): Record<string, string> {
+  let token = '';
+  try {
+    token = localStorage.getItem('tyer_token') || '';
+  } catch {
+    /* storage indisponível */
+  }
+  return { 'content-type': 'application/json', 'x-publishable-api-key': pk, ...(token ? { authorization: `Bearer ${token}` } : {}) };
+}
+
 export type MedusaCheckoutLine = { variantId: string; quantity: number };
 
 /** Cria carrinho Medusa + linhas (preços definidos pelo Medusa). */
@@ -31,7 +42,7 @@ export async function createMedusaCartWithLines(lines: MedusaCheckoutLine[]): Pr
 
   const created = await fetch(`${base}/store/carts`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-publishable-api-key': pk },
+    headers: authHeaders(pk),
     body: JSON.stringify({ region_id: regionId }),
   });
   const createdJson = await created.json();
@@ -42,7 +53,7 @@ export async function createMedusaCartWithLines(lines: MedusaCheckoutLine[]): Pr
     const qty = Math.max(1, Math.floor(Number(line.quantity) || 1));
     const res = await fetch(`${base}/store/carts/${cartId}/line-items`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-publishable-api-key': pk },
+      headers: authHeaders(pk),
       body: JSON.stringify({ variant_id: line.variantId, quantity: qty }),
     });
     if (!res.ok) {
@@ -53,7 +64,7 @@ export async function createMedusaCartWithLines(lines: MedusaCheckoutLine[]): Pr
 
   const code = getAppliedPromoCode();
   if (code) {
-    const headers: Record<string, string> = { 'content-type': 'application/json', 'x-publishable-api-key': pk };
+    const headers = authHeaders(pk);
     let applied: { cart?: unknown } | null = null;
     const pr = await fetch(`${base}/store/carts/${cartId}/promotions`, {
       method: 'POST',

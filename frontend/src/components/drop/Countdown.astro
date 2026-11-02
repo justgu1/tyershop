@@ -3,11 +3,12 @@ interface Props {
   targetIso: string;
   label?: string;
   align?: 'center' | 'start';
+  compact?: boolean;
 }
-const { targetIso, label, align = 'center' } = Astro.props;
+const { targetIso, label, align = 'center', compact = false } = Astro.props;
 ---
 
-<div class:list={['cd', { 'cd--start': align === 'start' }]} data-countdown data-target-iso={targetIso} role="timer" aria-live="off">
+<div class:list={['cd', { 'cd--start': align === 'start', 'cd--compact': compact }]} data-countdown data-target-iso={targetIso} role="timer" aria-live="off">
   {label && <p class="cd__label">{label}</p>}
   <div class="cd__clock">
     <div class="cd__unit"><span class="cd__num" data-cd="d">00</span><span class="cd__u">dias</span></div>
@@ -25,6 +26,12 @@ const { targetIso, label, align = 'center' } = Astro.props;
   .cd__unit { display: flex; flex-direction: column; align-items: center; min-width: 56px; }
   .cd__num { font-family: var(--font-title); font-size: 44px; line-height: 1; }
   .cd__u { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); margin-top: 4px; }
+  .cd--compact { flex-direction: row; gap: 8px; align-items: center; }
+  .cd--compact .cd__label { font-size: 11px; letter-spacing: 0.12em; white-space: nowrap; color: inherit; }
+  .cd--compact .cd__clock { gap: 6px; }
+  .cd--compact .cd__unit { flex-direction: row; align-items: baseline; gap: 2px; min-width: 0; }
+  .cd--compact .cd__num { font-family: inherit; font-size: 13px; font-weight: 800; color: #fff; }
+  .cd--compact .cd__u { font-size: 9px; margin-top: 0; }
   .cd.is-over .cd__clock { opacity: 0.4; }
   @media (max-width: 640px) {
     .cd__clock { gap: 10px; }

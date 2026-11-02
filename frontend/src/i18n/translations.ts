@@ -72,10 +72,10 @@ export const translations = {
       related:          'Você também pode gostar',
     },
     promo: {
-      kicker: 'Em breve',
-      title:  'Próximo Drop chegando',
-      text:   'Cadastre seu e-mail e garanta um desconto exclusivo assim que o próximo drop for ao ar.',
-      cta:    'Quero meu desconto',
+      kicker: 'Lista exclusiva',
+      title:  'Entre na próxima lista exclusiva',
+      text:   'Cadastre seu e-mail para receber o convite da pré-venda do próximo drop, antes de todo mundo.',
+      cta:    'Quero entrar na lista',
       close:  'Fechar aviso',
     },
     legal: {
