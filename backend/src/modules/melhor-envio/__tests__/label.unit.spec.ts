@@ -67,6 +67,21 @@ describe("carrinho do Melhor Envio", () => {
   })
 })
 
+describe("ponto de postagem no carrinho", () => {
+  it("vai no pedido quando informado e some quando não", () => {
+    const { sender } = senderFromEnv(env)
+    const input = {
+      order: { display_id: 1, items: [], shipping_address: { first_name: "A", postal_code: "01000000", province: "SP" } },
+      cpf: "98765432100",
+      serviceId: 4,
+      sender: sender!,
+      pkg: { height: 3, width: 25, length: 30, weight: 0.2 },
+    }
+    expect(buildCartPayload({ ...input, agency: 1 })).toMatchObject({ agency: 1 })
+    expect(buildCartPayload(input)).not.toHaveProperty("agency")
+  })
+})
+
 describe("ponto de postagem", () => {
   it("lê o id do ambiente e ignora valor inválido", () => {
     expect(agencyFromEnv({ MELHOR_ENVIO_AGENCY_ID: "49666" })).toBe(49666)
