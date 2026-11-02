@@ -130,13 +130,12 @@ spec:
               value: "https://homolog.tyershop.com/melhor-envio/callback"
             # Etiqueta automática no Melhor Envio: só liga com os dados do remetente preenchidos e o saldo da conta carregado.
             # Ponto de postagem da Jadlog (serviços .Com e .Package) onde o remetente deixa os pacotes. O id muda entre sandbox e produção:
-            # vem de um ConfigMap opcional por ambiente (kubectl create configmap tyershop-melhor-envio --from-literal=MELHOR_ENVIO_AGENCY_ID=...).
+            # vem de k8s/melhor-envio-config.yaml: troque o valor ali ao passar de sandbox para produção.
             - name: MELHOR_ENVIO_AGENCY_ID
               valueFrom:
                 configMapKeyRef:
                   name: tyershop-melhor-envio
                   key: MELHOR_ENVIO_AGENCY_ID
-                  optional: true
             - name: MELHOR_ENVIO_AUTO_LABEL
               value: "false"
             - name: MELHOR_ENVIO_SENDER_NAME

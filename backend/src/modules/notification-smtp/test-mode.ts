@@ -8,13 +8,13 @@ export function readTestMode(env: Record<string, string | undefined>): TestModeC
   }
 }
 
+export type Envelope = { to: string; subject: string; redirectedFrom?: string }
+
 /**
  * Com o modo de teste ligado (padrão), nada sai para o cliente: tudo vai para
  * o e-mail de teste, com o destinatário original avisado no corpo. Sem e-mail de teste configurado o envio é recusado, em
  * vez de cair no endereço real.
  */
-export type Envelope = { to: string; subject: string; redirectedFrom?: string }
-
 export function resolveRecipient(original: string, subject: string, cfg: TestModeConfig): Envelope {
   if (!cfg.enabled) return { to: original, subject }
   if (!cfg.to) {

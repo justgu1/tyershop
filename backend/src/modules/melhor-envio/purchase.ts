@@ -137,11 +137,13 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string, orig
     // consultar, não paga: melhor tentar de novo do que cobrar duas vezes.
     let paid = !!current?.paid
     let generated = !!current?.generated
+    let consulted: Awaited<ReturnType<typeof getLabel>> | null = null
     if (!paid || !generated || current?.status === "erro") {
-      const remote = (await getLabel(token, meId).catch((err) => {
+      consulted = await getLabel(token, meId).catch((err) => {
         if (err instanceof UnauthorizedError) throw err
         throw new Error("Não consegui conferir a etiqueta no Melhor Envio. Tente de novo em instantes.")
-      })).status
+      })
+      const remote = consulted.status
       if (remote === "canceled") {
         // Etiqueta cancelada não volta: esquece esta e cria outra no carrinho.
         await saveState(scope, order, { status: "carrinho", me_order_id: undefined, paid: false, generated: false, tracking_code: null, posted_seen_at: undefined })
@@ -153,16 +155,24 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string, orig
       paid = paid || (!!remote && remote !== "pending")
       generated = generated || (!!remote && ["generated", "posted", "delivered"].includes(remote))
     }
+    let changed = false
     if (!current?.paid) {
-      if (!paid) await checkoutLabel(token, meId)
+      if (!paid) {
+        await checkoutLabel(token, meId)
+        changed = true
+      }
       await saveState(scope, order, { status: "carrinho", paid: true })
     }
     if (!current?.generated) {
-      if (!generated) await generateLabel(token, meId)
+      if (!generated) {
+        await generateLabel(token, meId)
+        changed = true
+      }
       await saveState(scope, order, { status: "carrinho", generated: true })
     }
 
-    const info = (await tracking(token, [meId]).catch(() => ({} as Record<string, any>)))[meId]
+    // Se nada foi comprado nem gerado agora, a consulta de cima ainda vale (traz o código de rastreio).
+    const info = consulted && !changed ? consulted : (await tracking(token, [meId]).catch(() => ({} as Record<string, any>)))[meId]
     let fulfillmentId = current?.fulfillment_id
     if (!fulfillmentId) {
       const created = await createOrderFulfillmentWorkflow(scope).run({
