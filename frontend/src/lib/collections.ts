@@ -14,9 +14,6 @@ const norm = (s: string) =>
 const HIDDEN_WORDS = ['paris', 'five', 'mvp'];
 const HIDDEN_PHRASES = ['red-rose'];
 
-/** Coleções de acessórios: têm página própria, mas não entram no carrossel de drops nem no menu de drops. */
-const ACCESSORY_HANDLES = ['pulseiras'];
-
 /** Drops que saíram do site; vale tanto pelo título quanto pelo handle. */
 export const isHiddenCollection = (c: { title?: string; handle?: string }) =>
   [c.title, c.handle].some((v) => {
@@ -30,7 +27,7 @@ async function loadVisibleCollections(): Promise<Collection[]> {
     signal: AbortSignal.timeout(3000),
   });
   if (!res.ok) throw new Error(`coleções: ${res.status}`);
-  return ((await res.json()).collections ?? []).filter((c: Collection) => !isHiddenCollection(c) && !ACCESSORY_HANDLES.includes(c.handle));
+  return ((await res.json()).collections ?? []).filter((c: Collection) => !isHiddenCollection(c));
 }
 
 export async function fetchVisibleCollections(): Promise<Collection[]> {
