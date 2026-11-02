@@ -126,11 +126,6 @@ export default defineMiddlewares({
       ],
     },
     {
-      matcher: "/store/leads/unsubscribe",
-      method: "POST",
-      middlewares: [rateLimit("unsubscribe", { windowMs: 600_000, max: 30 })],
-    },
-    {
       matcher: "/store/orders/:id/invoice",
       method: "GET",
       middlewares: [requiredCustomer, rateLimit("invoice", { windowMs: 600_000, max: 60, perIp: false, by: (req) => (req as any).auth_context?.actor_id })],

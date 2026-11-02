@@ -1,5 +1,5 @@
 import { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
+import { ContainerRegistrationKeys, MedusaError, Modules } from "@medusajs/framework/utils"
 import { completeCartWorkflow } from "@medusajs/medusa/core-flows"
 
 const WAIT_MS = 25_000
@@ -10,21 +10,6 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /** Erros em que o carrinho segue válido e o cliente pode tentar de novo (mesma regra da rota original do Medusa). */
 const RETRYABLE = [MedusaError.Types.PAYMENT_AUTHORIZATION_ERROR, MedusaError.Types.PAYMENT_REQUIRES_MORE_ERROR]
-
-const ORDER_FIELDS = [
-  "id",
-  "display_id",
-  "status",
-  "email",
-  "currency_code",
-  "total",
-  "subtotal",
-  "shipping_total",
-  "items.id",
-  "items.title",
-  "items.quantity",
-  "items.unit_price",
-]
 
 /**
  * Conclui o pedido da conta logada. Substitui `POST /store/carts/:id/complete` no checkout: com várias compras ao mesmo tempo
@@ -51,8 +36,18 @@ export async function POST(req: AuthenticatedMedusaRequest<{ cart_id?: string }>
     return (data[0] as { order_id?: string } | undefined)?.order_id ?? null
   }
   const respondWithOrder = async (orderId: string) => {
-    const { data } = await query.graph({ entity: "order", fields: ORDER_FIELDS, filters: { id: orderId } })
-    return res.status(200).json({ type: "order", order: data[0] })
+    // Pelo módulo de pedidos: o grafo de consulta devolve totais zerados e itens sem quantidade.
+    const order = await req.scope.resolve(Modules.ORDER).retrieveOrder(orderId, {
+      select: ["id", "display_id", "status", "email", "currency_code", "total", "subtotal", "shipping_total"],
+      relations: ["items"],
+    })
+    return res.status(200).json({
+      type: "order",
+      order: {
+        ...order,
+        items: (order.items ?? []).map((i: any) => ({ id: i.id, title: i.product_title || i.title, quantity: i.quantity, unit_price: i.unit_price })),
+      },
+    })
   }
 
   // Já concluído (repetição, clique duplo): devolve o pedido existente sem rodar o fluxo de novo.

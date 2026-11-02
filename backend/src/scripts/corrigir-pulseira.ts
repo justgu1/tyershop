@@ -2,8 +2,8 @@ import { ExecArgs } from "@medusajs/framework/types";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
 import { deleteProductVariantsWorkflow } from "@medusajs/medusa/core-flows";
 
-// Idempotente. A pulseira tinha duas opções repetindo a cor ("Tamanho" e "Cor") e variantes duplicadas, e a galeria de
-// cada variante ainda listava uma foto removida. Fica uma opção "Cor" (Preto, Branco) com uma variante por cor.
+// Idempotente. Deixa a pulseira com uma única opção "Cor" (Preto, Branco), uma variante por cor e a galeria de cada uma
+// só com as fotos da própria cor.
 const COR_POR_SKU: Record<string, { cor: string; pasta: string; fotos: number[] }> = {
   "pulseira-tyer-preto": { cor: "Preto", pasta: "pulseira-preta", fotos: [1, 3, 4] },
   "pulseira-tyer-branco": { cor: "Branco", pasta: "pulseira-branca", fotos: [1, 2, 3, 4] },

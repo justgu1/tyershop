@@ -10,6 +10,7 @@ import { buildCartPayload, DELIVERED, POSTED, senderFromEnv, serviceIdOf } from 
 import { buildPackage, loadShipments } from "./quote"
 import { MELHOR_ENVIO_MODULE } from "./index"
 import { setMetadataKey } from "../../utils/order-metadata"
+import { loadOrder, trackingUrl } from "../../utils/order-email"
 import type MelhorEnvioModuleService from "./service"
 
 /** Estado da etiqueta guardado em `order.metadata.melhor_envio`. */
@@ -29,19 +30,6 @@ export type LabelState = {
 }
 
 export const autoLabelEnabled = () => (process.env.MELHOR_ENVIO_AUTO_LABEL ?? "").trim().toLowerCase() === "true"
-const trackingUrl = (code: string) => `https://www.melhorrastreio.com.br/rastreio/${encodeURIComponent(code)}`
-
-/** Pelo módulo de pedidos: o grafo de consulta não devolve a quantidade dos itens. */
-async function loadFullOrder(scope: MedusaContainer, orderId: string) {
-  try {
-    return (await scope.resolve(Modules.ORDER).retrieveOrder(orderId, {
-      select: ["id", "display_id", "email", "customer_id", "metadata"],
-      relations: ["items", "shipping_address", "shipping_methods"],
-    })) as any
-  } catch {
-    return null
-  }
-}
 
 async function saveState(scope: MedusaContainer, order: { id: string; metadata?: Record<string, any> | null }, state: Omit<LabelState, "updated_at">) {
   const next: LabelState = { ...(order.metadata?.melhor_envio ?? {}), ...state, updated_at: new Date().toISOString() }
@@ -100,7 +88,7 @@ const DONE: LabelState["status"][] = ["gerada", "postada", "entregue"]
 
 async function purchaseLabelLocked(scope: MedusaContainer, orderId: string, origin: "auto" | "manual"): Promise<LabelState> {
   const logger = scope.resolve("logger") as any
-  const order = await loadFullOrder(scope, orderId)
+  const order = await loadOrder(scope, orderId)
   if (!order) throw new Error("Pedido não encontrado.")
   const current = order.metadata?.melhor_envio as LabelState | undefined
   if (current && DONE.includes(current.status)) return current
@@ -236,7 +224,7 @@ async function syncShipmentsLocked(scope: MedusaContainer) {
 
   for (const summary of open) {
     try {
-      const order = await loadFullOrder(scope, summary.id)
+      const order = await loadOrder(scope, summary.id)
       if (!order) continue
       const state = order.metadata.melhor_envio as LabelState
       const info = infos[state.me_order_id!]

@@ -20,6 +20,8 @@ const InvoiceWidget = ({ data }: { data: { id: string; display_id?: number; meta
     try {
       const form = new FormData()
       form.append("files", file)
+      // A nota tem nome, CPF e endereço do cliente: nunca pública.
+      form.append("access", "private")
       const up = await fetch("/admin/uploads", { method: "POST", body: form, credentials: "include" })
       const uploaded = await up.json().catch(() => ({}))
       const stored = uploaded?.files?.[0]

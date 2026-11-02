@@ -1,5 +1,5 @@
 import { MedusaContainer } from "@medusajs/framework/types"
-import { Modules } from "@medusajs/framework/utils"
+import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { productionDaysOfProducts } from "../modules/melhor-envio/quote"
 
 const siteUrl = () => (process.env.SITE_URL || "http://localhost:4321").replace(/\/$/, "")
@@ -9,12 +9,24 @@ export const ordersUrl = () => `${siteUrl()}/account/orders`
 export async function loadOrder(scope: MedusaContainer, orderId: string) {
   try {
     return (await scope.resolve(Modules.ORDER).retrieveOrder(orderId, {
-      select: ["id", "display_id", "email", "currency_code", "total", "shipping_total", "metadata"],
-      relations: ["items", "shipping_address"],
+      select: ["id", "display_id", "email", "currency_code", "total", "shipping_total", "customer_id", "metadata"],
+      relations: ["items", "shipping_address", "shipping_methods"],
     })) as any
   } catch {
     return null
   }
+}
+
+/** Rastreio público do Melhor Envio, usado quando a transportadora não devolve um link próprio. */
+export const trackingUrl = (code: string) => `https://www.melhorrastreio.com.br/rastreio/${encodeURIComponent(code)}`
+
+/** Pedido a que um envio (fulfillment) pertence. */
+export async function orderOfFulfillment(scope: MedusaContainer, fulfillmentId: string) {
+  const { data } = await scope
+    .resolve(ContainerRegistrationKeys.QUERY)
+    .graph({ entity: "order_fulfillment", fields: ["order_id"], filters: { fulfillment_id: fulfillmentId } })
+  const orderId = (data[0] as { order_id?: string } | undefined)?.order_id
+  return orderId ? loadOrder(scope, orderId) : null
 }
 
 /** Dados comuns de todos os e-mails de pedido. */

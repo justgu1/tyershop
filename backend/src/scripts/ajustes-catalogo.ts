@@ -6,7 +6,7 @@ import {
   updateProductsWorkflow,
 } from "@medusajs/medusa/core-flows";
 
-// Idempotente. Remove o shorts Starter (igual ao Pro) e tira a pulseira do Starter, para a categoria própria "Pulseiras",
+// Idempotente. Exclui o shorts Starter (duplicata do Pro) e move a pulseira para a categoria "Pulseiras", fora do Starter e
 // sem a foto da modelo na galeria.
 export default async function ajustesCatalogo({ container }: ExecArgs) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER);

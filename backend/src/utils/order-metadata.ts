@@ -27,3 +27,19 @@ export async function claimMetadataKey(scope: MedusaContainer, orderId: string, 
   )
   return rowCount > 0
 }
+
+/**
+ * Reserva o envio da confirmação do pedido: só uma chamada leva a reserva, e ela expira em 10 minutos, para um processo que
+ * caiu no meio do envio não impedir o reenvio para sempre. `confirmation_sent_at` só é gravado depois que o e-mail sai.
+ */
+export async function claimConfirmation(scope: MedusaContainer, orderId: string): Promise<boolean> {
+  const { rowCount } = await pg(scope).raw(
+    `update "order" set metadata = jsonb_set(coalesce(metadata, '{}'::jsonb), '{confirmation_claimed_at}', to_jsonb(now()::text)), updated_at = now()
+      where id = ?
+        and not jsonb_exists(coalesce(metadata, '{}'::jsonb), 'confirmation_sent_at')
+        and (not jsonb_exists(coalesce(metadata, '{}'::jsonb), 'confirmation_claimed_at')
+             or (metadata->>'confirmation_claimed_at')::timestamptz < now() - interval '10 minutes')`,
+    [orderId]
+  )
+  return rowCount > 0
+}
