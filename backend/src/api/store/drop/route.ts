@@ -1,5 +1,4 @@
 import { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { Modules } from "@medusajs/framework/utils"
 import { DROP_MODULE } from "../../../modules/drop"
 import DropModuleService from "../../../modules/drop/service"
 import { presentDrop } from "../../../modules/drop/present"
@@ -32,8 +31,9 @@ const pick = (d: ReturnType<typeof presentDrop>) =>
 export async function GET(req: AuthenticatedMedusaRequest, res: MedusaResponse) {
   const drops = req.scope.resolve<DropModuleService>(DROP_MODULE)
 
-  const current = await drops.retrieveCurrent()
   const all = await drops.listDrops({}, { order: { preorder_starts_at: "DESC" } })
+  // Sem drop marcado como atual, vale o mais recente: a página nunca fica vazia havendo drops.
+  const current = (await drops.retrieveCurrent()) ?? all[0] ?? null
   const previous = all
     .filter((d) => d.id !== current?.id)
     .map((d) => presentDrop(d))
@@ -52,8 +52,7 @@ export async function GET(req: AuthenticatedMedusaRequest, res: MedusaResponse) 
       if (!customerId) {
         access = "login"
       } else {
-        const customer = await (req.scope.resolve(Modules.CUSTOMER) as any).retrieveCustomer(customerId)
-        access = (await hasTicket(req.scope, current.id, customer.email)) ? "granted" : "locked"
+        access = (await hasTicket(req.scope, current.id, customerId)) ? "granted" : "locked"
       }
     }
     // Sem direito de acesso a lista de produtos nem sai do servidor.

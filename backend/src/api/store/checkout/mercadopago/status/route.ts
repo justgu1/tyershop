@@ -1,6 +1,6 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
 import { mapMpStatusToMedusa } from "../../../../../modules/payment-mercadopago/service";
-import { getMercadoPagoClient, getMercadoPagoPaymentSession } from "../utils";
+import { assertSessionPayable, getMercadoPagoClient, getMercadoPagoPaymentSession } from "../utils";
 
 /**
  * Status atual do pagamento (consulta o Mercado Pago de novo, não só o que
@@ -15,6 +15,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
   }
 
   const { session } = await getMercadoPagoPaymentSession(req, paymentSessionId);
+  await assertSessionPayable(req, session as any, false);
   const data = session.data as { mp_payment_id?: number };
 
   if (!data?.mp_payment_id) {

@@ -162,7 +162,21 @@ class MercadoPagoProviderService extends AbstractPaymentProvider<Options> {
     }
 
     const confirmed = data as ConfirmedSessionData;
+
+    // O carrinho mudou depois do pagamento (ex.: item novo): o valor cobrado não cobre mais o pedido.
+    const expected = Number((data as any).amount)
+    const charged = Number((data as any).mp_amount)
+    if (!Number.isFinite(charged) || !Number.isFinite(expected) || Math.abs(expected - charged) > 0.009) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        "O valor pago não confere com o total do pedido. Refaça o pagamento."
+      );
+    }
+
     const payment = await this.client_.getPayment(confirmed.mp_payment_id);
+    if (Math.abs(Number(payment.transaction_amount) - charged) > 0.009) {
+      throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "O valor do pagamento no Mercado Pago não confere com o pedido.");
+    }
     const status = mapMpStatusToMedusa(payment.status);
 
     return {

@@ -2,6 +2,15 @@ const { loadEnv, defineConfig } = require('@medusajs/framework/utils')
 
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 
+// Segredos padrão em produção deixariam qualquer um forjar sessões de cliente e de admin.
+if (process.env.NODE_ENV === 'production') {
+  for (const name of ['JWT_SECRET', 'COOKIE_SECRET']) {
+    if (!process.env[name] || process.env[name] === 'supersecret') {
+      throw new Error(`${name} precisa estar definido em produção`)
+    }
+  }
+}
+
 module.exports = defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
@@ -42,7 +51,7 @@ module.exports = defineConfig({
                     channels: ["email"],
                     host: process.env.SMTP_HOST,
                     port: Number(process.env.SMTP_PORT) || undefined,
-                    secure: process.env.SMTP_SECURE === "true",
+                    secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === "true" : Number(process.env.SMTP_PORT) === 465,
                     user: process.env.SMTP_USER,
                     password: process.env.SMTP_PASSWORD,
                     from: process.env.SMTP_FROM,

@@ -1,5 +1,5 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
-import { getMercadoPagoClient, getMercadoPagoPaymentSession } from "../utils";
+import { assertSessionPayable, getMercadoPagoClient, getMercadoPagoPaymentSession } from "../utils";
 
 type Body = {
   payment_session_id: string;
@@ -31,6 +31,7 @@ export async function POST(req: MedusaRequest<Body>, res: MedusaResponse) {
 
   const client = getMercadoPagoClient();
   const { paymentModuleService, session } = await getMercadoPagoPaymentSession(req, payment_session_id);
+  await assertSessionPayable(req, session as any);
 
   const payment = await client.createBoletoPayment({
     idempotencyKey: session.id,
@@ -57,7 +58,14 @@ export async function POST(req: MedusaRequest<Body>, res: MedusaResponse) {
     id: session.id,
     amount: session.amount,
     currency_code: session.currency_code,
-    data: { status: "submitted", mp_payment_id: payment.id, mp_status: payment.status },
+    data: {
+      status: "submitted",
+      mp_payment_id: payment.id,
+      mp_status: payment.status,
+      // Valor cobrado no Mercado Pago: se o carrinho mudar depois do pagamento, a autorização recusa.
+      mp_amount: Number(session.amount),
+      amount: Number(session.amount),
+    },
   });
 
   return res.json({
