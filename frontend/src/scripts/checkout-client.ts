@@ -163,22 +163,25 @@ async function medusaFetch(path: string, init: RequestInit = {}) {
   return data;
 }
 
+const esc = (v: unknown) =>
+  String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
 function renderSummary(items: CartItem[]) {
   const list = qs('checkout-summary-items');
   if (list) {
     list.innerHTML = items
       .map((item) => {
         const img = item.thumbnail
-          ? `<img class="checkout-summary__item-img" src="${item.thumbnail}" alt="" loading="lazy" />`
+          ? `<img class="checkout-summary__item-img" src="${esc(item.thumbnail)}" alt="" loading="lazy" />`
           : '';
-        const variantLine = [item.variantTitle ? `Tamanho: ${item.variantTitle}` : '', `x${item.quantity}`]
+        const variantLine = [item.variantTitle ? `Tamanho: ${esc(item.variantTitle)}` : '', `x${Number(item.quantity) || 0}`]
           .filter(Boolean)
           .join(' · ');
         return `
           <div class="checkout-summary__item">
             <div class="checkout-summary__item-img-wrap">${img}</div>
             <div class="checkout-summary__item-info">
-              <span class="checkout-summary__item-title">${item.title}</span>
+              <span class="checkout-summary__item-title">${esc(item.title)}</span>
               <span class="checkout-summary__item-variant">${variantLine}</span>
               <span class="checkout-summary__item-price">${fmtBrl((item.price * item.quantity) / 100)}</span>
             </div>
@@ -406,8 +409,8 @@ function init() {
       const line2 = addr.metadata?.neighborhood ? ` — ${addr.metadata.neighborhood}` : '';
       card.innerHTML = `
         ${addr.is_default_shipping ? '<span class="checkout-address-card__badge">Padrão</span>' : ''}
-        <p class="checkout-address-card__name">${name}</p>
-        <p class="checkout-address-card__lines">${addr.address_1 || ''}, ${addr.address_2 || ''}${line2}<br>${addr.city || ''} - ${addr.province || ''} · ${addr.postal_code || ''}</p>
+        <p class="checkout-address-card__name">${esc(name)}</p>
+        <p class="checkout-address-card__lines">${esc(addr.address_1)}, ${esc(addr.address_2)}${esc(line2)}<br>${esc(addr.city)} - ${esc(addr.province)} · ${esc(addr.postal_code)}</p>
       `;
       card.addEventListener('click', () => {
         wrap.querySelectorAll('.checkout-address-card').forEach((c) => c.classList.remove('is-selected'));

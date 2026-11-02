@@ -39,7 +39,7 @@ export async function redeemTicket(scope: MedusaContainer, code: string) {
 
   let customer, authIdentity
   try {
-    ;({ customer, authIdentity } = await ensureAccount(scope, lead.email, lead.name))
+    ;({ customer, authIdentity } = await ensureAccount(scope, lead.email, lead.name, { ownerProved: true }))
   } catch {
     throw invalid()
   }

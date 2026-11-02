@@ -263,7 +263,7 @@ function renderCart() {
     el.setAttribute('role', 'listitem');
     const titleH = escHtml(item.title || '');
     const variantH = item.variantTitle ? escHtml(formatVariantLabel(item.variantTitle)) : '';
-    const thumb = item.thumbnail || '/logo.webp';
+    const thumb = escHtml(item.thumbnail || '/logo.webp');
     const maxQty = maxOrderableUnits(item);
     const isOutOfStock = (item as any).stockState === 'out_of_stock';
     el.innerHTML = `

@@ -120,7 +120,7 @@ function render() {
     el.setAttribute('role', 'listitem');
     const titleH = escHtml(item.title || '');
     const variantH = item.variantTitle ? escHtml(formatVariantLabel(item.variantTitle)) : '';
-    const thumb = item.thumbnail || '/logo.webp';
+    const thumb = escHtml(item.thumbnail || '/logo.webp');
     const maxQtyRaw = Number(item.maxQuantity ?? 0);
     const maxQty = Number.isFinite(maxQtyRaw) && maxQtyRaw > 0 ? Math.floor(maxQtyRaw) : 9999;
     const isOutOfStock = (item as any).stockState === 'out_of_stock';
