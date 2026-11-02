@@ -157,7 +157,7 @@ export async function findInCart(accessToken: string, tag: string): Promise<stri
     const cart = await meGet<CartPage>(accessToken, `/cart?page=${page}`)
     const hit = (cart.data ?? []).find((o) => (o.tags ?? []).some((t) => t.tag === tag) && o.status !== "canceled")
     if (hit) return hit.id
-    if (page >= (cart.last_page ?? 1)) break
+    if (page >= (cart.last_page ?? 1)) return null
   }
-  return null
+  throw new Error("O carrinho do Melhor Envio está grande demais para conferir. Esvazie o carrinho por lá e tente de novo.")
 }

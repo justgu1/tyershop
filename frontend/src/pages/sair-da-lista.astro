@@ -20,11 +20,11 @@ if (oneClick) {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-publishable-api-key': getPublishableKey() },
         body: JSON.stringify({ email, token }),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(5000),
       });
       done = res.ok;
-      // Só falha do servidor (5xx) vale tentar de novo; qualquer 4xx é definitivo.
-      invalid = res.status >= 400 && res.status < 500;
+      // Falha passageira (5xx, 408, 429) vale uma nova tentativa; os demais 4xx são definitivos.
+      invalid = res.status >= 400 && res.status < 500 && ![408, 429].includes(res.status);
       if (invalid) break;
     } catch {
       /* tenta de novo */

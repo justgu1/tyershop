@@ -32,21 +32,33 @@ export async function POST(req: AuthenticatedMedusaRequest<Body>, res: MedusaRes
   }
 
   const { order, metadata } = await currentMetadata(req, req.params.id)
-  const invoice = { file_id: fileId, number, filename: String(req.body?.filename ?? "nota-fiscal.pdf").slice(0, 120), issued_at: new Date().toISOString() }
+  const previous = metadata.invoice as { file_id?: string; emailed_at?: string } | undefined
+  const invoice: Record<string, unknown> = {
+    file_id: fileId,
+    number,
+    filename: String(req.body?.filename ?? "nota-fiscal.pdf").slice(0, 120),
+    issued_at: new Date().toISOString(),
+  }
+  // Reenviar o mesmo arquivo só manda o PDF de novo se o e-mail anterior não saiu.
+  const alreadyEmailed = previous?.file_id === fileId && !!previous.emailed_at
+  if (alreadyEmailed) invoice.emailed_at = previous!.emailed_at
   await setMetadataKey(req.scope, order.id, "invoice", invoice)
 
-  // Reenviar o mesmo arquivo não manda o PDF de novo ao cliente.
-  const previous = (metadata.invoice as { file_id?: string } | undefined)?.file_id
-  if (order.email && previous !== fileId) {
-    await sendOrderEmail(
+  let emailed = alreadyEmailed
+  if (order.email && !alreadyEmailed) {
+    emailed = await sendOrderEmail(
       req.scope,
       order.email,
       "order_invoice",
       { ...baseOrderData(order), invoice_number: number },
       [{ content: buffer.toString("base64"), filename: `nota-fiscal-pedido-${order.display_id}.pdf`, content_type: "application/pdf" }]
     )
+    if (emailed) {
+      invoice.emailed_at = new Date().toISOString()
+      await setMetadataKey(req.scope, order.id, "invoice", invoice)
+    }
   }
-  res.json({ invoice })
+  res.json({ invoice, emailed })
 }
 
 export async function DELETE(req: AuthenticatedMedusaRequest, res: MedusaResponse) {

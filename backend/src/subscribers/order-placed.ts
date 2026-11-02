@@ -11,9 +11,10 @@ export default async function orderPlacedHandler({ event: { data }, container }:
   try {
     sent = await sendOrderEmail(container, order.email, "order_confirmation", await confirmationData(container, order))
   } finally {
-    // Qualquer falha (montar os dados, enviar) devolve a marca, para uma nova entrega do evento tentar de novo.
+    // Qualquer falha (montar os dados, enviar) devolve a marca: a próxima entrega do evento volta a tentar.
     if (!sent) await setMetadataKey(container, data.id, "confirmation_sent_at", null)
   }
+  if (!sent) throw new Error(`Confirmação do pedido ${data.id} não enviada`)
 }
 
 export const config: SubscriberConfig = { event: "order.placed" }

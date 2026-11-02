@@ -1,7 +1,6 @@
 import { MedusaContainer } from "@medusajs/framework/types"
 import { Modules } from "@medusajs/framework/utils"
-import { dropRows } from "../modules/drop/access"
-import { presentDrop } from "../modules/drop/present"
+import { productionDaysOfProducts } from "../modules/melhor-envio/quote"
 
 const siteUrl = () => (process.env.SITE_URL || "http://localhost:4321").replace(/\/$/, "")
 export const ordersUrl = () => `${siteUrl()}/account/orders`
@@ -28,18 +27,6 @@ export function baseOrderData(order: any) {
   }
 }
 
-/**
- * Produção sob encomenda: maior prazo entre os drops dos itens que estão em pré-venda ou venda geral agora. Peças do Starter
- * (estoque pronto) e de drops encerrados não entram.
- */
-async function productionDays(scope: MedusaContainer, productIds: string[]): Promise<number | null> {
-  const rows = await dropRows(scope)
-  const days = rows
-    .filter((r) => ["presale", "general"].includes(presentDrop(r.drop).phase) && productIds.some((id) => r.productIds.has(id)))
-    .map((r) => Number(r.drop.production_days) || 0)
-  return days.length ? Math.max(...days) : null
-}
-
 export async function confirmationData(scope: MedusaContainer, order: any) {
   const a = order.shipping_address
   return {
@@ -54,7 +41,7 @@ export async function confirmationData(scope: MedusaContainer, order: any) {
       unit_price: i.unit_price,
     })),
     address: a ? [a.address_1, a.address_2, `${a.city}${a.province ? `/${a.province}` : ""}`, a.postal_code].filter(Boolean).join(", ") : null,
-    production_days: await productionDays(scope, (order.items ?? []).map((i: any) => i.product_id).filter(Boolean)),
+    production_days: (await productionDaysOfProducts(scope, (order.items ?? []).map((i: any) => i.product_id).filter(Boolean))) || null,
   }
 }
 

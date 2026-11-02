@@ -20,6 +20,8 @@ export type LabelState = {
   paid?: boolean
   generated?: boolean
   posted_seen_at?: string
+  /** Quem iniciou a compra: só as automáticas são retomadas pelo job; as do admin são retomadas pelo admin. */
+  origin?: "auto" | "manual"
   fulfillment_id?: string
   tracking_code?: string | null
   error?: string
@@ -90,13 +92,13 @@ async function cpfOf(scope: MedusaContainer, order: any): Promise<string> {
  * o e-mail de despacho sai quando a transportadora registra a postagem (ver `syncShipments`). Cada etapa fica gravada no
  * pedido, então um erro no meio e uma nova tentativa retomam de onde pararam, sem pagar a etiqueta duas vezes.
  */
-export async function purchaseLabel(scope: MedusaContainer, orderId: string): Promise<LabelState> {
-  return withLock(scope, `melhor-envio-label:${orderId}`, () => purchaseLabelLocked(scope, orderId))
+export async function purchaseLabel(scope: MedusaContainer, orderId: string, origin: "auto" | "manual" = "manual"): Promise<LabelState> {
+  return withLock(scope, `melhor-envio-label:${orderId}`, () => purchaseLabelLocked(scope, orderId, origin))
 }
 
 const DONE: LabelState["status"][] = ["gerada", "postada", "entregue"]
 
-async function purchaseLabelLocked(scope: MedusaContainer, orderId: string): Promise<LabelState> {
+async function purchaseLabelLocked(scope: MedusaContainer, orderId: string, origin: "auto" | "manual"): Promise<LabelState> {
   const logger = scope.resolve("logger") as any
   const order = await loadFullOrder(scope, orderId)
   if (!order) throw new Error("Pedido não encontrado.")
@@ -136,7 +138,7 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string): Pro
       )
       meId = (await addToCart(token, buildCartPayload({ order, cpf, serviceId, sender, pkg: buildPackage(shipments) }))).id
     }
-    if (meId !== current?.me_order_id) await saveState(scope, order, { status: "carrinho", me_order_id: meId })
+    if (meId !== current?.me_order_id) await saveState(scope, order, { status: "carrinho", me_order_id: meId, origin })
 
     // O estado remoto manda: uma compra ou geração que passou, mas cuja resposta se perdeu, não é refeita. Sem conseguir
     // consultar, não paga: melhor tentar de novo do que cobrar duas vezes.
@@ -185,7 +187,7 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string): Pro
 }
 
 const TRACKING_CHUNK = 50
-const NO_CODE_WAIT_MS = 6 * 3600 * 1000
+const NO_CODE_WAIT_MS = 48 * 3600 * 1000
 
 /**
  * Acompanha as etiquetas: quando a transportadora registra a postagem cria o envio no Medusa com o rastreio (o cliente
@@ -239,14 +241,14 @@ async function syncShipmentsLocked(scope: MedusaContainer) {
       const state = order.metadata.melhor_envio as LabelState
       const info = infos[state.me_order_id!]
       if (!info?.status) continue
-      const code = info.tracking ?? state.tracking_code ?? info.melhorenvio_tracking ?? null
+      const code = info.tracking || state.tracking_code || info.melhorenvio_tracking || null
 
       const { data: fulfillments } = await query.graph({ entity: "fulfillment", fields: ["id", "shipped_at", "delivered_at"], filters: { id: state.fulfillment_id } })
       const real = fulfillments[0] as any
       if (!real) continue
 
       let status: LabelState["status"] = real.delivered_at ? "entregue" : real.shipped_at ? "postada" : "gerada"
-      // O código de rastreio pode aparecer um pouco depois da postagem: espera até algumas horas em vez de avisar sem código.
+      // O código de rastreio pode aparecer um pouco depois da postagem: espera até dois dias em vez de avisar sem código; passado o prazo avisa mesmo assim, para o pedido não ficar parado.
       if (status === "gerada" && info.status === "posted" && !code) {
         const seen = state.posted_seen_at ? new Date(state.posted_seen_at).getTime() : Date.now()
         if (!state.posted_seen_at) await saveState(scope, order, { ...state, posted_seen_at: new Date(seen).toISOString() })
@@ -291,6 +293,7 @@ export async function resumeStuckPurchases(scope: MedusaContainer) {
       `select id from "order"
         where deleted_at is null and created_at >= now() - interval '1 year'
           and metadata->'melhor_envio'->>'status' = 'carrinho'
+          and metadata->'melhor_envio'->>'origin' = 'auto'
           and (metadata->'melhor_envio'->>'updated_at')::timestamptz < now() - interval '15 minutes'
         order by (metadata->'melhor_envio'->>'updated_at')::timestamptz asc
         limit ?`,
@@ -298,7 +301,7 @@ export async function resumeStuckPurchases(scope: MedusaContainer) {
     )
   ).rows
   for (const o of stuck) {
-    await purchaseLabel(scope, o.id).catch(async (err) => {
+    await purchaseLabel(scope, o.id, "auto").catch(async (err) => {
       if (err instanceof BusyError) return
       logger.error(`[melhor-envio] retomada: ${err.message}`)
       // Sai da fila: sem isso o mesmo pedido, falhando antes de gravar o estado, ocuparia as vagas de todas as rodadas.
