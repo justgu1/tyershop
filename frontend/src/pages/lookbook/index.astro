@@ -1,0 +1,228 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getLangFromUrl, t, getPathForLang } from '../../i18n/utils';
+import type { Lang } from '../../i18n/utils';
+import { LOOKBOOK_DROPS } from '../../lib/lookbook';
+
+export const prerender = false;
+
+const lang: Lang = getLangFromUrl(Astro.url);
+---
+
+<Layout
+  title={t(lang, 'lookbook', 'meta_title')}
+  description={t(lang, 'lookbook', 'meta_description')}
+  lang={lang}
+  ogImage={`/lookbook/${LOOKBOOK_DROPS[0].slug}/1.webp`}
+>
+  <main class="lookbook-page">
+    <header class="lookbook-head container">
+      <p class="lookbook-head__eyebrow">{t(lang, 'lookbook', 'eyebrow')}</p>
+      <h1 class="lookbook-head__title">{t(lang, 'lookbook', 'title')}</h1>
+      <p class="lookbook-head__sub">{t(lang, 'lookbook', 'subtitle')}</p>
+    </header>
+
+    <div class="lookbook-filter container">
+      <label class="visually-hidden" for="lb-sort">{t(lang, 'lookbook', 'sort_label')}</label>
+      <select id="lb-sort" class="lookbook-filter__select" data-lb-sort>
+        <option value="recent">{t(lang, 'lookbook', 'sort_recent')}</option>
+        <option value="oldest">{t(lang, 'lookbook', 'sort_oldest')}</option>
+      </select>
+    </div>
+
+    <ul class="lookbook-grid container" aria-label={t(lang, 'lookbook', 'title')} data-lb-grid>
+      {
+        LOOKBOOK_DROPS.map((d, i) => (
+          <li data-index={i}>
+            <a href={getPathForLang(`/lookbook/${d.slug}`, lang)} class="lb-card">
+              <img
+                src={`/lookbook/${d.slug}/1.webp`}
+                alt={`${d.title} — ${t(lang, 'lookbook', 'title')}`}
+                class="lb-card__img"
+                width="1080"
+                height="1440"
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="lb-card__shade" aria-hidden="true"></span>
+              <span class="lb-card__info">
+                <span class="lb-card__name">
+                  <span class="lb-card__title">{d.title}</span>
+                  <span class="lb-card__count">
+                    {d.count} {t(lang, 'lookbook', 'looks')}
+                  </span>
+                </span>
+                <span class="lb-card__cta">{t(lang, 'lookbook', 'view')} ›</span>
+              </span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </main>
+</Layout>
+
+<script>
+  const grid = document.querySelector<HTMLElement>('[data-lb-grid]');
+  const select = document.querySelector<HTMLSelectElement>('[data-lb-sort]');
+
+  /* A lista vem do mais recente ao mais antigo (índice do servidor). */
+  select?.addEventListener('change', () => {
+    if (!grid) return;
+    const dir = select.value === 'oldest' ? -1 : 1;
+    const items = Array.from(grid.children) as HTMLElement[];
+    items
+      .sort((a, b) => dir * (Number(a.dataset.index) - Number(b.dataset.index)))
+      .forEach((li) => grid.appendChild(li));
+  });
+</script>
+
+<style>
+  .container {
+    max-width: var(--max-w, 1200px);
+    margin-inline: auto;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .lookbook-page {
+    padding: calc(var(--header-h) + 32px) 0 72px;
+  }
+  .lookbook-head {
+    margin-bottom: 36px;
+  }
+  .lookbook-head__eyebrow {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--c-accent);
+    margin: 0 0 8px;
+  }
+  .lookbook-head__title {
+    font-family: var(--font-title);
+    font-size: clamp(40px, 7vw, 84px);
+    text-transform: uppercase;
+    line-height: 0.95;
+    margin: 0 0 14px;
+  }
+  .lookbook-head__sub {
+    max-width: 56ch;
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--c-muted);
+    margin: 0;
+  }
+
+  .lookbook-filter {
+    margin-bottom: 20px;
+  }
+  .lookbook-filter__select {
+    appearance: none;
+    background: #000 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%23fff' stroke-width='1.5'%3E%3Cpath d='m1 1 4 4 4-4'/%3E%3C/svg%3E") no-repeat right 12px center;
+    color: #fff;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-md, 6px);
+    padding: 8px 34px 8px 14px;
+    font: 800 11px/1 var(--font);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .lookbook-filter__select:hover {
+    border-color: var(--c-accent);
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .lookbook-grid {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  .lb-card {
+    position: relative;
+    display: block;
+    aspect-ratio: 3 / 4;
+    overflow: hidden;
+    border-radius: var(--r-md, 6px);
+    background: var(--c-surface2);
+    color: #fff;
+    text-decoration: none;
+  }
+  .lb-card__img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+  }
+  .lb-card:hover .lb-card__img {
+    transform: scale(1.05);
+  }
+  .lb-card__shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0) 55%);
+  }
+  .lb-card__info {
+    position: absolute;
+    inset: auto 0 0 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 20px;
+  }
+  .lb-card__name {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .lb-card__title {
+    font-family: var(--font-title);
+    font-size: clamp(24px, 2.4vw, 32px);
+    text-transform: uppercase;
+    line-height: 1;
+  }
+  .lb-card__count {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+  }
+  .lb-card__cta {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    transition: color 0.15s ease;
+  }
+  .lb-card:hover .lb-card__cta {
+    color: var(--c-accent);
+  }
+
+  @media (max-width: 1000px) {
+    .lookbook-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (max-width: 560px) {
+    .lookbook-grid {
+      gap: 10px;
+    }
+    .lb-card__info {
+      padding: 14px;
+    }
+    .lb-card__cta {
+      display: none;
+    }
+  }
+</style>
