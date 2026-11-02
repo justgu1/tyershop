@@ -7,11 +7,11 @@ import { createCollectionsWorkflow, updateCollectionsWorkflow, updateProductsWor
 // Rode depois de importar data/import-pre-venda.csv: liga cada produto à sua coleção pelo handle.
 const CATEGORIA_PULSEIRAS = "pulseiras";
 const COLECOES = [
-  { title: "Tyer Gang", handle: "tyer-gang", order: 2, label: "Cápsula", banner_url: "/drop-banners/tyer-gang.webp", handles: ["camiseta-tyer-gang"] },
+  { title: "Tyer Gang", handle: "tyer-gang", order: 1, label: "Cápsula", banner_url: "/drop-banners/tyer-gang.webp", handles: ["camiseta-tyer-gang"] },
   {
     title: "Caçada",
     handle: "cacada",
-    order: 1,
+    order: 2,
     label: "Drop",
     banner_url: "/drop-banners/cacada.webp",
     handles: ["short-compressao-cacada", "calca-cacada", "regata-cacada", "pulseira-cacada"],
