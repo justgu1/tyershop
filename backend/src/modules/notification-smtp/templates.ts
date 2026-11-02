@@ -14,6 +14,9 @@ const SOCIAL = [
   { label: "YouTube", url: "https://www.youtube.com/@tyer_br", icon: "youtube" },
 ]
 
+/** Sobe o número ao trocar os PNGs de `public/email/`: a Cloudflare guarda cada URL por horas (inclusive erros). */
+const ICON_VERSION = 1
+
 /** Endereço público do site: os ícones das redes e as fotos dos produtos são imagens hospedadas lá. */
 const siteUrl = () => (process.env.SITE_URL || "").replace(/\/$/, "")
 
@@ -55,7 +58,7 @@ function shell({ preheader, title, paragraphs, blocks, cta, note, reason }: Shel
   const noteHtml = note ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#6b6b6b">${note}</p>` : ""
   const social = SOCIAL.map(
     (s) =>
-      `<a href="${s.url}" style="text-decoration:none;display:inline-block;margin:0 8px"><img src="${siteUrl()}/email/${s.icon}.png?v=1" width="28" height="28" alt="${s.label}" style="display:block;border:0;color:#ffffff;font-size:12px"></a>`
+      `<a href="${s.url}" style="text-decoration:none;display:inline-block;margin:0 8px"><img src="${siteUrl()}/email/${s.icon}.png?v=${ICON_VERSION}" width="28" height="28" alt="${s.label}" style="display:block;border:0;color:#ffffff;font-size:12px"></a>`
   ).join("")
 
   return `<!doctype html>

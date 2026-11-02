@@ -7,6 +7,7 @@ import { getMedusaStoreUrl, getPublishableKey } from '../lib/medusa-env';
 import { fetchDrops, fetchStarterProducts, dropCountdown, PHASE_LABEL } from '../lib/drop';
 import { fetchCollectionsWithCounts } from '../lib/collections';
 import { cached } from '../lib/ssr-cache';
+import { SPAM_AVISO } from '../lib/avisos';
 
 // Home busca catálogo no Medusa: precisa renderizar por requisição —
 // pré-renderizada o HTML congelaria com o estado do build (sem backend).

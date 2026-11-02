@@ -38,3 +38,8 @@ export function applyTestModeNote(mail: { html: string; text: string }, redirect
     text: `${note}\n\n${mail.text}`,
   }
 }
+
+/** Destinatário e assunto de um envio: redefinição de senha vai sempre ao destinatário real, o resto segue o modo de teste. */
+export function envelopeFor(template: string, original: string, subject: string, cfg: TestModeConfig): { to: string; subject: string; redirectedFrom?: string } {
+  return template === "password_reset" ? { to: original, subject } : resolveRecipient(original, subject, cfg)
+}

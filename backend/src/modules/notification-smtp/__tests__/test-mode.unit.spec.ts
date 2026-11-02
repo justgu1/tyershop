@@ -1,4 +1,4 @@
-import { applyTestModeNote, isUndeliverable, readTestMode, resolveRecipient } from "../test-mode"
+import { applyTestModeNote, envelopeFor, isUndeliverable, readTestMode, resolveRecipient } from "../test-mode"
 
 describe("readTestMode", () => {
   it("is on by default", () => {
@@ -65,5 +65,15 @@ describe("applyTestModeNote", () => {
     const r = applyTestModeNote({ html: "<p>oi</p>", text: "oi" }, "a<b>@x.com")
     expect(r.html.startsWith("<div")).toBe(true)
     expect(r.html).not.toContain("<b>")
+  })
+})
+
+describe("envelopeFor", () => {
+  const cfg = { enabled: true, to: "eu@teste.com" }
+  it("redefinição de senha vai ao destinatário real, sem redirecionamento", () => {
+    expect(envelopeFor("password_reset", "cliente@x.com", "Senha", cfg)).toEqual({ to: "cliente@x.com", subject: "Senha" })
+  })
+  it("os demais seguem o modo de teste", () => {
+    expect(envelopeFor("ticket", "cliente@x.com", "Ingresso", cfg)).toMatchObject({ to: "eu@teste.com", redirectedFrom: "cliente@x.com" })
   })
 })

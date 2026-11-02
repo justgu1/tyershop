@@ -391,6 +391,8 @@ function init() {
     if (mail && order.email) {
       mail.textContent = `Enviamos a confirmação para ${order.email}.`;
       mail.hidden = false;
+      const spam = qs('checkout-success-spam');
+      if (spam) spam.hidden = false;
     }
   }
 

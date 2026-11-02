@@ -207,7 +207,7 @@ const c = (key: string) => t(lang, 'checkout', key);
           <ul class="checkout-success__items" id="checkout-success-items" role="list"></ul>
           <p class="checkout-success__total" id="checkout-success-total" hidden></p>
           <p class="checkout-success__mail" id="checkout-success-mail" hidden></p>
-          <p class="checkout-success__spam">{SPAM_AVISO}</p>
+          <p class="checkout-success__spam" id="checkout-success-spam" hidden>{SPAM_AVISO}</p>
           <div class="checkout-success__actions">
             <a href={getPathForLang('/account/orders', lang)} class="btn btn-primary">Ver meus pedidos</a>
             <a href={getPathForLang('/', lang)} class="btn btn-outline">Voltar ao início</a>
