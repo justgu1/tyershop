@@ -1,7 +1,7 @@
 import { getMedusaStoreUrl, getPublishableKey } from './medusa-env';
 import { cached } from './ssr-cache';
 
-export type Collection = { id: string; title: string; handle: string; products_count?: number };
+export type Collection = { id: string; title: string; handle: string; products_count?: number; metadata?: Record<string, unknown> | null };
 
 const norm = (s: string) =>
   s
@@ -14,20 +14,29 @@ const norm = (s: string) =>
 const HIDDEN_WORDS = ['paris', 'five', 'mvp'];
 const HIDDEN_PHRASES = ['red-rose'];
 
-/** Drops que saíram do site; vale tanto pelo título quanto pelo handle. */
-export const isHiddenCollection = (c: { title?: string; handle?: string }) =>
+/** Drops que saíram do site (pelo título ou handle) e coleções da pré-venda, que só aparecem em /drop (metadata.pre_venda). */
+export const isHiddenCollection = (c: { title?: string; handle?: string; metadata?: Record<string, unknown> | null }) =>
+  c.metadata?.pre_venda === true ||
   [c.title, c.handle].some((v) => {
     const n = norm(v ?? '');
     return n.split('-').some((w) => HIDDEN_WORDS.includes(w)) || HIDDEN_PHRASES.some((p) => n.includes(p));
   });
 
+/** Coleção sem produto à venda não aparece: rascunho, esgotada de vez ou só com produto de pré-venda fechada. */
 async function loadVisibleCollections(): Promise<Collection[]> {
-  const res = await fetch(`${getMedusaStoreUrl()}/store/collections?limit=50`, {
-    headers: { 'x-publishable-api-key': getPublishableKey() },
-    signal: AbortSignal.timeout(3000),
-  });
+  const headers = { 'x-publishable-api-key': getPublishableKey() };
+  const res = await fetch(`${getMedusaStoreUrl()}/store/collections?limit=50`, { headers, signal: AbortSignal.timeout(3000) });
   if (!res.ok) throw new Error(`coleções: ${res.status}`);
-  return ((await res.json()).collections ?? []).filter((c: Collection) => !isHiddenCollection(c));
+  const collections: Collection[] = ((await res.json()).collections ?? []).filter((c: Collection) => !isHiddenCollection(c));
+  const counts = await Promise.all(
+    collections.map((c) =>
+      fetch(`${getMedusaStoreUrl()}/store/products?collection_id[]=${c.id}&limit=1&fields=id`, { headers, signal: AbortSignal.timeout(3000) })
+        .then((r) => r.json())
+        .then((d) => d.count || 0)
+        .catch(() => 0)
+    )
+  );
+  return collections.map((c, i) => ({ ...c, products_count: counts[i] })).filter((c) => (c.products_count ?? 0) > 0);
 }
 
 export async function fetchVisibleCollections(): Promise<Collection[]> {
@@ -39,19 +48,4 @@ export async function fetchVisibleCollections(): Promise<Collection[]> {
 }
 
 /** Coleções com a contagem de produtos de cada uma (a home mostra "N itens disponíveis"). */
-export async function fetchCollectionsWithCounts(): Promise<Collection[]> {
-  return cached('collections:counts', 60_000, async () => {
-    const collections = (await fetchVisibleCollections()).map((c) => ({ ...c }));
-    const headers = { 'x-publishable-api-key': getPublishableKey() };
-    const counts = await Promise.all(
-      collections.map((c) =>
-        fetch(`${getMedusaStoreUrl()}/store/products?collection_id[]=${c.id}&limit=1&fields=id`, { headers, signal: AbortSignal.timeout(3000) })
-          .then((r) => r.json())
-          .then((d) => d.count || 0)
-          .catch(() => 0)
-      )
-    );
-    collections.forEach((c, i) => (c.products_count = counts[i]));
-    return collections;
-  }, (v) => v.length > 0);
-}
+export const fetchCollectionsWithCounts = fetchVisibleCollections;
