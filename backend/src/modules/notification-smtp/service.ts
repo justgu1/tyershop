@@ -70,7 +70,7 @@ class SmtpNotificationProviderService extends AbstractNotificationProviderServic
       html,
       text,
       // O cabeçalho deixa ver, em "mostrar original", que o e-mail foi redirecionado pelo modo de teste.
-      headers: { ...listHeaders(notification.template, (notification.data ?? {}) as Record<string, any>), ...(redirectedFrom ? { "X-Tyer-Teste": `redirecionado de ${redirectedFrom}` } : {}) },
+      headers: { ...listHeaders(notification.template, (notification.data ?? {}) as Record<string, any>), ...(redirectedFrom ? { "X-Tyer-Teste": "redirecionado" } : {}) },
       attachments: [
         {
           filename: "tyer.png",

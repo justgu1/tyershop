@@ -49,21 +49,22 @@ describe("isUndeliverable", () => {
 })
 
 describe("applyTestModeNote", () => {
-  const mail = { html: "<!doctype html><html><BODY class=\"x\"><p>oi</p></BODY></html>", text: "oi" }
+  const mail = { html: "<!doctype html><html><body class=\"x\"><div>preheader</div><p>oi</p></BODY></html>", text: "oi" }
 
   it("sem redirecionamento não muda nada", () => {
     expect(applyTestModeNote(mail)).toEqual(mail)
   })
 
-  it("põe o aviso logo depois do corpo, mesmo em maiúsculas", () => {
+  it("põe o aviso no fim do corpo, depois do texto de pré-visualização", () => {
     const r = applyTestModeNote(mail, "cliente@x.com")
-    expect(r.html).toMatch(/<BODY class="x"><div[^>]*>Modo de teste: este e-mail seria enviado para cliente@x\.com\./)
-    expect(r.text.startsWith("Modo de teste")).toBe(true)
+    expect(r.html.indexOf("preheader")).toBeLessThan(r.html.indexOf("Modo de teste"))
+    expect(r.html).toMatch(/Modo de teste: este e-mail seria enviado para cliente@x\.com\.<\/div><\/BODY>/)
+    expect(r.text.endsWith("seria enviado para cliente@x.com.")).toBe(true)
   })
 
-  it("sem tag de corpo, o aviso vai no começo e o endereço é escapado", () => {
+  it("sem tag de corpo, o aviso vai no fim e o endereço é escapado", () => {
     const r = applyTestModeNote({ html: "<p>oi</p>", text: "oi" }, "a<b>@x.com")
-    expect(r.html.startsWith("<div")).toBe(true)
+    expect(r.html.startsWith("<p>oi</p><div")).toBe(true)
     expect(r.html).not.toContain("<b>")
   })
 })

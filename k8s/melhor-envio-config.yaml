@@ -1,0 +1,9 @@
+# Ponto de postagem da Jadlog (serviços .Com e .Package) onde o remetente deixa os pacotes. O id muda entre sandbox e produção:
+# este é o do sandbox. Ao passar para produção, troque pelo id do ponto real (a lista sai de /api/v2/me/shipment/agencies).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tyershop-melhor-envio
+  namespace: apps
+data:
+  MELHOR_ENVIO_AGENCY_ID: "1"
