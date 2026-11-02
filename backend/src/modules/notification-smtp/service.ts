@@ -3,7 +3,7 @@ import type { Logger, ProviderSendNotificationDTO, ProviderSendNotificationResul
 import nodemailer, { Transporter } from "nodemailer"
 import { LOGO_PNG_BASE64 } from "./logo"
 import { LOGO_CID, renderTemplate } from "./templates"
-import { readTestMode, resolveRecipient } from "./test-mode"
+import { isUndeliverable, readTestMode, resolveRecipient } from "./test-mode"
 
 type Options = {
   host: string
@@ -54,6 +54,10 @@ class SmtpNotificationProviderService extends AbstractNotificationProviderServic
   }
 
   async send(notification: ProviderSendNotificationDTO): Promise<ProviderSendNotificationResultsDTO> {
+    if (isUndeliverable(notification.to)) {
+      this.logger_.info(`[smtp] ${notification.template} → ${notification.to} ignorado (endereço .invalid)`)
+      return { id: "ignored-invalid" }
+    }
     const rendered = renderTemplate(notification.template, (notification.data ?? {}) as Record<string, any>)
     // Redefinição de senha é a única que sempre vai ao destinatário real: quem pediu precisa receber.
     const { to, subject } =

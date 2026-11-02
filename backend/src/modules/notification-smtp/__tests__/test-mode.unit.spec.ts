@@ -1,4 +1,4 @@
-import { readTestMode, resolveRecipient } from "../test-mode"
+import { isUndeliverable, readTestMode, resolveRecipient } from "../test-mode"
 
 describe("readTestMode", () => {
   it("is on by default", () => {
@@ -36,5 +36,13 @@ describe("resolveRecipient", () => {
       to: "cliente@x.com",
       subject: "Seu ingresso",
     })
+  })
+})
+
+describe("isUndeliverable", () => {
+  it("reconhece o domínio reservado .invalid", () => {
+    expect(isUndeliverable("cliente@clientes-teste.invalid")).toBe(true)
+    expect(isUndeliverable(" Cliente@Teste.INVALID ")).toBe(true)
+    expect(isUndeliverable("cliente@gmail.com")).toBe(false)
   })
 })

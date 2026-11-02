@@ -20,3 +20,6 @@ export function resolveRecipient(original: string, subject: string, cfg: TestMod
   }
   return { to: cfg.to, subject: `[TESTE · ${original}] ${subject}` }
 }
+
+/** Endereços do domínio reservado `.invalid` nunca existem: não se envia (nem em modo de teste), só se registra. */
+export const isUndeliverable = (address: string) => /\.invalid$/i.test(address.trim())
