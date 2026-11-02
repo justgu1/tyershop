@@ -62,6 +62,8 @@ export const clientIp = (req: MedusaRequest) => {
 /** Limite por janela; responde 429 ao exceder. */
 export function rateLimit(name: string, { windowMs, max, by, globalMax }: Options) {
   return async (req: MedusaRequest, res: MedusaResponse, next: MedusaNextFunction) => {
+    // Só no ambiente de teste de carga: um gerador de carga sai de poucos IPs e bateria nos limites.
+    if (process.env.LOAD_TEST_MODE === "true") return next()
     const keys = [`${name}|ip|${clientIp(req)}`]
     if (globalMax) keys.push(`${name}|all`)
     const extra = by?.(req)
@@ -75,6 +77,10 @@ export function rateLimit(name: string, { windowMs, max, by, globalMax }: Option
     }
     next()
   }
+}
+
+if (process.env.LOAD_TEST_MODE === "true") {
+  console.warn("[rate-limit] LOAD_TEST_MODE ligado: limites de requisição desativados. Nunca use em produção.")
 }
 
 export const bodyEmail = (req: MedusaRequest) => {
