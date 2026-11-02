@@ -59,4 +59,3 @@ Por etapa: `step_cart_ms`, `step_line_item_ms`, `step_address_ms`, `step_shippin
 
 - 500 finalizações/s são cerca de **5000 requisições/s** a mais (cada finalização faz ~10 chamadas), além das 1000 de navegação. Um único gerador k6 raramente sustenta isso: use vários (k6 Operator no cluster ou várias máquinas, cada uma com uma fatia da taxa) e acompanhe CPU do gerador.
 - O gargalo esperado é o **Postgres** (cada pedido grava dezenas de linhas) e a CPU do Medusa. Acompanhe conexões, CPU e locks do banco durante o teste.
-- Hoje o backend roda em **uma réplica** (`replicas: 1`): provavelmente será preciso escalar horizontalmente (e usar Redis para locking e eventos) para chegar à meta.

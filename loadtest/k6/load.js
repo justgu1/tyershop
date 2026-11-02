@@ -83,8 +83,9 @@ if (PROFILE === "capacity") {
   LEVELS.forEach(([browseRps, checkoutRps], i) => {
     const level = `L${i + 1}`;
     const start = i * (STEP_SECONDS + GAP_SECONDS);
-    scenarios[`browse_${level}`] = constantStep("browse", browseRps, start, level, Math.max(10, browseRps), Math.max(50, browseRps * 3));
-    scenarios[`checkout_${level}`] = constantStep("checkout", checkoutRps, start, level, Math.max(10, checkoutRps * 3), Math.max(100, checkoutRps * 12));
+    // Taxa 0 = esse fluxo não roda neste degrau (permite medir só navegação ou só finalização).
+    if (browseRps > 0) scenarios[`browse_${level}`] = constantStep("browse", browseRps, start, level, Math.max(10, browseRps), Math.max(50, browseRps * 3));
+    if (checkoutRps > 0) scenarios[`checkout_${level}`] = constantStep("checkout", checkoutRps, start, level, Math.max(10, checkoutRps * 3), Math.max(100, checkoutRps * 12));
     // Submétricas por degrau: aparecem no resumo e dizem em qual taxa a meta deixou de valer.
     thresholds[`http_req_duration{level:${level},flow:browse}`] = [`p(99)<${P99_MS}`];
     thresholds[`http_req_duration{level:${level},flow:checkout}`] = [`p(99)<${P99_MS}`];
