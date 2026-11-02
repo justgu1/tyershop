@@ -194,10 +194,10 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
   <section id="starter" class="section starter-section" aria-labelledby="starter-title">
     <div class="container section-content">
       {starter.length > 0 ? (
-        <ProductCarousel products={starter} lang={lang} title="Starter" headingId="starter-title" ariaLabel="Linha Starter" align="center" />
+        <ProductCarousel products={starter} lang={lang} title="TYER STARTER" headingId="starter-title" ariaLabel="Linha Starter" align="center" />
       ) : (
         <header class="section__header section__header--centered">
-          <h2 class="section__title" id="starter-title">Starter</h2>
+          <h2 class="section__title" id="starter-title">TYER STARTER</h2>
         </header>
       )}
       <p class="starter__note">Linha fixa com estoque pronto: sem prazo de produção.</p>
@@ -253,24 +253,6 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
           <span class="editorial__left-label">Tyer BasketBall</span>
         </div>
         <div class="editorial__right">
-          <a
-            class="editorial__right-link"
-            href={YOUTUBE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Conteúdos Tyer no YouTube"
-          >
-            <img
-              src="/editorial-right-image.webp"
-              alt="Conteúdos e basketball"
-              width="560"
-              height="400"
-              class="editorial__right-img"
-              loading="lazy"
-              decoding="async"
-              onerror="this.src='/no-data.webp'"
-            />
-          </a>
           <ul class="editorial__social" role="list" aria-label="Redes e comunidade">
             <li>
               <a
@@ -328,6 +310,24 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
               </a>
             </li>
           </ul>
+          <a
+            class="editorial__right-link"
+            href={YOUTUBE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Conteúdos Tyer no YouTube"
+          >
+            <img
+              src="/editorial-right-image.webp"
+              alt="Conteúdos e basketball"
+              width="560"
+              height="400"
+              class="editorial__right-img"
+              loading="lazy"
+              decoding="async"
+              onerror="this.src='/no-data.webp'"
+            />
+          </a>
         </div>
       </div>
     </div>
@@ -353,8 +353,11 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
         <p class="history__text-body"><em>Não vestimos basquete.</em><br /><em>Somos basquete.</em></p>
         <p class="history__text-body"><em>TYER GANG.</em></p>
       </div>
-      <div class="history__image" aria-hidden="true">
-        <img src="/our-history.webp?v=2" alt="" width="1200" height="1600" loading="lazy" decoding="async" onerror="this.src='/no-data.webp'" />
+      <div class="history__image">
+        <video class="history__video" autoplay muted loop playsinline preload="metadata" poster="/video/historia-poster.webp" width="1280" height="720" aria-hidden="true">
+          <source src="/video/historia.webm" type="video/webm" />
+          <source src="/video/historia.mp4" type="video/mp4" />
+        </video>
       </div>
     </div>
   </section>
@@ -787,7 +790,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 .history__text { display: flex; flex-direction: column; gap: 16px; }
 .history__title { font-family: var(--font-title); font-size: clamp(36px, 5vw, 64px); text-transform: uppercase; line-height: 0.95; margin: 0; }
 .history__text-body { font-size: 15px; line-height: 1.8; color: var(--c-muted); }
-.history__image img { width: 100%; height: auto; border-radius: 8px; }
+.history__image img, .history__video { width: 100%; height: auto; border-radius: 8px; display: block; background: #000; aspect-ratio: 16 / 9; }
 </style>
 <style is:global>
 /* `height: 100%` (não `auto`) aqui reintroduzia o bug do stretch quebrado:
@@ -910,14 +913,12 @@ a.past__card:hover img { border-color: var(--c-accent, #e77e23); }
       return;
     }
   
-    // Todos os cards têm o mesmo tamanho; só o recuo e o brilho mostram quem é o ativo.
-    const step = (cards[0]?.offsetWidth || 260) + 20;
     const SLOTS = [
-      { x: -2 * step, scale: 1, opacity: 0.35, zi: 1 },
-      { x: -step,     scale: 1, opacity: 0.60, zi: 2 },
-      { x: 0,         scale: 1, opacity: 1.00, zi: 5 },
-      { x: step,      scale: 1, opacity: 0.60, zi: 2 },
-      { x: 2 * step,  scale: 1, opacity: 0.35, zi: 1 },
+      { x: -430, scale: 0.62, opacity: 0.35, zi: 1 },
+      { x: -238, scale: 0.80, opacity: 0.60, zi: 2 },
+      { x:    0, scale: 1.00, opacity: 1.00, zi: 5 },
+      { x:  238, scale: 0.80, opacity: 0.60, zi: 2 },
+      { x:  430, scale: 0.62, opacity: 0.35, zi: 1 },
     ];
   
     const HALF = Math.floor(SLOTS.length / 2);
@@ -1042,8 +1043,18 @@ a.past__card:hover img { border-color: var(--c-accent, #e77e23); }
       }
     });
   
-    stage.addEventListener('mouseenter', stopAuto);
-    stage.addEventListener('mouseleave', startAuto);
+    // Só o foco por teclado pausa: parar no hover deixava o carrossel parado para quem deixa o mouse em cima (e no toque nunca voltava).
+    stage.addEventListener('focusin', (e) => { if (e.target.matches(':focus-visible')) stopAuto(); });
+    stage.addEventListener('focusout', startAuto);
+
+    // Gira só enquanto o carrossel está visível e a aba aberta.
+    let visible = true;
+    const sync = () => (visible && !document.hidden ? startAuto() : stopAuto());
+    new IntersectionObserver((entries) => {
+      visible = entries[0].isIntersecting;
+      sync();
+    }, { threshold: 0.2 }).observe(stage);
+    document.addEventListener('visibilitychange', sync);
 
     startAuto();
     })();

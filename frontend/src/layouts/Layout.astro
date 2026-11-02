@@ -27,7 +27,8 @@ const navDrops = (await fetchVisibleCollections()).map((c, i) => ({
   img: `/collections/${c.handle}.webp`,
 }));
 const showCollectionsInNav = navDrops.length > 0;
-const { drop: currentDrop } = await fetchDrops();
+const { drop: currentDrop, previous: previousDrops } = await fetchDrops();
+const navLatest = currentDrop ? null : (previousDrops[0] ? { title: previousDrops[0].title, handle: previousDrops[0].handle } : null);
 const navCountdown = currentDrop ? { ...dropCountdown(currentDrop), title: currentDrop.title, phase: currentDrop.phase } : null;
 
 interface Props {
@@ -132,7 +133,7 @@ const schemas: object[] = [
   </head>
   <body class={bodyClass} data-lang={lang}>
     <a class="skip-link" href="#main-content">Skip to content</a>
-    {!bare && <Header lang={lang} drops={navDrops} countdown={navCountdown} />}
+    {!bare && <Header lang={lang} drops={navDrops} countdown={navCountdown} latest={navLatest} />}
     {!bare && <SideCart lang={lang} />}
     {!bare && !hidePromoPopup && <PromoPopup lang={lang} />}
     <main id="main-content" tabindex="-1">
@@ -144,6 +145,7 @@ const schemas: object[] = [
       import "../scripts/product-carousel-client";
       import "../scripts/side-cart-client";
       import "../scripts/mosaic-item-client";
+      import "../scripts/session-sync-client";
     </script>
   </body>
 </html>
