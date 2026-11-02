@@ -15,9 +15,9 @@ describe("statusOnCapture", () => {
     expect(statusOnCapture("pendente", "coming_soon")).toBe("liberado")
   })
 
-  it("quem se descadastrou e volta a se cadastrar entra como um lead novo", () => {
-    expect(statusOnCapture("descadastrado", "coming_soon")).toBe("liberado")
-    expect(statusOnCapture("descadastrado", "presale")).toBe("pendente")
+  it("quem se descadastrou continua descadastrado, mesmo em um novo cadastro", () => {
+    expect(statusOnCapture("descadastrado", "coming_soon")).toBe("descadastrado")
+    expect(statusOnCapture("descadastrado", "presale")).toBe("descadastrado")
   })
 
   it("não muda liberado, inativo nem negado", () => {

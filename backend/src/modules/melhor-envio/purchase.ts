@@ -47,15 +47,29 @@ async function saveState(scope: MedusaContainer, order: { id: string; metadata?:
   return next
 }
 
-const SCOPE_HINT = "O Melhor Envio recusou o acesso. A autorização antiga só calcula frete: reconecte o Melhor Envio no admin para liberar a compra de etiquetas."
+/** Já existe uma execução para a mesma chave (clique duplo, subscriber e admin ao mesmo tempo, outra réplica). */
+export class BusyError extends Error {
+  constructor() {
+    super("Já há uma compra em andamento para este pedido.")
+  }
+}
 
-/** Uma execução por vez para cada chave (clique duplo, duas réplicas, subscriber e admin ao mesmo tempo). */
-async function withLock<T>(scope: MedusaContainer, key: string, fn: () => Promise<T>, busy: () => T | Promise<T>): Promise<T> {
+/** Uma execução por vez para cada chave; o lock é no banco, então vale entre réplicas. */
+async function withLock<T>(scope: MedusaContainer, key: string, fn: () => Promise<T>): Promise<T> {
   const locking = scope.resolve(Modules.LOCKING) as any
+  let started = false
   try {
-    return await locking.execute(key, fn, { timeout: 1 })
+    return await locking.execute(
+      key,
+      () => {
+        started = true
+        return fn()
+      },
+      { timeout: 1 }
+    )
   } catch (err) {
-    if (/timed out|acquire/i.test((err as Error).message)) return busy()
+    // Só é "ocupado" se a trava não foi obtida; um erro vindo de dentro de `fn` segue como erro.
+    if (!started) throw new BusyError()
     throw err
   }
 }
@@ -75,23 +89,17 @@ async function cpfOf(scope: MedusaContainer, order: any): Promise<string> {
  * pedido, então um erro no meio e uma nova tentativa retomam de onde pararam, sem pagar a etiqueta duas vezes.
  */
 export async function purchaseLabel(scope: MedusaContainer, orderId: string): Promise<LabelState> {
-  return withLock(
-    scope,
-    `melhor-envio-label:${orderId}`,
-    () => purchaseLabelLocked(scope, orderId),
-    async () => {
-      const order = await loadFullOrder(scope, orderId)
-      return (order?.metadata?.melhor_envio as LabelState) ?? ({ status: "carrinho", updated_at: new Date().toISOString() } as LabelState)
-    }
-  )
+  return withLock(scope, `melhor-envio-label:${orderId}`, () => purchaseLabelLocked(scope, orderId))
 }
+
+const DONE: LabelState["status"][] = ["gerada", "postada", "entregue"]
 
 async function purchaseLabelLocked(scope: MedusaContainer, orderId: string): Promise<LabelState> {
   const logger = scope.resolve("logger") as any
   const order = await loadFullOrder(scope, orderId)
   if (!order) throw new Error("Pedido não encontrado.")
   const current = order.metadata?.melhor_envio as LabelState | undefined
-  if (current && current.status !== "erro") return current
+  if (current && DONE.includes(current.status)) return current
 
   const fail = async (message: string) => {
     logger.error(`[melhor-envio] pedido #${order.display_id}: ${message}`)
@@ -138,12 +146,18 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string): Pro
         input: { order_id: order.id, items: order.items.map((i: any) => ({ id: i.id, quantity: i.quantity })), no_notification: true },
       })
       fulfillmentId = (created.result as any)?.id
+      // Grava já: se algo falhar daqui em diante, a nova tentativa não cria outro envio.
+      await saveState(scope, order, { status: "carrinho", fulfillment_id: fulfillmentId })
     }
     const state = await saveState(scope, order, { status: "gerada", tracking_code: info?.tracking ?? null, fulfillment_id: fulfillmentId })
     logger.info(`[melhor-envio] pedido #${order.display_id}: etiqueta ${meId} comprada`)
     return state
   } catch (err) {
-    return fail(err instanceof UnauthorizedError ? SCOPE_HINT : (err as Error).message)
+    return fail(
+      err instanceof UnauthorizedError
+        ? `${(err as Error).message}. Se o acesso foi concedido só para calcular frete, reconecte o Melhor Envio no admin.`
+        : (err as Error).message
+    )
   }
 }
 
@@ -155,15 +169,38 @@ const TRACKING_CHUNK = 50
  * antes de agir, então repetir a rodada depois de uma falha não duplica envio nem e-mail.
  */
 export async function syncShipments(scope: MedusaContainer) {
-  return withLock(scope, "sync-melhor-envio", () => syncShipmentsLocked(scope), () => ({ checked: 0 }))
+  return withLock(scope, "sync-melhor-envio", () => syncShipmentsLocked(scope)).catch((err) => {
+    if (err instanceof BusyError) return { checked: 0 }
+    throw err
+  })
 }
 
 async function syncShipmentsLocked(scope: MedusaContainer) {
   const logger = scope.resolve("logger") as any
   const query = scope.resolve(ContainerRegistrationKeys.QUERY)
-  const since = new Date(Date.now() - 60 * 24 * 3600 * 1000)
-  const { data } = await query.graph({ entity: "order", fields: ["id", "display_id", "metadata"], filters: { created_at: { $gte: since } } })
-  const open = (data as any[]).filter((o) => ["gerada", "postada"].includes(o.metadata?.melhor_envio?.status) && o.metadata.melhor_envio.me_order_id)
+  // Só as etiquetas em aberto dos últimos 60 dias, filtradas no banco: sem etiquetas a rodada custa uma consulta barata.
+  const pg = scope.resolve(ContainerRegistrationKeys.PG_CONNECTION) as any
+  const rows: { id: string; display_id: number; metadata: any }[] = (
+    await pg.raw(
+      `select id, display_id, metadata from "order"
+        where deleted_at is null and created_at >= now() - interval '60 days'
+          and metadata->'melhor_envio'->>'status' in ('gerada', 'postada')
+          and metadata->'melhor_envio'->>'me_order_id' is not null`
+    )
+  ).rows
+  // Compras que pararam no meio (processo reiniciado, por exemplo) e não deram erro: retoma de onde ficaram.
+  const stuck: { id: string }[] = (
+    await pg.raw(
+      `select id from "order"
+        where deleted_at is null and created_at >= now() - interval '60 days'
+          and metadata->'melhor_envio'->>'status' = 'carrinho'
+          and (metadata->'melhor_envio'->>'updated_at')::timestamptz < now() - interval '15 minutes'`
+    )
+  ).rows
+  for (const o of stuck) await purchaseLabel(scope, o.id).catch((err) => logger.error(`[melhor-envio] retomada: ${err.message}`))
+
+  const open = rows.filter((o) => o.metadata.melhor_envio.fulfillment_id)
+  for (const o of rows) if (!o.metadata.melhor_envio.fulfillment_id) logger.warn(`[melhor-envio] pedido #${o.display_id}: etiqueta sem envio no Medusa; refaça pelo admin`)
   if (!open.length) return { checked: 0 }
 
   const token = await scope.resolve<MelhorEnvioModuleService>(MELHOR_ENVIO_MODULE).accessToken()
@@ -191,7 +228,7 @@ async function syncShipmentsLocked(scope: MedusaContainer) {
       if (!info?.status) continue
       const code = info.tracking ?? state.tracking_code ?? null
 
-      const { data: fulfillments } = await query.graph({ entity: "fulfillment", fields: ["id", "shipped_at", "delivered_at"], filters: { id: state.fulfillment_id! } })
+      const { data: fulfillments } = await query.graph({ entity: "fulfillment", fields: ["id", "shipped_at", "delivered_at"], filters: { id: state.fulfillment_id } })
       const real = fulfillments[0] as any
       if (!real) continue
 

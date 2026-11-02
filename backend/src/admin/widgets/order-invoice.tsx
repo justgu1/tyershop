@@ -87,9 +87,9 @@ const InvoiceWidget = ({ data }: { data: { id: string; display_id?: number; meta
           {label.error ? <span style={{ display: "block", color: "#b91c1c", marginTop: 4 }}>{label.error}</span> : null}
         </p>
       )}
-      {(!label || label.status === "erro") && (
+      {(!label || label.status === "erro" || label.status === "carrinho") && (
         <button type="button" onClick={buyLabel} disabled={labelBusy} style={{ padding: "8px 14px", borderRadius: 6, border: 0, background: "#e77e23", color: "#fff", cursor: "pointer" }}>
-          {labelBusy ? "Comprando..." : "Comprar etiqueta no Melhor Envio"}
+          {labelBusy ? "Comprando..." : label ? "Retomar a compra da etiqueta" : "Comprar etiqueta no Melhor Envio"}
         </button>
       )}
     </div>
