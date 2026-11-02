@@ -37,7 +37,8 @@ interface CsvRow {
   SKU: string;
 }
 
-const REGION_ID = "reg_01M1F3BE3DPC7HPNNF8ZZG21F2";
+// Id da região Brasil do ambiente: cada banco tem o seu.
+const REGION_ID = process.env.IMPORT_REGION_ID || "reg_01M1F3BE3DPC7HPNNF8ZZG21F2";
 const SALES_CHANNEL_ID = process.env.TYER_SALES_CHANNEL_ID || "";
 
 function norm(s: string): string {
