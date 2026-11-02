@@ -29,7 +29,8 @@ const drops: NavDrop[] = Array.isArray(Astro.props.drops) ? Astro.props.drops : 
 const countdown = Astro.props.countdown ?? null;
 const latest = Astro.props.latest ?? null;
 // Sem drop ativo, o link leva o nome do drop mais recente em vez de "Drop" ao lado de "Drops".
-const dropLabel = countdown?.title ?? latest?.title ?? "Drop";
+// Sem drop ativo nem anterior não há nome para mostrar: o link some em vez de aparecer como "Drop" ao lado de "Drops".
+const dropLabel = countdown?.title ?? latest?.title ?? null;
 const dropHref = !countdown && latest ? getPathForLang(`/collections/${latest.handle}`, lang) : getPathForLang("/drop", lang);
 
 const url = getMedusaStoreUrl();
@@ -59,7 +60,7 @@ const searchGroupPopular = t(lang, "search", "group_popular");
 
     <!-- Nav -->
     <nav class="hdr__nav" aria-label="Main navigation">
-      <div class="hdr__drop-wrap">
+      {dropLabel && <div class="hdr__drop-wrap">
         <a href={dropHref} class="hdr__nav-link">{dropLabel}</a>
         {countdown?.target && (
           <div class="hdr__drop-tag">
@@ -73,7 +74,7 @@ const searchGroupPopular = t(lang, "search", "group_popular");
             <button type="button" class="hdr__drop-tag__toggle" data-tag-toggle aria-label="Minimizar plaquinha" aria-expanded="true">−</button>
           </div>
         )}
-      </div>
+      </div>}
       {drops.length > 0 && (
         <div class="hdr__nav-item hdr__nav-item--mega" id="nav-collections-wrap">
           <a
@@ -492,12 +493,14 @@ const searchGroupPopular = t(lang, "search", "group_popular");
         </li>
       ))
     }
-    <li>
-      <a href={dropHref} class="mob-menu__link">
-        {dropLabel}
-        {countdown?.target && <Countdown targetIso={countdown.target} label={countdown.label} compact />}
-      </a>
-    </li>
+    {dropLabel && (
+      <li>
+        <a href={dropHref} class="mob-menu__link">
+          {dropLabel}
+          {countdown?.target && <Countdown targetIso={countdown.target} label={countdown.label} compact />}
+        </a>
+      </li>
+    )}
     <li>
       <a href={getPathForLang("/shop", lang)} class="mob-menu__link">{t(lang, "nav", "shop")}</a>
     </li>

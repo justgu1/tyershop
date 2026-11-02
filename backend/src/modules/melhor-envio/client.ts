@@ -52,7 +52,8 @@ async function tokenRequest(body: Record<string, string>): Promise<TokenResponse
   })
   const data = (await res.json().catch(() => ({}))) as Partial<TokenResponse>
   if (!res.ok || !data.access_token || !data.refresh_token) {
-    throw new Error(`Melhor Envio recusou a autorização (${res.status})`)
+    const reason = String((data as any)?.error_description || (data as any)?.message || "").slice(0, 120)
+    throw new Error(`Melhor Envio recusou a autorização (${res.status}${reason ? `: ${reason}` : ""})`)
   }
   return data as TokenResponse
 }
