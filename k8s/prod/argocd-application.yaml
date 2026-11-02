@@ -1,0 +1,23 @@
+# Não entra no kustomization: aplicar uma vez no cluster (ou no repositório do root-app).
+# Sem argocd-image-updater: produção só muda quando a tag em kustomization.yaml muda.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tyershop-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/justgu1/tyershop.git
+    targetRevision: main
+    path: k8s/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tyershop-prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
