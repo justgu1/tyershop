@@ -6,7 +6,7 @@ import {
   markOrderFulfillmentAsDeliveredWorkflow,
 } from "@medusajs/medusa/core-flows"
 import { addToCart, checkoutLabel, findInCart, generateLabel, getLabel, tracking, UnauthorizedError } from "./client"
-import { buildCartPayload, DELIVERED, POSTED, senderFromEnv, serviceIdOf } from "./label"
+import { agencyFromEnv, buildCartPayload, DELIVERED, NEEDS_AGENCY, POSTED, senderFromEnv, serviceIdOf } from "./label"
 import { buildPackage, loadShipments } from "./quote"
 import { MELHOR_ENVIO_MODULE } from "./index"
 import { setMetadataKey } from "../../utils/order-metadata"
@@ -107,6 +107,10 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string, orig
     const serviceId = method ? serviceIdOf(method) : null
     if (!serviceId) return await fail("Não identifiquei o serviço de entrega do pedido.")
     if (!order.shipping_address?.postal_code) return await fail("O pedido não tem endereço de entrega.")
+    const agency = agencyFromEnv(process.env)
+    if (NEEDS_AGENCY.includes(serviceId) && !agency) {
+      return await fail("Os serviços da Jadlog exigem o ponto de postagem: defina MELHOR_ENVIO_AGENCY_ID.")
+    }
 
     const cpf = await cpfOf(scope, order)
     if (!cpf) return await fail("Não encontrei o CPF do cliente no cadastro nem no pedido.")
@@ -125,7 +129,7 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string, orig
         scope,
         order.items.filter((i: any) => i.variant_id).map((i: any) => ({ variant_id: i.variant_id, quantity: i.quantity }))
       )
-      meId = (await addToCart(token, buildCartPayload({ order, cpf, serviceId, sender, pkg: buildPackage(shipments) }))).id
+      meId = (await addToCart(token, buildCartPayload({ order, cpf, serviceId, sender, agency, pkg: buildPackage(shipments) }))).id
     }
     if (meId !== current?.me_order_id) await saveState(scope, order, { status: "carrinho", me_order_id: meId, origin })
 

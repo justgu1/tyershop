@@ -1,4 +1,4 @@
-import { buildCartPayload, senderFromEnv, serviceIdOf } from "../label"
+import { agencyFromEnv, buildCartPayload, senderFromEnv, serviceIdOf } from "../label"
 
 const env = {
   MELHOR_ENVIO_SENDER_NAME: "Tyer",
@@ -61,8 +61,16 @@ describe("carrinho do Melhor Envio", () => {
       pkg: { height: 6, width: 25, length: 30, weight: 0.4 },
     })
     expect(payload.to).toMatchObject({ name: "Ana Souza", document: "98765432100", district: "Sé", state_abbr: "SP", postal_code: "01000000", number: "20" })
-    expect(payload.products).toEqual([{ name: "Camiseta Red Rose", quantity: 2, unit_value: 60 }])
+    expect(payload.products).toEqual([{ name: "Camiseta Red Rose", quantity: 2, unitary_value: 60 }])
     expect(payload.volumes[0]).toEqual({ height: 6, width: 25, length: 30, weight: 0.4 })
     expect(payload.options).toMatchObject({ non_commercial: true, insurance_value: 120 })
+  })
+})
+
+describe("ponto de postagem", () => {
+  it("lê o id do ambiente e ignora valor inválido", () => {
+    expect(agencyFromEnv({ MELHOR_ENVIO_AGENCY_ID: "49666" })).toBe(49666)
+    expect(agencyFromEnv({ MELHOR_ENVIO_AGENCY_ID: "abc" })).toBeNull()
+    expect(agencyFromEnv({})).toBeNull()
   })
 })
