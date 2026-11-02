@@ -576,7 +576,7 @@ if (root) {
   function addCurrentToCart(options?: { openSideCart?: boolean }) {
     const openSide = options?.openSideCart !== false;
     if (!atcBtn) return Promise.resolve();
-    const { variantId, title, price, thumbnail, variantTitle, maxQty, qty } = atcBtn.dataset;
+    const { variantId, title, handle, price, thumbnail, variantTitle, maxQty, qty } = atcBtn.dataset;
     if (!variantId || atcBtn.disabled) return Promise.resolve();
     const parsedMax = Number(maxQty || '');
     const maxQuantity = Number.isFinite(parsedMax) && parsedMax > 0 ? Math.floor(parsedMax) : undefined;
@@ -584,6 +584,7 @@ if (root) {
     return Promise.resolve().then(() => {
       addItem({
         variantId,
+        handle: handle || undefined,
         title: title ?? '',
         variantTitle: variantTitle ?? '',
         price: Number(price ?? 0),

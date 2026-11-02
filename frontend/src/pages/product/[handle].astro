@@ -514,6 +514,7 @@ const jsonLd = productFound
             id="pdp-atc"
             data-variant-id={defaultVariant?.id}
             data-title={product.title}
+            data-handle={product.handle}
             data-price={defaultPriceInfo?.amountCents ?? ''}
             data-thumbnail={initialSlides[0] ?? product.thumbnail ?? ''}
             data-variant-title={defaultVariantTitle}
@@ -1350,10 +1351,15 @@ const jsonLd = productFound
     max-width: 100%;
   }
   @media (max-width: 420px) {
-    .pdp-buy-card .pdp-variant-btn {
+    .pdp-buy-card .pdp-variant-btn:not(.pdp-variant-btn--swatch) {
       padding: 0 9px;
       font-size: 10px;
       min-height: 30px;
+    }
+    /* A bolinha de cor precisa continuar redonda: sem padding e sem encolher. */
+    .pdp-buy-card .pdp-variant-btn--swatch {
+      padding: 0;
+      flex: 0 0 auto;
     }
     .pdp-buy-card .pdp-variant-values {
       gap: 4px;

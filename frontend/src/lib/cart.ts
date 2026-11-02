@@ -6,6 +6,8 @@ import { getVariantPriceInfo } from './medusa-pricing';
 
 export interface CartItem {
   variantId: string;
+  /** Handle do produto, para o título da bag levar à página dele. */
+  handle?: string;
   title: string;
   variantTitle?: string;
   thumbnail?: string;
@@ -148,6 +150,7 @@ type VariantSnapshot = {
   soldOut: boolean;
   maxQuantity?: number;
   title?: string;
+  handle?: string;
   variantTitle?: string;
   thumbnail?: string;
   price?: number;
@@ -184,6 +187,7 @@ const VARIANT_SNAPSHOT_FIELDS = [
   '+inventory_items.inventory.location_levels.stocked_quantity',
   'product.id',
   'product.title',
+  'product.handle',
   'product.thumbnail',
   '*product.images',
 ].join(',');
@@ -211,6 +215,7 @@ async function fetchVariantSnapshot(variantId: string): Promise<VariantSnapshot>
     const product = variant?.product || data?.product;
     const thumb = product?.thumbnail || product?.images?.[0]?.url || undefined;
     const title = product?.title || undefined;
+    const handle = product?.handle || undefined;
     const optionTitle = String(variant?.title || '').trim() || undefined;
     // `calculated_amount`/`prices[].amount` não vêm garantidamente em centavos
     // (depende de como o preço foi cadastrado) — mesma normalização usada na
@@ -225,6 +230,7 @@ async function fetchVariantSnapshot(variantId: string): Promise<VariantSnapshot>
       soldOut: isVariantSoldOutFromProduct(variant, true),
       maxQuantity,
       title,
+      handle,
       variantTitle: optionTitle,
       thumbnail: thumb,
       price: typeof price === 'number' && price > 0 ? price : undefined,
@@ -281,6 +287,7 @@ export async function validateCartItems(): Promise<{
     const merged: CartItem = {
       ...item,
       title: snapshot.title || item.title,
+      handle: snapshot.handle || item.handle,
       variantTitle: snapshot.variantTitle || item.variantTitle,
       thumbnail: snapshot.thumbnail || item.thumbnail,
       price: Number.isFinite(Number(snapshot.price)) && Number(snapshot.price) > 0 ? Number(snapshot.price) : item.price,

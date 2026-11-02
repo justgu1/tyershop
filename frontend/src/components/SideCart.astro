@@ -134,6 +134,8 @@ const lang: Lang = Astro.props.lang ?? 'pt';
   display: flex;
   align-items: flex-start;
 }
+.sc :global(.sc-item__name--link) { color: inherit; text-decoration: none; }
+.sc :global(.sc-item__name--link:hover) { text-decoration: underline; }
 .sc :global(.sc-item__name) {
   font-size: 13px;
   font-weight: 500;

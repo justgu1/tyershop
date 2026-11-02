@@ -57,13 +57,16 @@ const searchGroupPopular = t(lang, "search", "group_popular");
       <div class="hdr__drop-wrap">
         <a href={getPathForLang("/drop", lang)} class="hdr__nav-link">{countdown?.title ?? "Drop"}</a>
         {countdown?.target && (
-          <a href={getPathForLang("/drop", lang)} class="hdr__drop-tag" aria-label={`${countdown.title}: ${countdown.label}`}>
-            <span class="hdr__drop-tag__edge">
-              <span class="hdr__drop-tag__in">
-                <Countdown targetIso={countdown.target} label={countdown.label} compact />
+          <div class="hdr__drop-tag">
+            <a href={getPathForLang("/drop", lang)} class="hdr__drop-tag__link" aria-label={`${countdown.title}: ${countdown.label}`}>
+              <span class="hdr__drop-tag__edge">
+                <span class="hdr__drop-tag__in">
+                  <Countdown targetIso={countdown.target} label={countdown.label} compact />
+                </span>
               </span>
-            </span>
-          </a>
+            </a>
+            <button type="button" class="hdr__drop-tag__toggle" data-tag-toggle aria-label="Minimizar plaquinha" aria-expanded="true">−</button>
+          </div>
         )}
       </div>
       {drops.length > 0 && (
@@ -357,14 +360,17 @@ const searchGroupPopular = t(lang, "search", "group_popular");
     </div>
   </div>
   {countdown?.target && (
-    <a href={getPathForLang("/drop", lang)} class="hdr__drop-tag hdr__drop-tag--mobile" aria-label={`${countdown.title}: ${countdown.label}`}>
-      <span class="hdr__drop-tag__edge">
-        <span class="hdr__drop-tag__in">
-          <span class="hdr__drop-tag__name">{countdown.title}</span>
-          <Countdown targetIso={countdown.target} label={countdown.label} compact />
+    <div class="hdr__drop-tag hdr__drop-tag--mobile">
+      <a href={getPathForLang("/drop", lang)} class="hdr__drop-tag__link" aria-label={`${countdown.title}: ${countdown.label}`}>
+        <span class="hdr__drop-tag__edge">
+          <span class="hdr__drop-tag__in">
+            <span class="hdr__drop-tag__name">{countdown.title}</span>
+            <Countdown targetIso={countdown.target} label={countdown.label} compact />
+          </span>
         </span>
-      </span>
-    </a>
+      </a>
+      <button type="button" class="hdr__drop-tag__toggle" data-tag-toggle aria-label="Minimizar plaquinha" aria-expanded="true">−</button>
+    </div>
   )}
 </header>
 
@@ -626,6 +632,28 @@ const searchGroupPopular = t(lang, "search", "group_popular");
     background: var(--c-accent, #e77e23);
   }
   /* A navegação some no celular: a plaquinha sai de dentro dela e pende direto da barra, com o nome do drop. */
+  .hdr__drop-tag__link { display: block; color: inherit; text-decoration: none; }
+  .hdr__drop-tag__toggle {
+    position: absolute;
+    top: 3px;
+    right: -9px;
+    z-index: 2;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--c-accent, #e77e23);
+    color: #fff;
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  /* Minimizada: só o cronômetro, com o botão para abrir de novo. */
+  :global(html[data-tag-min="1"]) .hdr__drop-tag__name,
+  :global(html[data-tag-min="1"] .hdr__drop-tag .cd__label) { display: none; }
+  :global(html[data-tag-min="1"]) .hdr__drop-tag__in { padding: 16px 12px 6px; }
   .hdr__drop-tag--mobile { display: none; }
   .hdr__drop-tag__name { font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; }
   @media (max-width: 900px) {
@@ -1272,6 +1300,9 @@ const searchGroupPopular = t(lang, "search", "group_popular");
     color: var(--c-white);
     background: rgba(255, 255, 255, 0.04);
   }
+  .mob-menu { overflow-x: hidden; }
+  .mob-menu__link :global(.cd--compact) { flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 4px; max-width: 100%; }
+  .mob-menu__link :global(.cd--compact .cd__clock) { flex-wrap: wrap; gap: 8px; }
   .mob-menu__link--btn {
     width: 100%;
     text-align: left;
@@ -2090,4 +2121,40 @@ const searchGroupPopular = t(lang, "search", "group_popular");
       });
     });
   }
+</script>
+
+<script>
+  // Plaquinha do drop: minimiza para só o cronômetro e lembra a escolha entre páginas.
+  const KEY = 'tyer_tag_min';
+  const root = document.documentElement;
+
+  function paint(min: boolean) {
+    if (min) root.dataset.tagMin = '1';
+    else delete root.dataset.tagMin;
+    document.querySelectorAll<HTMLButtonElement>('[data-tag-toggle]').forEach((btn) => {
+      btn.textContent = min ? '+' : '−';
+      btn.setAttribute('aria-expanded', String(!min));
+      btn.setAttribute('aria-label', min ? 'Maximizar plaquinha' : 'Minimizar plaquinha');
+    });
+  }
+
+  let minimized = false;
+  try {
+    minimized = localStorage.getItem(KEY) === '1';
+  } catch {
+    /* storage indisponível: começa aberta */
+  }
+  paint(minimized);
+
+  document.querySelectorAll('[data-tag-toggle]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      minimized = !minimized;
+      paint(minimized);
+      try {
+        localStorage.setItem(KEY, minimized ? '1' : '0');
+      } catch {
+        /* storage indisponível: vale só nesta página */
+      }
+    })
+  );
 </script>
