@@ -4,22 +4,30 @@ import LeadModuleService from "../../../modules/lead/service"
 import { Modules } from "@medusajs/framework/utils"
 import { DROP_MODULE } from "../../../modules/drop"
 import { ensureAccount } from "../../../modules/lead/account"
+import { resolveDropPhase } from "../../../modules/drop/phase"
+import { statusOnCapture } from "../../../modules/lead/status"
 import { StoreCreateLeadBody } from "./validators"
 
 const WHATSAPP_GROUP_URL = "https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN"
 
 /**
- * Captura pública: cria o lead como pendente e nunca altera quem já existe
- * (um negado continua negado) nem revela o status de ninguém na resposta.
+ * Captura pública: cria o lead como pendente (ou liberado, se o cronômetro da pré-venda está correndo) e nunca
+ * rebaixa quem já existe (um negado continua negado) nem revela o status de ninguém na resposta.
  */
 export async function POST(req: MedusaRequest<StoreCreateLeadBody>, res: MedusaResponse) {
   const leads = req.scope.resolve<LeadModuleService>(LEAD_MODULE)
   const { email, name, source } = req.validatedBody
 
+  const drops = req.scope.resolve(DROP_MODULE) as any
+  const current = await drops.retrieveCurrent?.()
+  const phase = current ? resolveDropPhase(current) : null
+
   const [existing] = await leads.listLeads({ email }, { take: 1 })
   const isNew = !existing
   if (isNew) {
-    await leads.createLeads({ email, name: name ?? null, source, status: "pendente" })
+    await leads.createLeads({ email, name: name ?? null, status: statusOnCapture(null, phase), source })
+  } else if (existing.status === "pendente" && statusOnCapture("pendente", phase) === "liberado") {
+    await leads.updateLeads({ id: existing.id, status: "liberado" })
   }
   if (existing?.status !== "negado") {
     try {
@@ -33,8 +41,6 @@ export async function POST(req: MedusaRequest<StoreCreateLeadBody>, res: MedusaR
   // A resposta é igual para todos, para não revelar quem já está na lista nem o status.
   if (isNew) {
     try {
-      const drops = req.scope.resolve(DROP_MODULE) as any
-      const current = await drops.retrieveCurrent?.()
       await req.scope.resolve(Modules.NOTIFICATION).createNotifications({
         to: email,
         channel: "email",

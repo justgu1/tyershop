@@ -92,7 +92,7 @@ async function fetchProductsByIdsUncached(ids: string[], token?: string): Promis
 }
 
 /** Linha fixa Starter, na ordem do catálogo: sempre à venda (esgotado aparece como esgotado). */
-const STARTER_HANDLES = ['regata-savage-mode', 'shorts-tyer-pro', 'camiseta-tyer-starter-dry-fit', 'pulseira-tyer'];
+const STARTER_HANDLES = ['regata-savage-mode', 'shorts-tyer-pro', 'camiseta-tyer-starter-dry-fit'];
 
 export async function fetchStarterProducts(): Promise<any[]> {
   return cached('starter', 30_000, () => fetchStarterUncached(), (v) => v.length > 0);
