@@ -356,6 +356,16 @@ const searchGroupPopular = t(lang, "search", "group_popular");
       </button>
     </div>
   </div>
+  {countdown?.target && (
+    <a href={getPathForLang("/drop", lang)} class="hdr__drop-tag hdr__drop-tag--mobile" aria-label={`${countdown.title}: ${countdown.label}`}>
+      <span class="hdr__drop-tag__edge">
+        <span class="hdr__drop-tag__in">
+          <span class="hdr__drop-tag__name">{countdown.title}</span>
+          <Countdown targetIso={countdown.target} label={countdown.label} compact />
+        </span>
+      </span>
+    </a>
+  )}
 </header>
 
 <!-- Search overlay -->
@@ -614,6 +624,13 @@ const searchGroupPopular = t(lang, "search", "group_popular");
     height: 20px;
     margin-left: -1px;
     background: var(--c-accent, #e77e23);
+  }
+  /* A navegação some no celular: a plaquinha sai de dentro dela e pende direto da barra, com o nome do drop. */
+  .hdr__drop-tag--mobile { display: none; }
+  .hdr__drop-tag__name { font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; }
+  @media (max-width: 900px) {
+    .hdr__drop-tag--mobile { display: block; max-width: calc(100vw - 24px); }
+    .hdr__drop-tag--mobile .hdr__drop-tag__in { padding: 18px 12px 8px; }
   }
   .hdr__drop-tag :global(.cd--compact) { flex-direction: column; gap: 3px; align-items: center; }
   .hdr__drop-tag :global(.cd--compact .cd__label) { font-size: 9px; letter-spacing: 0.14em; color: var(--c-accent, #e77e23); }
