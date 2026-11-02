@@ -22,19 +22,23 @@ const fmtDate = (iso?: string) =>
     ? new Date(iso).toLocaleString("pt-BR", { dateStyle: "long", timeStyle: "short", timeZone: "America/Sao_Paulo" })
     : ""
 
+const brl = (v: unknown, currency = "BRL") =>
+  Number(v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: String(currency || "BRL").toUpperCase() })
+
 const FONT = "Helvetica,Arial,sans-serif"
 
 type Shell = {
   preheader: string
   title: string
   paragraphs: string[]
+  blocks?: string
   cta?: { label: string; url: string }
   note?: string
   reason: string
 }
 
 /** Casca visual compartilhada por todos os e-mails: cabeçalho com logo, cartão, botão e rodapé. */
-function shell({ preheader, title, paragraphs, cta, note, reason }: Shell): string {
+function shell({ preheader, title, paragraphs, blocks, cta, note, reason }: Shell): string {
   const body = paragraphs.map((p) => `<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#2b2b2b">${p}</p>`).join("")
   const button = cta
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0 8px"><tr><td bgcolor="${ACCENT}" style="border-radius:8px">
@@ -58,7 +62,7 @@ function shell({ preheader, title, paragraphs, cta, note, reason }: Shell): stri
   <tr><td height="4" bgcolor="${ACCENT}" style="font-size:0;line-height:0">&nbsp;</td></tr>
   <tr><td bgcolor="#ffffff" style="padding:40px 36px 36px;font-family:${FONT}">
     <h1 style="margin:0 0 20px;font-size:26px;line-height:1.2;font-weight:800;text-transform:uppercase;color:#0b0b0b">${esc(title)}</h1>
-    ${body}${button}${noteHtml}
+    ${body}${blocks ?? ""}${button}${noteHtml}
   </td></tr>
   <tr><td align="center" bgcolor="#0b0b0b" style="padding:28px 24px;border-radius:0 0 12px 12px;font-family:${FONT}">
     <p style="margin:0 0 14px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">${social}</p>
@@ -168,6 +172,120 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
 
     return { subject, html, text }
   },
+  /** Pedido recebido e pago. A nota fiscal segue em e-mail próprio, quando for emitida. */
+  order_confirmation: (d) => {
+    const subject = `Pedido #${d.display_id} confirmado`
+    const reason = `Você recebeu este e-mail porque fez um pedido na Tyer com ${esc(d.email)}.`
+    const items: { title: string; variant?: string; quantity: number; unit_price: number }[] = d.items ?? []
+    const rows = items
+      .map(
+        (i) => `<tr><td style="padding:10px 0;border-bottom:1px solid #eeeeee;font-size:15px;color:#2b2b2b">${esc(i.title)}${
+          i.variant ? `<br><span style="font-size:13px;color:#6b6b6b">${esc(i.variant)}</span>` : ""
+        }</td><td align="center" style="padding:10px 8px;border-bottom:1px solid #eeeeee;font-size:15px;color:#2b2b2b">${esc(i.quantity)}x</td><td align="right" style="padding:10px 0;border-bottom:1px solid #eeeeee;font-size:15px;color:#2b2b2b">${brl(
+          i.unit_price * i.quantity,
+          d.currency_code
+        )}</td></tr>`
+      )
+      .join("")
+    const totals = `<tr><td colspan="2" style="padding:10px 0 0;font-size:14px;color:#6b6b6b">Frete</td><td align="right" style="padding:10px 0 0;font-size:14px;color:#6b6b6b">${brl(d.shipping_total, d.currency_code)}</td></tr>
+<tr><td colspan="2" style="padding:6px 0 0;font-size:17px;font-weight:700;color:#0b0b0b">Total</td><td align="right" style="padding:6px 0 0;font-size:17px;font-weight:700;color:#0b0b0b">${brl(d.total, d.currency_code)}</td></tr>`
+    const blocks = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 8px">${rows}${totals}</table>${
+      d.address ? `<p style="margin:16px 0 0;font-size:14px;line-height:1.5;color:#6b6b6b"><strong>Entrega em:</strong> ${esc(d.address)}</p>` : ""
+    }`
+    const prazo = d.production_days
+      ? `As peças do drop são feitas sob encomenda: a produção leva até <strong>${esc(d.production_days)} dias</strong>, mais o prazo da transportadora.`
+      : `Assim que o pedido for despachado, você recebe o código de rastreio por e-mail.`
+    const html = shell({
+      preheader: `Recebemos o pagamento do pedido #${d.display_id}.`,
+      title: d.name ? `${d.name}, pedido confirmado` : "Pedido confirmado",
+      paragraphs: [`Recebemos o pagamento do pedido <strong>#${esc(d.display_id)}</strong>. Obrigado por vestir a Tyer!`, prazo],
+      blocks,
+      cta: { label: "Acompanhar meu pedido", url: d.orders_url },
+      note: "A nota fiscal chega por e-mail assim que for emitida e fica disponível para baixar na página Meus pedidos.",
+      reason,
+    })
+    const text = [
+      `${d.name ? `${d.name}, p` : "P"}edido #${d.display_id} confirmado. Obrigado por vestir a Tyer!`,
+      "",
+      ...items.map((i) => `${i.quantity}x ${i.title}${i.variant ? ` (${i.variant})` : ""} — ${brl(i.unit_price * i.quantity, d.currency_code)}`),
+      `Frete: ${brl(d.shipping_total, d.currency_code)}`,
+      `Total: ${brl(d.total, d.currency_code)}`,
+      d.address ? `Entrega em: ${d.address}` : "",
+      "",
+      d.production_days ? `Produção em até ${d.production_days} dias, mais o prazo da transportadora.` : "Você recebe o código de rastreio quando o pedido for despachado.",
+      "A nota fiscal chega por e-mail assim que for emitida e fica em Meus pedidos.",
+      `Acompanhar: ${d.orders_url}`,
+      footerText(reason),
+    ]
+      .join("\n")
+    return { subject, html, text }
+  },
+
+  /** Pedido despachado, com o código de rastreio. */
+  order_shipped: (d) => {
+    const subject = `Pedido #${d.display_id} a caminho`
+    const reason = `Você recebeu este e-mail porque fez um pedido na Tyer com ${esc(d.email)}.`
+    const code = d.tracking_code ? esc(d.tracking_code) : ""
+    const html = shell({
+      preheader: `Seu pedido #${d.display_id} foi despachado.`,
+      title: d.name ? `${d.name}, seu pedido saiu` : "Seu pedido saiu",
+      paragraphs: [
+        `O pedido <strong>#${esc(d.display_id)}</strong> foi despachado e já está com a transportadora.`,
+        code ? `Código de rastreio: <strong>${code}</strong>` : "O código de rastreio aparece em Meus pedidos assim que a transportadora registrar a postagem.",
+      ],
+      cta: { label: d.tracking_url ? "Rastrear entrega" : "Ver meu pedido", url: d.tracking_url || d.orders_url },
+      note: "O rastreio pode levar algumas horas para mostrar as primeiras atualizações.",
+      reason,
+    })
+    const text = [
+      `O pedido #${d.display_id} foi despachado.`,
+      d.tracking_code ? `Código de rastreio: ${d.tracking_code}` : "",
+      `${d.tracking_url ? "Rastrear" : "Ver pedido"}: ${d.tracking_url || d.orders_url}`,
+      footerText(reason),
+    ].join("\n")
+    return { subject, html, text }
+  },
+
+  /** Pedido entregue. */
+  order_delivered: (d) => {
+    const subject = `Pedido #${d.display_id} entregue`
+    const reason = `Você recebeu este e-mail porque fez um pedido na Tyer com ${esc(d.email)}.`
+    const html = shell({
+      preheader: `O pedido #${d.display_id} foi entregue.`,
+      title: "Pedido entregue",
+      paragraphs: [
+        `O pedido <strong>#${esc(d.display_id)}</strong> foi entregue. Esperamos que você curta cada peça!`,
+        "Se algo não estiver certo, fale com a gente em até 7 dias do recebimento.",
+      ],
+      cta: { label: "Ver meu pedido", url: d.orders_url },
+      reason,
+    })
+    const text = [`O pedido #${d.display_id} foi entregue.`, "Se algo não estiver certo, fale com a gente em até 7 dias do recebimento.", `Ver pedido: ${d.orders_url}`, footerText(reason)].join("\n")
+    return { subject, html, text }
+  },
+
+  /** Nota fiscal emitida; o PDF vai em anexo e também fica para baixar em Meus pedidos. */
+  order_invoice: (d) => {
+    const subject = `Nota fiscal do pedido #${d.display_id}`
+    const reason = `Você recebeu este e-mail porque fez um pedido na Tyer com ${esc(d.email)}.`
+    const html = shell({
+      preheader: `A nota fiscal do pedido #${d.display_id} está em anexo.`,
+      title: "Sua nota fiscal",
+      paragraphs: [
+        `Segue em anexo a nota fiscal${d.invoice_number ? ` <strong>nº ${esc(d.invoice_number)}</strong>` : ""} do pedido <strong>#${esc(d.display_id)}</strong>.`,
+        "Você também pode baixá-la quando quiser na página Meus pedidos, depois de entrar na sua conta.",
+      ],
+      cta: { label: "Meus pedidos", url: d.orders_url },
+      reason,
+    })
+    const text = [
+      `Segue em anexo a nota fiscal${d.invoice_number ? ` nº ${d.invoice_number}` : ""} do pedido #${d.display_id}.`,
+      `Você também pode baixá-la em Meus pedidos: ${d.orders_url}`,
+      footerText(reason),
+    ].join("\n")
+    return { subject, html, text }
+  },
+
 }
 
 export function renderTemplate(template: string, data: TemplateData): RenderedEmail {

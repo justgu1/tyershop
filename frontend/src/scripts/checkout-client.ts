@@ -359,6 +359,41 @@ function init() {
     }
   }
 
+  /** Mostra o número do pedido, o que foi comprado e o total na tela de agradecimento. */
+  function fillSuccess(order: any) {
+    if (!order) return;
+    const money = (v: number) => Number(v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: String(order.currency_code || 'brl').toUpperCase() });
+    const num = qs('checkout-success-order');
+    if (num && order.display_id) {
+      num.textContent = `Pedido #${order.display_id}`;
+      num.hidden = false;
+    }
+    const list = qs('checkout-success-items');
+    if (list) {
+      list.replaceChildren(
+        ...(order.items ?? []).map((i: any) => {
+          const li = document.createElement('li');
+          const name = document.createElement('span');
+          name.textContent = `${i.quantity}x ${i.title}`;
+          const price = document.createElement('span');
+          price.textContent = money(i.unit_price * i.quantity);
+          li.append(name, price);
+          return li;
+        })
+      );
+    }
+    const total = qs('checkout-success-total');
+    if (total && order.total != null) {
+      total.textContent = `Total: ${money(order.total)}`;
+      total.hidden = false;
+    }
+    const mail = qs('checkout-success-mail');
+    if (mail && order.email) {
+      mail.textContent = `Enviamos a confirmação para ${order.email}.`;
+      mail.hidden = false;
+    }
+  }
+
   async function completeCart() {
     // Rota própria: a original responde 409 enquanto o pedido ainda está sendo concluído em compras simultâneas.
     const data = await medusaFetch('/store/checkout/complete', { method: 'POST', body: JSON.stringify({ cart_id: cartId }) });
@@ -371,6 +406,7 @@ function init() {
       if (panel) panel.hidden = true;
       const lock = qs('checkout-lock-indicator');
       if (lock) lock.hidden = true;
+      fillSuccess(data.order);
       show('checkout-success', true);
       return true;
     }

@@ -14,6 +14,12 @@ type Options = {
   from: string
 }
 
+// Só os e-mails de lista levam o cabeçalho: o cliente de e-mail mostra o botão "cancelar inscrição", que abre uma resposta a esta caixa.
+const LIST_UNSUBSCRIBE: Record<string, string> = {
+  lead_welcome: "<mailto:suporte@tyershop.com?subject=Sair%20da%20lista>",
+  ticket: "<mailto:suporte@tyershop.com?subject=Sair%20da%20lista>",
+}
+
 class SmtpNotificationProviderService extends AbstractNotificationProviderService {
   static identifier = "smtp"
 
@@ -56,6 +62,7 @@ class SmtpNotificationProviderService extends AbstractNotificationProviderServic
       subject,
       html: rendered.html,
       text: rendered.text,
+      headers: LIST_UNSUBSCRIBE[notification.template] ? { "List-Unsubscribe": LIST_UNSUBSCRIBE[notification.template] } : undefined,
       attachments: [
         {
           filename: "tyer.png",
@@ -63,6 +70,11 @@ class SmtpNotificationProviderService extends AbstractNotificationProviderServic
           cid: LOGO_CID,
           contentType: "image/png",
         },
+        ...(notification.attachments ?? []).map((a) => ({
+          filename: a.filename,
+          content: Buffer.from(a.content, "base64"),
+          contentType: a.content_type,
+        })),
       ],
     })
     this.logger_.info(`[smtp] ${notification.template} → ${to} (${info.messageId})`)
