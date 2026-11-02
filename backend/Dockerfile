@@ -57,7 +57,11 @@ COPY --chown=node:node --from=builder /app/medusa-config.js ./
 
 RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund
 
+# `medusa db:migrate` cria pastas de migração dentro de node_modules/@medusajs: precisa ser gravável pelo usuário do container.
+RUN chown -R node:node /app/node_modules/@medusajs
+
 USER node
 
 EXPOSE 9000
-CMD ["npm", "run", "start"]
+# Aplica as migrações pendentes (idempotente) antes de subir: um deploy novo nunca roda com tabelas faltando.
+CMD ["sh", "-c", "npx medusa db:migrate && npm run start"]
