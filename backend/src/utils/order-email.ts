@@ -1,6 +1,6 @@
 import { MedusaContainer } from "@medusajs/framework/types"
-import { Modules } from "@medusajs/framework/utils"
-import { dropRows } from "../modules/drop/access"
+import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
+import { productionDaysOfProducts } from "../modules/melhor-envio/quote"
 
 const siteUrl = () => (process.env.SITE_URL || "http://localhost:4321").replace(/\/$/, "")
 export const ordersUrl = () => `${siteUrl()}/account/orders`
@@ -9,12 +9,24 @@ export const ordersUrl = () => `${siteUrl()}/account/orders`
 export async function loadOrder(scope: MedusaContainer, orderId: string) {
   try {
     return (await scope.resolve(Modules.ORDER).retrieveOrder(orderId, {
-      select: ["id", "display_id", "email", "currency_code", "total", "shipping_total", "metadata"],
-      relations: ["items", "shipping_address"],
+      select: ["id", "display_id", "email", "currency_code", "total", "shipping_total", "customer_id", "metadata"],
+      relations: ["items", "shipping_address", "shipping_methods"],
     })) as any
   } catch {
     return null
   }
+}
+
+/** Rastreio público do Melhor Envio, usado quando a transportadora não devolve um link próprio. */
+export const trackingUrl = (code: string) => `https://www.melhorrastreio.com.br/rastreio/${encodeURIComponent(code)}`
+
+/** Pedido a que um envio (fulfillment) pertence. */
+export async function orderOfFulfillment(scope: MedusaContainer, fulfillmentId: string) {
+  const { data } = await scope
+    .resolve(ContainerRegistrationKeys.QUERY)
+    .graph({ entity: "order_fulfillment", fields: ["order_id"], filters: { fulfillment_id: fulfillmentId } })
+  const orderId = (data[0] as { order_id?: string } | undefined)?.order_id
+  return orderId ? loadOrder(scope, orderId) : null
 }
 
 /** Dados comuns de todos os e-mails de pedido. */
@@ -25,13 +37,6 @@ export function baseOrderData(order: any) {
     display_id: order.display_id,
     orders_url: ordersUrl(),
   }
-}
-
-/** Produção sob encomenda: pega o maior prazo entre os drops dos itens (peças do Starter têm estoque e não entram). */
-async function productionDays(scope: MedusaContainer, productIds: string[]): Promise<number | null> {
-  const rows = await dropRows(scope)
-  const days = rows.filter((r) => productIds.some((id) => r.productIds.has(id))).map((r) => Number(r.drop.production_days) || 0)
-  return days.length ? Math.max(...days) : null
 }
 
 export async function confirmationData(scope: MedusaContainer, order: any) {
@@ -48,11 +53,11 @@ export async function confirmationData(scope: MedusaContainer, order: any) {
       unit_price: i.unit_price,
     })),
     address: a ? [a.address_1, a.address_2, `${a.city}${a.province ? `/${a.province}` : ""}`, a.postal_code].filter(Boolean).join(", ") : null,
-    production_days: await productionDays(scope, (order.items ?? []).map((i: any) => i.product_id).filter(Boolean)),
+    production_days: (await productionDaysOfProducts(scope, (order.items ?? []).map((i: any) => i.product_id).filter(Boolean))) || null,
   }
 }
 
-export async function sendOrderEmail(scope: MedusaContainer, to: string, template: string, data: Record<string, unknown>, attachments?: { content: string; filename: string; content_type: string }[]) {
+export async function sendOrderEmail(scope: MedusaContainer, to: string, template: string, data: Record<string, unknown>, attachments?: { content: string; filename: string; content_type: string }[]): Promise<boolean> {
   try {
     await scope.resolve(Modules.NOTIFICATION).createNotifications({
       to,
@@ -61,8 +66,10 @@ export async function sendOrderEmail(scope: MedusaContainer, to: string, templat
       data,
       ...(attachments ? { attachments: attachments.map((a) => ({ ...a, disposition: "attachment" as const })) } : {}),
     })
+    return true
   } catch (err) {
     // Falha de e-mail não pode derrubar o pedido nem a ação do admin.
     scope.resolve("logger").error(`E-mail ${template} não enviado: ${(err as Error).message}`)
+    return false
   }
 }

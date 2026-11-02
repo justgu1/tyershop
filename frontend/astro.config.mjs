@@ -39,6 +39,8 @@ export default defineConfig({
     locales: ['pt'],
     routing: { prefixDefaultLocale: false },
   },
+  // A checagem de origem fica no middleware: a do Astro recusa o clique único de descadastro dos clientes de e-mail (sem Origin).
+  security: { checkOrigin: false },
   server: { host: true, port: 4321 },
   image: {
     remotePatterns: [{ protocol: 'https' }, { protocol: 'http' }],

@@ -20,18 +20,20 @@ const InvoiceWidget = ({ data }: { data: { id: string; display_id?: number; meta
     try {
       const form = new FormData()
       form.append("files", file)
+      // A nota tem nome, CPF e endereço do cliente: nunca pública.
+      form.append("access", "private")
       const up = await fetch("/admin/uploads", { method: "POST", body: form, credentials: "include" })
       const uploaded = await up.json().catch(() => ({}))
       const stored = uploaded?.files?.[0]
       if (!up.ok || !stored?.id) throw new Error(uploaded?.message || "Não foi possível enviar o arquivo.")
-      const r = await adminFetch<{ invoice: Invoice }>(`/admin/orders/${data.id}/invoice`, {
+      const r = await adminFetch<{ invoice: Invoice; emailed: boolean }>(`/admin/orders/${data.id}/invoice`, {
         method: "POST",
         body: JSON.stringify({ file_id: stored.id, filename: file.name, number }),
       })
       setInvoice(r.invoice)
       setNumber("")
       if (fileRef.current) fileRef.current.value = ""
-      setMessage("Nota fiscal anexada e enviada por e-mail ao cliente.")
+      setMessage(r.emailed ? "Nota fiscal anexada e enviada por e-mail ao cliente." : "Nota fiscal anexada, mas o e-mail não saiu. Envie o mesmo arquivo de novo para tentar outra vez.")
     } catch (e: any) {
       setMessage(e.message)
     } finally {

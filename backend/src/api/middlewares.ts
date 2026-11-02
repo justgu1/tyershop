@@ -126,9 +126,9 @@ export default defineMiddlewares({
       ],
     },
     {
-      matcher: "/store/leads/unsubscribe",
-      method: "POST",
-      middlewares: [rateLimit("unsubscribe", { windowMs: 600_000, max: 30 })],
+      matcher: "/store/order-invoices",
+      method: "GET",
+      middlewares: [requiredCustomer],
     },
     {
       matcher: "/store/orders/:id/invoice",

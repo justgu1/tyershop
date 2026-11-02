@@ -106,20 +106,24 @@ export async function quotePackage(scope: MedusaContainer, toZip: string, pkg: P
   return quotes
 }
 
-/** Maior prazo de produção entre as peças que são de um drop à venda (peças fixas, como a Starter, não têm). */
-export async function productionDays(scope: MedusaContainer, variantIds: string[]): Promise<number> {
-  if (!variantIds.length) return 0
-  const query = scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { data } = await query.graph({ entity: "variant", fields: ["id", "product_id"], filters: { id: variantIds } })
-  const products = new Set((data as any[]).map((v) => v.product_id))
+/** Maior prazo de produção entre os produtos de drops à venda agora (peças fixas, como a Starter, não têm). */
+export async function productionDaysOfProducts(scope: MedusaContainer, productIds: string[]): Promise<number> {
   let days = 0
-  for (const { drop, productIds } of await dropRows(scope)) {
+  for (const { drop, productIds: dropProducts } of await dropRows(scope)) {
     const { phase } = presentDrop(drop)
-    if ((phase === "presale" || phase === "general") && [...products].some((p) => productIds.has(p))) {
+    if ((phase === "presale" || phase === "general") && productIds.some((p) => dropProducts.has(p))) {
       days = Math.max(days, Number(drop.production_days) || 0)
     }
   }
   return days
+}
+
+/** Mesma regra, a partir das variantes do carrinho. */
+export async function productionDays(scope: MedusaContainer, variantIds: string[]): Promise<number> {
+  if (!variantIds.length) return 0
+  const query = scope.resolve(ContainerRegistrationKeys.QUERY)
+  const { data } = await query.graph({ entity: "variant", fields: ["id", "product_id"], filters: { id: variantIds } })
+  return productionDaysOfProducts(scope, (data as any[]).map((v) => v.product_id))
 }
 
 /** Variantes com peso e medidas, na quantidade pedida, prontas para montar o pacote. */

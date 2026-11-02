@@ -1,14 +1,11 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
-import { autoLabelEnabled, BusyError, purchaseLabel } from "../modules/melhor-envio/purchase"
-import { confirmationData, loadOrder, sendOrderEmail } from "../utils/order-email"
+import { deliverConfirmation } from "../utils/order-confirmation"
 
 export default async function orderPlacedHandler({ event: { data }, container }: SubscriberArgs<{ id: string }>) {
-  const order = await loadOrder(container, data.id)
-  if (order?.email) await sendOrderEmail(container, order.email, "order_confirmation", await confirmationData(container, order))
-  // Etiqueta automática (desligada por padrão). Erros ficam gravados no pedido e não afetam o e-mail acima.
-  if (autoLabelEnabled()) await purchaseLabel(container, data.id).catch((err) => {
-      if (!(err instanceof BusyError)) container.resolve("logger").error(`[melhor-envio] ${err.message}`)
-    })
+  // Se não sair agora, o job `resend-confirmations` tenta de novo.
+  if (!(await deliverConfirmation(container, data.id))) {
+    container.resolve("logger").warn(`Confirmação do pedido ${data.id} não enviada; o reenvio tenta depois`)
+  }
 }
 
 export const config: SubscriberConfig = { event: "order.placed" }

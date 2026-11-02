@@ -131,3 +131,33 @@ export type TrackingInfo = { status?: string; tracking?: string | null; melhoren
 export async function tracking(accessToken: string, ids: string[]): Promise<Record<string, TrackingInfo>> {
   return meRequest(accessToken, "/shipment/tracking", { orders: ids })
 }
+
+async function meGet<T>(accessToken: string, path: string): Promise<T> {
+  const res = await fetch(`${baseUrl()}/api/v2/me${path}`, {
+    headers: { authorization: `Bearer ${accessToken}`, accept: "application/json", "user-agent": userAgent() },
+    signal: AbortSignal.timeout(20_000),
+  })
+  const data = (await res.json().catch(() => ({}))) as any
+  if (res.status === 401 || res.status === 403) throw new UnauthorizedError(String(data?.message ?? "").slice(0, 300))
+  if (!res.ok) throw new Error(`Melhor Envio respondeu ${res.status}`)
+  return data as T
+}
+
+/** Situação da etiqueta no Melhor Envio (pending = no carrinho, ainda não paga). Lança erro se não conseguir consultar. */
+export async function getLabel(accessToken: string, id: string): Promise<{ status?: string }> {
+  return meGet(accessToken, `/orders/${encodeURIComponent(id)}`)
+}
+
+type CartPage = { data?: { id: string; status?: string; tags?: { tag?: string }[] }[]; last_page?: number }
+const CART_PAGES_MAX = 10
+
+/** Procura no carrinho do Melhor Envio um envio já criado para o pedido (pela etiqueta "Pedido #N"). Erro de consulta é erro: não se cria outro às cegas. */
+export async function findInCart(accessToken: string, tag: string): Promise<string | null> {
+  for (let page = 1; page <= CART_PAGES_MAX; page++) {
+    const cart = await meGet<CartPage>(accessToken, `/cart?page=${page}`)
+    const hit = (cart.data ?? []).find((o) => (o.tags ?? []).some((t) => t.tag === tag) && o.status !== "canceled")
+    if (hit) return hit.id
+    if (page >= (cart.last_page ?? 1)) return null
+  }
+  throw new Error("O carrinho do Melhor Envio está grande demais para conferir. Esvazie o carrinho por lá e tente de novo.")
+}

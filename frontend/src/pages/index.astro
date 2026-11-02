@@ -354,7 +354,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
         <p class="history__text-body"><em>TYER GANG.</em></p>
       </div>
       <div class="history__image">
-        <video class="history__video" autoplay muted loop playsinline preload="metadata" poster="/video/historia-poster.webp" width="1280" height="720" aria-hidden="true">
+        <video class="history__video" muted loop playsinline preload="none" poster="/video/historia-poster.webp" width="1280" height="720" aria-hidden="true">
           <source src="/video/historia.webm" type="video/webm" />
           <source src="/video/historia.mp4" type="video/mp4" />
         </video>
@@ -878,6 +878,18 @@ a.past__card:hover img { border-color: var(--c-accent, #e77e23); }
       observer.observe(heroVideo);
     }
 
+    /* Vídeo da história: só baixa e toca quando chega perto da tela. */
+    (function () {
+      const v = document.querySelector('.history__video');
+      if (!v) return;
+      new IntersectionObserver((entries, obs) => {
+        if (!entries[0].isIntersecting) return;
+        obs.disconnect();
+        v.preload = 'auto';
+        v.play().catch(() => {});
+      }, { rootMargin: '200px' }).observe(v);
+    })();
+
     /* Mais Vendidos: setas/scroll agora são do <ProductCarousel>
        (product-carousel-client.ts, importado globalmente no Layout). */
 
@@ -1043,7 +1055,7 @@ a.past__card:hover img { border-color: var(--c-accent, #e77e23); }
       }
     });
   
-    // Só o foco por teclado pausa: parar no hover deixava o carrossel parado para quem deixa o mouse em cima (e no toque nunca voltava).
+    // Só o foco por teclado pausa: pausar no hover pararia o carrossel de quem deixa o mouse em cima, e no toque ele nunca voltaria.
     stage.addEventListener('focusin', (e) => { if (e.target.matches(':focus-visible')) stopAuto(); });
     stage.addEventListener('focusout', startAuto);
 

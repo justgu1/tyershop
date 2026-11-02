@@ -11,20 +11,30 @@ const oneClick = Astro.request.method === 'POST';
 // POST vem do botão desta página ou do clique único do próprio cliente de e-mail (Gmail/Outlook).
 let done = false;
 let failed = false;
+let invalid = false;
 if (oneClick) {
-  try {
-    const res = await fetch(`${getMedusaStoreUrl()}/store/leads/unsubscribe`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-publishable-api-key': getPublishableKey() },
-      body: JSON.stringify({ email, token }),
-      signal: AbortSignal.timeout(8000),
-    });
-    done = res.ok;
-    failed = !res.ok;
-  } catch {
-    failed = true;
+  // Uma nova tentativa cobre falha passageira do servidor: o clique único do e-mail não é repetido por quem o enviou.
+  for (let attempt = 0; attempt < 2 && !done; attempt++) {
+    try {
+      const res = await fetch(`${getMedusaStoreUrl()}/store/leads/unsubscribe`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-publishable-api-key': getPublishableKey() },
+        body: JSON.stringify({ email, token }),
+        signal: AbortSignal.timeout(5000),
+      });
+      done = res.ok;
+      // Falha passageira (5xx, 408, 429) vale uma nova tentativa; os demais 4xx são definitivos.
+      invalid = res.status >= 400 && res.status < 500 && ![408, 429].includes(res.status);
+      if (invalid) break;
+    } catch {
+      /* tenta de novo */
+    }
   }
+  failed = !done;
 }
+// O cliente de e-mail só enxerga o código HTTP: falha precisa ser 4xx/5xx para ele não dar o descadastro por feito.
+if (invalid) Astro.response.status = 400;
+else if (failed) Astro.response.status = 503;
 Astro.response.headers.set('cache-control', 'private, no-store');
 ---
 
@@ -33,13 +43,13 @@ Astro.response.headers.set('cache-control', 'private, no-store');
     {done ? (
       <>
         <h1>Pronto, você saiu da lista</h1>
-        <p>Não vamos mais enviar avisos nem convites de drops para este e-mail. Se mudar de ideia, é só se cadastrar de novo.</p>
+        <p>Não vamos mais enviar avisos nem convites de drops para este e-mail. Se mudar de ideia, escreva para suporte@tyershop.com.</p>
         <a class="leave__link" href="/">Voltar para o início</a>
       </>
-    ) : failed || !email || !token ? (
+    ) : invalid || failed || !email || !token ? (
       <>
-        <h1>Link inválido</h1>
-        <p>Não consegui validar este link. Responda ao e-mail que recebeu, ou escreva para suporte@tyershop.com, e tiramos você da lista.</p>
+        <h1>{failed && !invalid ? 'Não deu certo agora' : 'Link inválido'}</h1>
+        <p>{failed && !invalid ? 'Tente de novo em instantes, ou escreva para suporte@tyershop.com e tiramos você da lista.' : 'Não consegui validar este link. Responda ao e-mail que recebeu, ou escreva para suporte@tyershop.com, e tiramos você da lista.'}</p>
         <a class="leave__link" href="/">Voltar para o início</a>
       </>
     ) : (

@@ -44,7 +44,7 @@ const pk = getPublishableKey();
 .orders-loading { color: var(--c-muted); font-size: 14px; }
 </style>
 <script define:vars={{ pk }}>
-  const FIELDS = 'id,display_id,status,created_at,total,currency_code,payment_status,fulfillment_status,metadata,*items,*fulfillments,*fulfillments.labels';
+  const FIELDS = 'id,display_id,status,created_at,total,currency_code,payment_status,fulfillment_status,*items,*fulfillments,*fulfillments.labels';
   const headers = (token) => ({ Authorization: `Bearer ${token}`, 'x-publishable-api-key': pk });
 
   // Etapas que o cliente entende, tiradas do pagamento e da entrega do pedido.
@@ -89,7 +89,7 @@ const pk = getPublishableKey();
     }
   }
 
-  function card(order, token) {
+  function card(order, token, withInvoice) {
     const el = document.createElement('div');
     el.className = 'order-card';
     el.setAttribute('role', 'listitem');
@@ -142,8 +142,7 @@ const pk = getPublishableKey();
       a.textContent = 'Rastrear entrega';
       actions.append(a);
     }
-    const invoice = order.metadata?.invoice;
-    if (invoice?.file_id && order.status !== 'canceled') {
+    if (withInvoice.has(order.id) && order.status !== 'canceled') {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'btn btn-outline';
@@ -185,12 +184,17 @@ const pk = getPublishableKey();
         throw new Error(`Orders request failed: ${res.status}`);
       }
       const { orders } = await res.json();
+      // Só o que a página precisa: quais pedidos têm nota fiscal (sem trazer o estado interno do pedido).
+      const invoices = await fetch('/store/order-invoices', { headers: headers(token) })
+        .then((r) => (r.ok ? r.json() : { order_ids: [] }))
+        .catch(() => ({ order_ids: [] }));
+      const withInvoice = new Set(invoices.order_ids ?? []);
       if (loading) loading.remove();
       if (!orders?.length) {
         container.innerHTML = '<p class="orders-empty">Você ainda não fez nenhum pedido.</p>';
         return;
       }
-      for (const order of orders) container.appendChild(card(order, token));
+      for (const order of orders) container.appendChild(card(order, token, withInvoice));
     } catch {
       if (loading instanceof HTMLElement) loading.remove();
       container.innerHTML = '<p class="orders-empty">Não foi possível carregar os pedidos agora.</p>';

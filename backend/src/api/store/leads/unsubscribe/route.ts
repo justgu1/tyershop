@@ -8,6 +8,7 @@ import { validUnsubscribeToken } from "../../../../modules/lead/unsubscribe"
 const Body = z.object({ email: z.string().trim().toLowerCase().email(), token: z.string().min(1).max(64) })
 
 /**
+ * Sem limite por IP: a chamada vem do servidor do site (um só IP para todos) e o token assinado já barra tentativas.
  * Tira o e-mail da lista do link do e-mail. Quem foi negado continua negado; quem não está na lista recebe a mesma
  * resposta (não revela quem está). O cliente de e-mail também chama este caminho (clique único) pela página do site.
  */
