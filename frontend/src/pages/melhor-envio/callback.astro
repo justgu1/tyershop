@@ -1,0 +1,46 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+export const prerender = false;
+---
+
+<Layout title="Melhor Envio" description="Conexão com o Melhor Envio." lang="pt" noindex bodyClass="page-drop">
+  <section class="me">
+    <p class="me__msg" id="me-msg" role="status">Conectando ao Melhor Envio…</p>
+  </section>
+</Layout>
+
+<style>
+  .me { min-height: 70vh; display: flex; align-items: center; justify-content: center; padding: 120px 20px 80px; text-align: center; background: #0b0b0b; color: #fff; }
+  .me__msg { margin: 0; font-size: 18px; }
+  .me__msg.is-error { color: #f87171; }
+</style>
+
+<script>
+  const msg = document.getElementById('me-msg')!;
+  const params = new URLSearchParams(location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+
+  (async () => {
+    if (!code || !state) {
+      msg.textContent = 'Retorno incompleto. Inicie a conexão pelo painel de administração.';
+      msg.classList.add('is-error');
+      return;
+    }
+    try {
+      const res = await fetch('/store/melhor-envio/callback', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-publishable-api-key': (window as any).__MEDUSA_PK__ || '' },
+        body: JSON.stringify({ code, state }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || 'Não foi possível conectar.');
+      history.replaceState({}, '', location.pathname);
+      msg.textContent = 'Melhor Envio conectado. Pode voltar ao painel.';
+    } catch (err) {
+      msg.textContent = err instanceof Error ? err.message : 'Não foi possível conectar.';
+      msg.classList.add('is-error');
+    }
+  })();
+</script>

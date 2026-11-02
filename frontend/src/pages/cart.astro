@@ -42,9 +42,18 @@ const lang: Lang = getLangFromUrl(Astro.url);
             <span>Taxas</span>
             <span id="cart-taxes">R$ 0,00</span>
           </div>
+          <div class="sc__ship">
+            <label class="sc__ship-label" for="cart-cep">Calcular frete</label>
+            <div class="sc__ship-row">
+              <input id="cart-cep" class="sc__ship-input" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="9" placeholder="00000-000" />
+              <button type="button" id="cart-cep-calc" class="btn btn-outline sc__ship-btn">Calcular</button>
+            </div>
+            <p id="cart-ship-hint" class="sc__ship-hint" role="status"></p>
+            <div class="ship-opts" id="cart-ship-options" aria-live="polite"></div>
+          </div>
           <div class="sc__line-detail">
             <span>Entrega</span>
-            <span id="cart-shipping">R$ 0,00</span>
+            <span id="cart-shipping">A calcular</span>
           </div>
           <div class="sc__subtotal sc__subtotal--total">
             <span class="sc__total-label">{t(lang, 'cart', 'total')}</span>
@@ -81,6 +90,12 @@ const lang: Lang = getLangFromUrl(Astro.url);
 </Layout>
 
 <style>
+  .sc__ship { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; }
+  .sc__ship-label { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+  .sc__ship-row { display: flex; gap: 8px; }
+  .sc__ship-input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.05); color: inherit; font-size: 14px; }
+  .sc__ship-btn { padding: 10px 16px; }
+  .sc__ship-hint { margin: 0; min-height: 16px; font-size: 12px; color: rgba(255, 255, 255, 0.65); }
 .cart-page { padding-block: 40px 56px; }
 .cart-page__title { font-family: var(--font-title); font-size: clamp(42px, 5vw, 64px); text-transform: uppercase; margin-bottom: 24px; }
 .cart-shell { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; }

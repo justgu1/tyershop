@@ -15,6 +15,7 @@
  * as páginas em volta.
  */
 import { getCart, clearCart, type CartItem } from '../lib/cart';
+import { fetchShippingQuote, isCep, linesSignature, readSavedShipping, renderShippingOptions, saveShipping, type ShipOption } from '../lib/shipping';
 import { saveCheckoutDraft, loadCheckoutDraft, clearCheckoutDraft } from '../lib/checkout-draft';
 
 declare global {
@@ -222,6 +223,58 @@ function init() {
   renderSummary(items);
   initCustomSelect('ck-installments-select', 'ck-installments-btn', 'ck-installments-list', 'ck-installments-value', 'ck-installments');
 
+  // ---- Frete: opções (preço e prazo) calculadas no servidor para o CEP digitado ----
+  let shipChoice: ShipOption | null = null;
+  let shipFor = '';
+  let shipTimer: ReturnType<typeof setTimeout> | null = null;
+
+  async function refreshShipping() {
+    const zip = (qs<HTMLInputElement>('ck-zip')?.value || '').trim();
+    const box = qs('ck-shipping');
+    const hint = qs('ck-ship-hint');
+    const list = qs('ck-ship-options');
+    if (!box || !hint || !list) return;
+    if (!isCep(zip)) {
+      shipChoice = null;
+      shipFor = '';
+      box.hidden = true;
+      return;
+    }
+    const lines = items.map((i) => ({ variant_id: i.variantId, quantity: i.quantity }));
+    const key = `${zip}|${linesSignature(lines)}`;
+    if (key === shipFor && shipChoice) return;
+    box.hidden = false;
+    hint.textContent = 'Calculando o frete…';
+    list.replaceChildren();
+    try {
+      const quote = await fetchShippingQuote(zip, lines);
+      if ((qs<HTMLInputElement>('ck-zip')?.value || '').trim() !== zip) return;
+      const savedId = readSavedShipping()?.id;
+      shipChoice = quote.options.find((o) => o.id === (shipChoice?.id ?? savedId)) ?? quote.options[0] ?? null;
+      shipFor = key;
+      hint.textContent = shipChoice ? '' : 'Nenhum serviço de entrega atende este CEP.';
+      renderShippingOptions(list, quote, {
+        name: 'ck-ship',
+        selectedId: shipChoice?.id,
+        onSelect: (o) => {
+          shipChoice = o;
+          saveShipping({ cep: zip, id: o.id, name: o.name, price: o.price, signature: linesSignature(lines) });
+        },
+      });
+    } catch (err) {
+      shipChoice = null;
+      shipFor = '';
+      hint.textContent = err instanceof Error ? err.message : 'Não foi possível calcular o frete agora.';
+    }
+  }
+  const zipField = qs<HTMLInputElement>('ck-zip');
+  const scheduleShipping = () => {
+    if (shipTimer) clearTimeout(shipTimer);
+    shipTimer = setTimeout(() => void refreshShipping(), 400);
+  };
+  zipField?.addEventListener('input', scheduleShipping);
+  zipField?.addEventListener('change', scheduleShipping);
+
   // Pré-preenche o CEP se o cliente já digitou na PDP (evita perguntar de
   // novo — "Comprar agora" pula direto pra cá).
   try {
@@ -231,6 +284,8 @@ function init() {
   } catch {
     /* storage indisponível: segue sem pré-preencher */
   }
+
+  void refreshShipping();
 
   const setIfEmpty = (id: string, value: string | undefined | null) => {
     const el = qs<HTMLInputElement>(id);
@@ -248,6 +303,7 @@ function init() {
     setIfEmpty('ck-cpf', draft.cpf);
     setIfEmpty('ck-phone', draft.phone);
     setIfEmpty('ck-zip', draft.zip_code);
+    scheduleShipping();
     setIfEmpty('ck-street', draft.street_name);
     setIfEmpty('ck-number', draft.street_number);
     setIfEmpty('ck-neighborhood', draft.neighborhood);
@@ -389,6 +445,7 @@ function init() {
       const el = qs<HTMLInputElement>(id);
       if (el) el.value = value;
     });
+    scheduleShipping();
   }
 
   /** Passo 2 (endereço) — cliente logado com endereço(s) salvos: cards em
@@ -896,6 +953,11 @@ function init() {
       show('checkout-contact-error', true);
       return;
     }
+    if (!shipChoice) {
+      setText('checkout-contact-error', 'Escolha a forma de entrega. Se nenhuma aparecer, confira o CEP.');
+      show('checkout-contact-error', true);
+      return;
+    }
     show('checkout-contact-error', false);
     const cta = qs<HTMLButtonElement>('checkout-summary-cta');
     if (cta) {
@@ -946,13 +1008,12 @@ function init() {
       void persistAddressToAccount(addr, payer);
 
       const shipRes = await medusaFetch(`/store/shipping-options?cart_id=${cartId}`);
-      const option = shipRes?.shipping_options?.[0];
-      if (option) {
-        await medusaFetch(`/store/carts/${cartId}/shipping-methods`, {
-          method: 'POST',
-          body: JSON.stringify({ option_id: option.id }),
-        });
-      }
+      const option = (shipRes?.shipping_options ?? []).find((o: any) => o?.data?.id === `melhorenvio-${shipChoice!.id}` || o?.name === shipChoice!.name);
+      if (!option) throw new Error('Este serviço de entrega não está disponível para o seu endereço. Escolha outro.');
+      await medusaFetch(`/store/carts/${cartId}/shipping-methods`, {
+        method: 'POST',
+        body: JSON.stringify({ option_id: option.id }),
+      });
 
       const cartRes = await medusaFetch(`/store/carts/${cartId}`);
       const cart = cartRes?.cart ?? {};

@@ -1,6 +1,7 @@
 /**
  * Cliente PDP: variantes, galeria, carrinho, sticky. Módulo único (evita TS/`OptionRow` no HTML).
  */
+import { fetchShippingQuote, isCep, renderShippingOptions } from '../lib/shipping';
 import { addItem, getCart, hasOutOfStockItems, CART_MAX_WHEN_UNKNOWN } from '../lib/cart';
 
 type OptionRow = { id: string; title: string; values: string[] };
@@ -643,19 +644,38 @@ if (root) {
     const next = formatCep(cur);
     applyCepToInputs(next);
   });
-  /* Não existe cálculo de frete real hoje (nenhum endpoint de shipping-rate
-     é chamado) — o botão só torna explícito o mesmo fluxo de validar/formatar
-     e salvar o CEP que já rodava sozinho ao digitar, pra não parecer que
-     "não faz nada" ao clicar. */
-  const cepCalcBtn = document.getElementById('pdp-cep-calc');
-  cepCalcBtn?.addEventListener('click', () => {
-    if (!cepInput) return;
+  const shipList = document.getElementById('pdp-ship-options');
+  const cepCalcBtn = document.getElementById('pdp-cep-calc') as HTMLButtonElement | null;
+  async function calculateShipping() {
+    if (!cepInput || !shipList) return;
     const next = formatCep(cepInput.value);
     applyCepToInputs(next);
-    const ok = next.replace(/\D/g, '').length === 8;
-    if (ok && cepHint) cepHint.textContent = 'Frete calculado no checkout.';
+    if (!isCep(next)) {
+      if (cepHint) cepHint.textContent = 'CEP inválido';
+      return;
+    }
+    const variantId = atcBtn?.dataset.variantId || '';
+    if (!variantId) return;
+    if (cepHint) cepHint.textContent = 'Calculando…';
+    if (cepCalcBtn) cepCalcBtn.disabled = true;
+    try {
+      const quote = await fetchShippingQuote(next, [{ variant_id: variantId, quantity: Math.max(1, Number(atcBtn?.dataset.qty) || 1) }]);
+      renderShippingOptions(shipList, quote);
+      if (cepHint) cepHint.textContent = '';
+    } catch (err) {
+      shipList.replaceChildren();
+      if (cepHint) cepHint.textContent = err instanceof Error ? err.message : 'Não foi possível calcular o frete agora.';
+    } finally {
+      if (cepCalcBtn) cepCalcBtn.disabled = false;
+    }
+  }
+  cepCalcBtn?.addEventListener('click', () => void calculateShipping());
+  cepInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void calculateShipping();
+    }
   });
-
   document.querySelectorAll('[data-modal-target]').forEach((el) => {
     el.addEventListener('click', () => {
       const id = el.getAttribute('data-modal-target');

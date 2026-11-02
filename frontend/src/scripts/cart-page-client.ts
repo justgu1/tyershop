@@ -1,5 +1,6 @@
 import { getCart, removeItem, updateQty, setQty, clearCart, getTotal, getAppliedPromoCode, setAppliedPromoCode, validateCartItems } from '../lib/cart';
 import { createMedusaCartFromLocalCart } from '../lib/medusa-checkout-cart';
+import { fetchShippingQuote, isCep, linesSignature, onlyDigits, readSavedShipping, renderShippingOptions, saveShipping, type ShipOption, type ShipQuote } from '../lib/shipping';
 function fmt(cents: number) { return (Number(cents) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
 function escHtml(s: string) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function formatVariantLabel(raw: string) {
@@ -105,6 +106,104 @@ function syncMoreToggle(body: HTMLElement, total: number) {
   toggle.textContent = body.classList.contains('sc-body--expanded') ? 'Ver menos' : `Ver mais (${total - 3})`;
 }
 
+const ship: { quote: ShipQuote | null; selected: ShipOption | null; sig: string } = { quote: null, selected: null, sig: '' };
+const cartLines = () => getCart().map((i) => ({ variant_id: i.variantId, quantity: i.quantity }));
+const shippingCents = () =>
+  ship.selected && ship.sig === linesSignature(cartLines()) ? Math.round(ship.selected.price * 100) : 0;
+
+function formatCepInput(v: string) {
+  const d = onlyDigits(v).slice(0, 8);
+  return d.length <= 5 ? d : `${d.slice(0, 5)}-${d.slice(5)}`;
+}
+
+function paintShipping() {
+  const list = document.getElementById('cart-ship-options');
+  if (!(list instanceof HTMLElement)) return;
+  if (!ship.quote) {
+    list.replaceChildren();
+    return;
+  }
+  renderShippingOptions(list, ship.quote, {
+    name: 'cart-ship',
+    selectedId: ship.selected?.id,
+    onSelect: (o) => {
+      ship.selected = o;
+      persistShipping();
+      render();
+    },
+  });
+}
+
+function persistShipping() {
+  const input = document.getElementById('cart-cep');
+  if (!ship.selected || !(input instanceof HTMLInputElement)) return saveShipping(null);
+  saveShipping({ cep: input.value, id: ship.selected.id, name: ship.selected.name, price: ship.selected.price, signature: ship.sig });
+}
+
+async function calculateShipping() {
+  const input = document.getElementById('cart-cep');
+  const hint = document.getElementById('cart-ship-hint');
+  const btn = document.getElementById('cart-cep-calc');
+  if (!(input instanceof HTMLInputElement) || !(hint instanceof HTMLElement)) return;
+  input.value = formatCepInput(input.value);
+  const lines = cartLines();
+  if (!lines.length) return;
+  if (!isCep(input.value)) {
+    hint.textContent = 'CEP inválido';
+    return;
+  }
+  hint.textContent = 'Calculando…';
+  if (btn instanceof HTMLButtonElement) btn.disabled = true;
+  try {
+    const quote = await fetchShippingQuote(input.value, lines);
+    const keep = ship.selected ?? undefined;
+    ship.quote = quote;
+    ship.sig = linesSignature(lines);
+    ship.selected = quote.options.find((o) => o.id === (keep?.id ?? readSavedShipping()?.id)) ?? quote.options[0] ?? null;
+    persistShipping();
+    hint.textContent = '';
+    paintShipping();
+  } catch (err) {
+    ship.quote = null;
+    ship.selected = null;
+    hint.textContent = err instanceof Error ? err.message : 'Não foi possível calcular o frete agora.';
+    paintShipping();
+  } finally {
+    if (btn instanceof HTMLButtonElement) btn.disabled = false;
+    render();
+  }
+}
+
+let shipTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleShippingRefresh() {
+  const input = document.getElementById('cart-cep');
+  if (!(input instanceof HTMLInputElement) || !isCep(input.value) || !ship.quote) return;
+  if (shipTimer) clearTimeout(shipTimer);
+  shipTimer = setTimeout(() => void calculateShipping(), 500);
+}
+
+function initShipping() {
+  const input = document.getElementById('cart-cep');
+  if (!(input instanceof HTMLInputElement)) return;
+  const saved = readSavedShipping();
+  let cep = saved?.cep || '';
+  try {
+    cep = cep || localStorage.getItem('tyer_last_cep') || '';
+  } catch {
+    /* storage indisponível */
+  }
+  input.value = cep;
+  input.addEventListener('input', () => (input.value = formatCepInput(input.value)));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void calculateShipping();
+    }
+  });
+  document.getElementById('cart-cep-calc')?.addEventListener('click', () => void calculateShipping());
+  if (isCep(cep) && getCart().length) void calculateShipping();
+}
+
 function render() {
   const body = document.getElementById('cart-items');
   const empty = document.getElementById('cart-empty');
@@ -130,13 +229,14 @@ function render() {
   syncMoreToggle(body, items.length);
   const subtotal = getTotal();
   const discount = Number(couponState.discountCents || 0);
-  const total = Math.max(0, subtotal - discount);
+  const shipping = shippingCents();
+  const total = Math.max(0, subtotal - discount + shipping);
   const savePct = subtotal > 0 && discount > 0 ? Math.round((discount / subtotal) * 100) : 0;
   const setText = (id: string, text: string) => { const el = document.getElementById(id); if (el) el.textContent = text; };
   setText('cart-subtotal', fmt(subtotal));
   setText('cart-discount', `-${fmt(discount)}`);
   setText('cart-taxes', fmt(0));
-  setText('cart-shipping', fmt(0));
+  setText('cart-shipping', shipping > 0 ? fmt(shipping) : 'A calcular');
   setText('cart-total', fmt(total));
   setText('cart-sticky-total', fmt(total));
   const saveTag = document.getElementById('cart-save-tag');
@@ -293,7 +393,9 @@ function ensureStickyDrawerClone() {
   const mount = document.getElementById('cart-sticky-drawer');
   const source = document.querySelector('.sc__footer.cart-footer');
   if (!(mount instanceof HTMLElement) || !source || mount.dataset.ready === '1') return;
-  mount.appendChild(source.cloneNode(true));
+  const clone = source.cloneNode(true) as HTMLElement;
+  clone.querySelector('.sc__ship')?.remove();
+  mount.appendChild(clone);
   mount.dataset.ready = '1';
   // Clone é só apresentação — cliques nos botões/inputs dele disparam o
   // mesmo evento no elemento real, sem duplicar handler nenhum (ids
@@ -341,6 +443,7 @@ if (stickyBar instanceof HTMLElement && summaryAside && 'IntersectionObserver' i
   io.observe(summaryAside);
 }
 window.addEventListener('cart:update', () => {
+  scheduleShippingRefresh();
   render();
   scheduleCouponResync();
 });
@@ -354,3 +457,5 @@ window.addEventListener('pageshow', (e) => {
     })();
   }
 });
+
+initShipping();

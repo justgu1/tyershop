@@ -303,7 +303,7 @@ function renderCart() {
   subtotalEl.textContent = fmt(subtotal);
   discountEl.textContent = `-${fmt(discount)}`;
   taxesEl.textContent = fmt(taxes);
-  shippingEl.textContent = fmt(shipping);
+  shippingEl.textContent = 'No carrinho';
   totalEl.textContent = fmt(total);
   saveTagEl.hidden = savePct <= 0;
   saveTagEl.textContent = `${savePct}% OFF`;

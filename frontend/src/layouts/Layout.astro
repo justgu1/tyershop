@@ -149,6 +149,15 @@ const schemas: object[] = [
 </html>
 
 <style is:global>
+
+  .ship-opts { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+  .ship-opts__item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 8px; cursor: default; }
+  .ship-opts__item:has(input) { cursor: pointer; }
+  .ship-opts__item:has(input:checked) { border-color: var(--c-accent, #e77e23); }
+  .ship-opts__text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; font-size: 13px; }
+  .ship-opts__text small { color: rgba(255, 255, 255, 0.6); font-size: 12px; }
+  .ship-opts__price { font-weight: 800; font-size: 14px; white-space: nowrap; }
+  .ship-opts__empty { margin: 0; font-size: 13px; color: rgba(255, 255, 255, 0.7); }
   *,
   *::before,
   *::after {
