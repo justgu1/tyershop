@@ -50,7 +50,7 @@ export async function POST(req: MedusaRequest<Body>, res: MedusaResponse) {
         data: {
           status: "submitted",
           mp_payment_id: created.id,
-          mp_status: created.status,
+          mp_status: created.status, method: "pix",
           // Valor cobrado no Mercado Pago: se o carrinho mudar depois do pagamento, a autorização recusa.
           mp_amount: amount,
           amount,

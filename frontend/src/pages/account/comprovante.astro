@@ -1,0 +1,87 @@
+---
+export const prerender = false;
+
+import Layout from '../../layouts/Layout.astro';
+import { getPublishableKey } from '../../lib/medusa-env';
+const pk = getPublishableKey();
+---
+<Layout title="Comprovante do pedido" lang="pt" noindex>
+  <div class="rc container">
+    <div class="rc__bar">
+      <a href="/account/orders" class="btn btn-outline">← Meus pedidos</a>
+      <button type="button" class="btn btn-primary" id="rc-print" hidden>Imprimir ou salvar em PDF</button>
+    </div>
+    <article class="rc__doc" id="rc-doc" aria-live="polite"><p class="rc__msg">Carregando o comprovante...</p></article>
+  </div>
+</Layout>
+
+<style is:global>
+.rc { padding-block: 56px; max-width: 760px; }
+.rc__bar { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.rc__doc { background: #fff; color: #0b0b0b; border-radius: 12px; padding: 32px; }
+.rc__msg { margin: 0; color: #555; }
+.rc__doc h1 { margin: 0 0 4px; font-size: 24px; text-transform: uppercase; }
+.rc__doc h2 { margin: 24px 0 8px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: #e77e23; }
+.rc__doc p { margin: 0 0 4px; font-size: 14px; line-height: 1.5; }
+.rc__muted { color: #666; }
+.rc__table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rc__table td { padding: 8px 0; border-bottom: 1px solid #eee; vertical-align: top; }
+.rc__table td:last-child { text-align: right; white-space: nowrap; }
+.rc__total td { font-weight: 800; font-size: 16px; border-bottom: 0; }
+@media print {
+  body * { visibility: hidden; }
+  #rc-doc, #rc-doc * { visibility: visible; }
+  #rc-doc { position: absolute; inset: 0 auto auto 0; width: 100%; border-radius: 0; padding: 0; }
+}
+</style>
+
+<script define:vars={{ pk }}>
+  const doc = document.getElementById('rc-doc');
+  const printBtn = document.getElementById('rc-print');
+  const el = (tag, text, cls) => { const n = document.createElement(tag); if (text != null) n.textContent = text; if (cls) n.className = cls; return n; };
+
+  (async () => {
+    const token = localStorage.getItem('tyer_token') || '';
+    const id = new URLSearchParams(location.search).get('o') || '';
+    if (!token) { location.href = '/account'; return; }
+    try {
+      const res = await fetch(`/store/orders/${encodeURIComponent(id)}/receipt`, { headers: { Authorization: `Bearer ${token}`, 'x-publishable-api-key': pk } });
+      if (!res.ok) throw new Error('fail');
+      const { receipt: r } = await res.json();
+      const money = (v) => Number(v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: String(r.currency_code || 'brl').toUpperCase() });
+      doc.replaceChildren();
+      doc.append(el('h1', 'Comprovante de compra'));
+      doc.append(el('p', `Pedido #${r.display_id} · ${new Date(r.placed_at).toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short' })}`, 'rc__muted'));
+      doc.append(el('p', 'Tyer — tyershop.com', 'rc__muted'));
+
+      doc.append(el('h2', 'Itens'));
+      const items = el('table', null, 'rc__table');
+      for (const i of r.items) {
+        const tr = el('tr');
+        tr.append(el('td', `${i.quantity}× ${i.title}${i.variant ? ` (${i.variant})` : ''}`), el('td', money(i.unit_price * i.quantity)));
+        items.append(tr);
+      }
+      const row = (label, value, cls) => { const tr = el('tr', null, cls); tr.append(el('td', label), el('td', value)); items.append(tr); };
+      row('Subtotal', money(r.subtotal));
+      row(`Frete${r.shipping_name ? ` (${r.shipping_name})` : ''}`, money(r.shipping_total));
+      row('Total', money(r.total), 'rc__total');
+      doc.append(items);
+
+      if (r.address_info) {
+        const a = r.address_info;
+        doc.append(el('h2', 'Entrega'));
+        doc.append(el('p', a.name));
+        doc.append(el('p', `${a.line1}${a.district ? ` — ${a.district}` : ''}`));
+        doc.append(el('p', `${a.city}/${a.uf} · CEP ${a.zip}`));
+      }
+      doc.append(el('h2', 'Pagamento'));
+      doc.append(el('p', `${r.payment?.method ?? 'Mercado Pago'}${r.payment?.status ? ` — ${r.payment.status}` : ''}`));
+      if (r.payment?.id) doc.append(el('p', `Mercado Pago nº ${r.payment.id}`, 'rc__muted'));
+      doc.append(el('p', 'Este comprovante registra o pagamento da compra. Não é documento fiscal.', 'rc__muted'));
+      printBtn.hidden = false;
+      printBtn.addEventListener('click', () => window.print());
+    } catch {
+      doc.replaceChildren(el('p', 'Não foi possível carregar o comprovante agora.', 'rc__msg'));
+    }
+  })();
+</script>

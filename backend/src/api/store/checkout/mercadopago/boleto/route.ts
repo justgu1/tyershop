@@ -60,7 +60,7 @@ export async function POST(req: MedusaRequest<Body>, res: MedusaResponse) {
         id: session.id,
         amount: session.amount,
         currency_code: session.currency_code,
-        data: { status: "submitted", mp_payment_id: created.id, mp_status: created.status, mp_amount: amount, amount, attempt },
+        data: { status: "submitted", mp_payment_id: created.id, mp_status: created.status, method: "boleto", mp_amount: amount, amount, attempt },
       });
     }
   );

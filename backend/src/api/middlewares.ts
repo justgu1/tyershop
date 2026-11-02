@@ -131,6 +131,11 @@ export default defineMiddlewares({
       middlewares: [requiredCustomer],
     },
     {
+      matcher: "/store/orders/:id/receipt",
+      method: "GET",
+      middlewares: [requiredCustomer, rateLimit("receipt", { windowMs: 600_000, max: 60, perIp: false, by: (req) => (req as any).auth_context?.actor_id })],
+    },
+    {
       matcher: "/store/orders/:id/invoice",
       method: "GET",
       middlewares: [requiredCustomer, rateLimit("invoice", { windowMs: 600_000, max: 60, perIp: false, by: (req) => (req as any).auth_context?.actor_id })],

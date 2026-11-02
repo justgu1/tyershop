@@ -9,10 +9,13 @@ export const LOGO_CID = "tyer-logo"
 const ACCENT = "#e77e23"
 const SUPPORT_EMAIL = "suporte@tyershop.com"
 const SOCIAL = [
-  { label: "Instagram", url: "https://www.instagram.com/tyer_br" },
-  { label: "TikTok", url: "https://www.tiktok.com/@tyer_br" },
-  { label: "YouTube", url: "https://www.youtube.com/@tyer_br" },
+  { label: "Instagram", url: "https://www.instagram.com/tyer_br", icon: "instagram" },
+  { label: "TikTok", url: "https://www.tiktok.com/@tyer_br", icon: "tiktok" },
+  { label: "YouTube", url: "https://www.youtube.com/@tyer_br", icon: "youtube" },
 ]
+
+/** Endereço público do site: os ícones das redes e as fotos dos produtos são imagens hospedadas lá. */
+const siteUrl = () => (process.env.SITE_URL || "").replace(/\/$/, "")
 
 const esc = (v: unknown) =>
   String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!)
@@ -50,9 +53,10 @@ function shell({ preheader, title, paragraphs, blocks, cta, note, reason }: Shel
 </td></tr></table>`
     : ""
   const noteHtml = note ? `<p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#6b6b6b">${note}</p>` : ""
-  const social = SOCIAL.map((s) => `<a href="${s.url}" style="color:#ffffff;text-decoration:none">${s.label}</a>`).join(
-    `<span style="color:#555555">&nbsp;&nbsp;·&nbsp;&nbsp;</span>`
-  )
+  const social = SOCIAL.map(
+    (s) =>
+      `<a href="${s.url}" style="text-decoration:none;display:inline-block;margin:0 8px"><img src="${siteUrl()}/email/${s.icon}.png" width="28" height="28" alt="${s.label}" style="display:block;border:0;color:#ffffff;font-size:12px"></a>`
+  ).join("")
 
   return `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${esc(title)}</title></head>
@@ -69,7 +73,7 @@ function shell({ preheader, title, paragraphs, blocks, cta, note, reason }: Shel
     ${body}${blocks ?? ""}${button}${noteHtml}
   </td></tr>
   <tr><td align="center" bgcolor="#0b0b0b" style="padding:28px 24px;border-radius:0 0 12px 12px;font-family:${FONT}">
-    <p style="margin:0 0 14px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">${social}</p>
+    <p style="margin:0 0 14px;font-size:0;line-height:0">${social}</p>
     <p style="margin:0 0 10px;font-size:12px;line-height:1.6;color:#9a9a9a">${reason}</p>
     <p style="margin:0;font-size:12px;line-height:1.6;color:#9a9a9a">Dúvidas? Fale com a gente em <a href="mailto:${SUPPORT_EMAIL}" style="color:#ffffff">${SUPPORT_EMAIL}</a><br>© ${new Date().getFullYear()} Tyer. Todos os direitos reservados.</p>
   </td></tr>
@@ -176,28 +180,48 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
 
     return { subject, html, text }
   },
-  /** Pedido recebido e pago. A nota fiscal segue em e-mail próprio, quando for emitida. */
+  /** Pedido recebido e pago. A nota fiscal, quando houver, segue em e-mail próprio. */
   order_confirmation: (d) => {
     const subject = `Pedido #${d.display_id} confirmado`
     const reason = `Você recebeu este e-mail porque fez um pedido na Tyer com ${esc(d.email)}.`
-    const items: { title: string; variant?: string; quantity: number; unit_price: number }[] = d.items ?? []
+    const cur = d.currency_code
+    type Item = { title: string; variant?: string | null; quantity: number; unit_price: number; image?: string | null }
+    const items: Item[] = d.items ?? []
+    const cell = "padding:14px 0;border-bottom:1px solid #eeeeee;vertical-align:top"
     const rows = items
-      .map(
-        (i) => `<tr><td style="padding:10px 0;border-bottom:1px solid #eeeeee;font-size:15px;color:#2b2b2b">${esc(i.title)}${
-          i.variant ? `<br><span style="font-size:13px;color:#6b6b6b">${esc(i.variant)}</span>` : ""
-        }</td><td align="center" style="padding:10px 8px;border-bottom:1px solid #eeeeee;font-size:15px;color:#2b2b2b">${esc(i.quantity)}x</td><td align="right" style="padding:10px 0;border-bottom:1px solid #eeeeee;font-size:15px;color:#2b2b2b">${brl(
-          i.unit_price * i.quantity,
-          d.currency_code
-        )}</td></tr>`
-      )
+      .map((i) => {
+        const img = i.image
+          ? `<img src="${esc(i.image)}" width="72" alt="${esc(i.title)}" style="display:block;width:72px;height:auto;border:0;border-radius:6px;background:#f2f2f2">`
+          : `<div style="width:72px;height:72px;border-radius:6px;background:#f2f2f2"></div>`
+        return `<tr><td width="88" style="${cell};padding-right:16px">${img}</td>
+<td style="${cell};font-size:15px;line-height:1.4;color:#0b0b0b"><strong>${esc(i.title)}</strong>${
+          i.variant ? `<br><span style="font-size:13px;color:#6b6b6b">Tamanho / opção: ${esc(i.variant)}</span>` : ""
+        }<br><span style="font-size:13px;color:#6b6b6b">${esc(i.quantity)} × ${brl(i.unit_price, cur)}</span></td>
+<td align="right" style="${cell};font-size:15px;font-weight:700;color:#0b0b0b;white-space:nowrap">${brl(i.unit_price * i.quantity, cur)}</td></tr>`
+      })
       .join("")
-    const totals = `<tr><td colspan="2" style="padding:10px 0 0;font-size:14px;color:#6b6b6b">Frete</td><td align="right" style="padding:10px 0 0;font-size:14px;color:#6b6b6b">${brl(d.shipping_total, d.currency_code)}</td></tr>
-<tr><td colspan="2" style="padding:6px 0 0;font-size:17px;font-weight:700;color:#0b0b0b">Total</td><td align="right" style="padding:6px 0 0;font-size:17px;font-weight:700;color:#0b0b0b">${brl(d.total, d.currency_code)}</td></tr>`
-    const blocks = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 8px">${rows}${totals}</table>${
-      d.address ? `<p style="margin:16px 0 0;font-size:14px;line-height:1.5;color:#6b6b6b"><strong>Entrega em:</strong> ${esc(d.address)}</p>` : ""
-    }`
+    const line = (label: string, value: string, strong = false) =>
+      `<tr><td style="padding:${strong ? "12px 0 0" : "8px 0 0"};font-size:${strong ? 18 : 14}px;${strong ? "font-weight:800;color:#0b0b0b" : "color:#6b6b6b"}">${label}</td><td align="right" style="padding:${strong ? "12px 0 0" : "8px 0 0"};font-size:${strong ? 18 : 14}px;${strong ? "font-weight:800;color:#0b0b0b" : "color:#6b6b6b"}">${value}</td></tr>`
+    const totals =
+      line("Subtotal", brl(d.subtotal ?? items.reduce((s, i) => s + i.unit_price * i.quantity, 0), cur)) +
+      line(`Frete${d.shipping_name ? ` (${esc(d.shipping_name)})` : ""}`, brl(d.shipping_total, cur)) +
+      line("Total", brl(d.total, cur), true)
+    const box = (title: string, html: string) =>
+      `<td valign="top" width="50%" style="padding:0 8px 0 0"><p style="margin:0 0 6px;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#e77e23">${title}</p><p style="margin:0;font-size:14px;line-height:1.6;color:#2b2b2b">${html}</p></td>`
+    const a = d.address_info
+    const addressHtml = a
+      ? `${esc(a.name)}<br>${esc(a.line1)}${a.district ? ` — ${esc(a.district)}` : ""}<br>${esc(a.city)}/${esc(a.uf)} · CEP ${esc(a.zip)}${a.phone ? `<br>Tel. ${esc(a.phone)}` : ""}`
+      : "Endereço informado no checkout"
+    const pay = d.payment
+    const payHtml = pay
+      ? `${esc(pay.method)}<br>${pay.status ? `Pagamento ${esc(pay.status)}<br>` : ""}${pay.id ? `<span style="color:#6b6b6b">Mercado Pago nº ${esc(pay.id)}</span>` : ""}`
+      : "Mercado Pago"
+    const info = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 8px"><tr>${box("Entrega", addressHtml)}${box("Pagamento", payHtml)}</tr></table>`
+    const when = d.placed_at ? `<p style="margin:0 0 4px;font-size:13px;color:#6b6b6b">Pedido #${esc(d.display_id)} · ${esc(fmtDate(d.placed_at))}</p>` : ""
+    const blocks = `${when}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 0">${rows}</table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 0">${totals}</table>${info}`
     const prazo = d.production_days
-      ? `As peças do drop são feitas sob encomenda: a produção leva até <strong>${esc(d.production_days)} dias</strong>, mais o prazo da transportadora.`
+      ? `As peças do drop são feitas sob encomenda: a produção leva até <strong>${esc(d.production_days)} dias</strong>, mais o prazo da transportadora. Você recebe um e-mail quando o pedido for despachado, com o código de rastreio.`
       : `Assim que o pedido for despachado, você recebe o código de rastreio por e-mail.`
     const html = shell({
       preheader: `Recebemos o pagamento do pedido #${d.display_id}.`,
@@ -205,23 +229,25 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
       paragraphs: [`Recebemos o pagamento do pedido <strong>#${esc(d.display_id)}</strong>. Obrigado por vestir a Tyer!`, prazo],
       blocks,
       cta: { label: "Acompanhar meu pedido", url: d.orders_url },
-      note: "Guarde este e-mail: ele é o comprovante da sua compra. O pedido e a entrega também ficam em Meus pedidos.",
+      note: "Guarde este e-mail: ele é o comprovante da sua compra. O pedido, o comprovante de pagamento e a entrega também ficam em Meus pedidos.",
       reason,
     })
     const text = [
       `${d.name ? `${d.name}, p` : "P"}edido #${d.display_id} confirmado. Obrigado por vestir a Tyer!`,
+      d.placed_at ? fmtDate(d.placed_at) : "",
       "",
-      ...items.map((i) => `${i.quantity}x ${i.title}${i.variant ? ` (${i.variant})` : ""} — ${brl(i.unit_price * i.quantity, d.currency_code)}`),
-      `Frete: ${brl(d.shipping_total, d.currency_code)}`,
-      `Total: ${brl(d.total, d.currency_code)}`,
-      d.address ? `Entrega em: ${d.address}` : "",
+      ...items.map((i) => `${i.quantity}x ${i.title}${i.variant ? ` (${i.variant})` : ""} — ${brl(i.unit_price * i.quantity, cur)}`),
+      `Frete${d.shipping_name ? ` (${d.shipping_name})` : ""}: ${brl(d.shipping_total, cur)}`,
+      `Total: ${brl(d.total, cur)}`,
+      "",
+      a ? `Entrega: ${a.name}, ${a.line1}${a.district ? ` - ${a.district}` : ""}, ${a.city}/${a.uf}, CEP ${a.zip}` : "",
+      pay ? `Pagamento: ${pay.method}${pay.status ? ` (${pay.status})` : ""}${pay.id ? ` — Mercado Pago nº ${pay.id}` : ""}` : "",
       "",
       d.production_days ? `Produção em até ${d.production_days} dias, mais o prazo da transportadora.` : "Você recebe o código de rastreio quando o pedido for despachado.",
-      "Guarde este e-mail: ele é o comprovante da sua compra. O pedido e a entrega também ficam em Meus pedidos.",
+      "Guarde este e-mail: ele é o comprovante da sua compra.",
       `Acompanhar: ${d.orders_url}`,
       footerText(reason),
-    ]
-      .join("\n")
+    ].join("\n")
     return { subject, html, text }
   },
 
