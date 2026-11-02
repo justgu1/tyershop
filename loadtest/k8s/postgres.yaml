@@ -1,0 +1,70 @@
+# Banco PRÓPRIO do teste de carga: o teste não escreve (nem pesa) no PostgreSQL compartilhado. Dados em memória, descartáveis.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadtest-postgres
+  namespace: apps
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: loadtest-postgres }
+  template:
+    metadata:
+      labels: { app: loadtest-postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          args: ["-c", "shared_buffers=256MB", "-c", "max_connections=200", "-c", "fsync=off", "-c", "synchronous_commit=off"]
+          env:
+            - { name: POSTGRES_USER, value: tyershop }
+            - { name: POSTGRES_PASSWORD, value: carga }
+            - { name: POSTGRES_DB, value: tyershop }
+          ports: [{ containerPort: 5432 }]
+          resources:
+            requests: { cpu: 100m, memory: 512Mi }
+            limits: { cpu: "1500m", memory: 2Gi }
+          volumeMounts: [{ name: dados, mountPath: /var/lib/postgresql/data }]
+      volumes:
+        - name: dados
+          emptyDir: { medium: Memory, sizeLimit: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loadtest-postgres
+  namespace: apps
+spec:
+  selector: { app: loadtest-postgres }
+  ports: [{ port: 5432, targetPort: 5432 }]
+---
+# Copia o esquema e os dados de homologação para o banco de teste (só leitura no banco compartilhado).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: loadtest-copia-banco
+  namespace: apps
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: copia
+          image: postgres:17-alpine
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              until pg_isready -h loadtest-postgres -U tyershop >/dev/null 2>&1; do sleep 2; done
+              pg_dump --no-owner --no-acl "$ORIGEM" | psql -q -v ON_ERROR_STOP=0 "postgres://tyershop:carga@loadtest-postgres:5432/tyershop" >/dev/null
+              psql -tA "postgres://tyershop:carga@loadtest-postgres:5432/tyershop" -c 'select count(*) from product'
+          env:
+            - name: ORIGEM
+              valueFrom: { secretKeyRef: { name: tyershop-secrets, key: BACKEND_DATABASE_URL } }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: "500m", memory: 512Mi }

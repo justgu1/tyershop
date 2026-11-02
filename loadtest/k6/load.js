@@ -1,7 +1,7 @@
 // Teste de carga do Tyer Shop (k6).  Meta: p99 < 1000 ms com 1000 req/s de navegação e 500 finalizações/s.
 // Veja loadtest/README.md antes de rodar.
 import http from "k6/http";
-import { check, fail } from "k6";
+import { check, fail, sleep } from "k6";
 import { Trend, Counter } from "k6/metrics";
 
 const FRONT = (__ENV.FRONT_URL || "http://localhost:4321").replace(/\/$/, "");
@@ -76,9 +76,37 @@ const constantStep = (exec, rate, startTime, level, preAllocatedVUs, maxVUs) => 
   tags: { level },
 });
 
+// Perfil "sessions": N pessoas simultâneas, cada uma navegando e comprando em 3 a 5 minutos (tempo de leitura e de digitação
+// entre as ações). PEOPLE="100,200,300" define os degraus; HOLD_SECONDS é quanto cada degrau fica estável.
+const PEOPLE = (__ENV.PEOPLE || "100,200,300").split(",").map(Number);
+const HOLD_SECONDS = Number(__ENV.HOLD_SECONDS || 300);
+const RAMP_SECONDS = 60;
+const THINK = Number(__ENV.THINK_SCALE || 1); // 1 = tempo de gente de verdade; 0.2 = sessões 5x mais curtas
+
 let scenarios;
 const thresholds = {};
-if (PROFILE === "capacity") {
+if (PROFILE === "sessions") {
+  scenarios = {};
+  PEOPLE.forEach((n, i) => {
+    const level = `P${n}`;
+    const start = i * (RAMP_SECONDS + HOLD_SECONDS + 45);
+    scenarios[`pessoas_${level}`] = {
+      executor: "ramping-vus",
+      startVUs: 0,
+      stages: [{ duration: `${RAMP_SECONDS}s`, target: n }, { duration: `${HOLD_SECONDS}s`, target: n }, { duration: "30s", target: 0 }],
+      gracefulRampDown: "120s",
+      startTime: `${start}s`,
+      exec: "session",
+      tags: { level, flow: "session" },
+    };
+    thresholds[`http_req_duration{level:${level}}`] = [`p(99)<${P99_MS}`];
+    thresholds[`http_req_duration{level:${level},flow:checkout}`] = [`p(99)<${P99_MS}`];
+    thresholds[`http_req_failed{level:${level}}`] = ["rate<0.01"];
+    thresholds[`orders_completed{level:${level}}`] = ["count>=0"];
+    thresholds[`session_ms{level:${level}}`] = ["p(99)<9999999"];
+  });
+  thresholds["http_req_failed"] = [{ threshold: "rate<0.5", abortOnFail: true, delayAbortEval: "60s" }];
+} else if (PROFILE === "capacity") {
   scenarios = {};
   LEVELS.forEach(([browseRps, checkoutRps], i) => {
     const level = `L${i + 1}`;
@@ -206,6 +234,12 @@ export function browse(data) {
 export function checkout(data) {
   const token = pick(data.tokens, (__VU * 7919 + __ITER) % data.tokens.length);
   const variant = pick(data.variants, __ITER + __VU);
+  checkoutFlow(data, token, variant, false);
+}
+
+// `thinking`: pausa entre as etapas como uma pessoa preenchendo e conferindo os dados (perfil de sessões).
+function checkoutFlow(data, token, variant, thinking) {
+  const pause = () => { if (thinking) think(3, 9); };
   const tags = { flow: "checkout" };
   const started = Date.now();
   const time = (trend, res, name) => {
@@ -217,10 +251,12 @@ export function checkout(data) {
   time(steps.cart, cart, "cart");
   const cartId = cart.json("cart.id");
   if (!check(cart, { "carrinho criado": () => !!cartId })) return;
+  pause();
 
   const line = post(`${API}/store/carts/${cartId}/line-items`, { variant_id: variant, quantity: 1 }, token, { ...tags, step: "line_item" });
   time(steps.line, line, "line_item");
   if (!check(line, { "item adicionado": (r) => r.status === 200 })) return;
+  pause();
 
   const addr = post(`${API}/store/carts/${cartId}`, {
     email: `carga@teste.local`,
@@ -228,6 +264,7 @@ export function checkout(data) {
   }, token, { ...tags, step: "address" });
   time(steps.address, addr, "address");
   if (!check(addr, { "endereço salvo": (r) => r.status === 200 })) return;
+  pause();
 
   const opts = http.get(`${API}/store/shipping-options?cart_id=${cartId}`, { headers: jsonHeaders(token), tags: { ...tags, step: "shipping_options" } });
   time(steps.options, opts, "shipping_options");
@@ -239,6 +276,7 @@ export function checkout(data) {
   const method = post(`${API}/store/carts/${cartId}/shipping-methods`, { option_id: option.id }, token, { ...tags, step: "shipping_method" });
   time(steps.method, method, "shipping_method");
   if (!check(method, { "frete aplicado": (r) => r.status === 200 })) return;
+  pause();
 
   const col = post(`${API}/store/payment-collections`, { cart_id: cartId }, token, { ...tags, step: "payment_collection" });
   time(steps.collection, col, "payment_collection");
@@ -257,7 +295,7 @@ export function checkout(data) {
   time(steps.pay, pay, "pay");
   if (!check(pay, { "pagamento aprovado": (r) => r.status === 200 && r.json("status") === "approved" })) return;
 
-  const done = post(`${API}/store/carts/${cartId}/complete`, {}, token, { ...tags, step: "complete" });
+  const done = post(`${API}/store/checkout/complete`, { cart_id: cartId }, token, { ...tags, step: "complete" });
   time(steps.complete, done, "complete");
   if (check(done, { "pedido criado": (r) => r.status === 200 && r.json("type") === "order" })) {
     ordersCompleted.add(1);
@@ -265,11 +303,36 @@ export function checkout(data) {
   }
 }
 
+const sessionMs = new Trend("session_ms", true);
+const think = (min, max) => sleep((min + Math.random() * (max - min)) * THINK);
+
+// Uma pessoa: lê a loja, olha produtos, calcula frete, preenche dados e paga. Em média 3 a 5 minutos.
+export function session(data) {
+  const started = Date.now();
+  const tags = { flow: "browse" };
+  const slot = (__VU * 7919 + __ITER) % data.tokens.length;
+  const token = data.tokens[slot];
+  const variant = pick(data.variants, __VU + __ITER);
+
+  http.get(`${FRONT}/`, { headers: plain(), tags: { ...tags, page: "home" } });
+  think(6, 15);
+  http.get(`${FRONT}/drop`, { headers: plain(), tags: { ...tags, page: "drop" } });
+  think(10, 25);
+  http.get(`${API}/store/products?limit=12&region_id=${data.region}`, { headers: jsonHeaders(), tags: { ...tags, page: "catalog" } });
+  think(10, 25);
+  http.get(`${FRONT}/cart`, { headers: plain(), tags: { ...tags, page: "cart" } });
+  think(5, 12);
+  post(`${API}/store/shipping/quote`, { postal_code: ZIP, items: [{ variant_id: variant, quantity: 1 }] }, null, { ...tags, page: "quote" });
+  think(15, 40); // decide e começa a preencher os dados
+  checkoutFlow(data, token, variant, true);
+  sessionMs.add(Date.now() - started);
+}
+
 export function handleSummary(data) {
   const pick = (m) => (m && m.values ? m.values : null);
   const levels = {};
   for (const [name, metric] of Object.entries(data.metrics)) {
-    const m = name.match(/^([a-z_]+)\{level:(L\d+)(?:,flow:(\w+))?\}$/);
+    const m = name.match(/^([a-z_]+)\{level:([LP]\d+)(?:,flow:(\w+))?\}$/);
     if (!m) continue;
     const [, metricName, level, flow] = m;
     levels[level] = levels[level] || {};

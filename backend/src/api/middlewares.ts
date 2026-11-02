@@ -115,6 +115,12 @@ export default defineMiddlewares({
       middlewares: [rateLimit("me-callback", { windowMs: 600_000, max: 20 })],
     },
     {
+      // Conclusão do pedido: só a conta dona do carrinho (a rota confere o dono).
+      matcher: "/store/checkout/complete",
+      method: "POST",
+      middlewares: [rateLimit("checkout-complete", { windowMs: 600_000, max: 30 }), requiredCustomer],
+    },
+    {
       matcher: "/store/products*",
       method: "GET",
       middlewares: [optionalCustomer, hideBlockedProducts],

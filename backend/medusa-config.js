@@ -19,6 +19,9 @@ module.exports = defineConfig({
     redisUrl: process.env.REDIS_URL,
     databaseDriverOptions: {
       ssl: false,
+      // Conexões por servidor: o padrão (10) forma fila quando muita gente compra ao mesmo tempo. Com N servidores o banco
+      // vê até N x max conexões, então o PostgreSQL precisa de max_connections acima disso (hoje 100, sendo ~20 de outros apps).
+      pool: { min: 2, max: Number(process.env.DB_POOL_MAX) || 15, idleTimeoutMillis: 30000 },
     },
     http: {
       storeCors: process.env.STORE_CORS || "http://localhost:4321,http://localhost:3000,http://172.24.0.8:4321,http://127.0.0.1:4321",
@@ -65,6 +68,14 @@ module.exports = defineConfig({
           },
         }
       : {}),
+    // Travas compartilhadas pelo banco: com mais de um servidor de backend, a trava de cobrança por cliente e a de conclusão
+    // do pedido precisam valer entre eles (a trava padrão é da memória de cada processo).
+    locking: {
+      resolve: "@medusajs/locking",
+      options: {
+        providers: [{ resolve: "@medusajs/locking-postgres", id: "locking-postgres", is_default: true }],
+      },
+    },
     fulfillment: {
       resolve: "@medusajs/fulfillment",
       options: {
