@@ -1,0 +1,36 @@
+---
+interface Props {
+  index: number;
+  title: string;
+  label?: string | null;
+  bannerUrl?: string | null;
+  bannerMobileUrl?: string | null;
+}
+const { index, title, label = null, bannerUrl = null, bannerMobileUrl = null } = Astro.props;
+const num = String(index).padStart(2, '0');
+---
+
+{bannerUrl ? (
+  <h2 class="band band--banner">
+    <picture>
+      {bannerMobileUrl && <source media="(max-width: 700px)" srcset={bannerMobileUrl} />}
+      <img src={bannerUrl} alt={title} loading="lazy" decoding="async" />
+    </picture>
+  </h2>
+) : (
+  <div class="band band--plain">
+    <span class="band__num">{num}</span>
+    {label && <span class="band__label">{label}</span>}
+    <h2 class="band__title">{title}</h2>
+  </div>
+)}
+
+<style>
+  .band { margin: 0; }
+  .band--banner picture, .band--banner img { display: block; width: 100%; }
+  .band--banner img { height: auto; }
+  .band--plain { display: flex; align-items: center; gap: 16px; padding: 22px 0; border-top: 1px solid rgba(255, 255, 255, 0.12); border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
+  .band__num { font-size: 12px; font-weight: 800; color: var(--c-accent, #e77e23); padding-right: 16px; border-right: 1px solid rgba(255, 255, 255, 0.2); }
+  .band__label { font-family: var(--font); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); }
+  .band__title { margin: 0 0 0 auto; padding-left: 16px; font-family: var(--font-title); font-weight: 400; letter-spacing: 0.04em; text-transform: uppercase; font-size: clamp(26px, 3.4vw, 38px); line-height: 1; }
+</style>
