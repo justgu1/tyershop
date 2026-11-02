@@ -11,7 +11,9 @@
     "dev": "docker compose up",
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "guards:check": "node tools/check-review-guards.mjs",
+    "guards:test": "node --test tools/check-review-guards.test.mjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

@@ -1,0 +1,29 @@
+name: Checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  guards:
+    name: Guards de review
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tools/check-review-guards.test.mjs
+      - run: node tools/check-review-guards.mjs
+
+  backend-unit:
+    name: Testes unitários do backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --workspace backend --include-workspace-root --ignore-scripts
+      - run: npm run test:unit --workspace backend
