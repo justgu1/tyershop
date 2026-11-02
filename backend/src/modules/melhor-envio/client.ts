@@ -143,24 +143,21 @@ async function meGet<T>(accessToken: string, path: string): Promise<T> {
   return data as T
 }
 
-/** Situação da etiqueta no Melhor Envio (pending = no carrinho, ainda não paga). Falha de consulta não impede a compra. */
-export async function getLabel(accessToken: string, id: string): Promise<{ status?: string } | null> {
-  try {
-    return await meGet(accessToken, `/orders/${encodeURIComponent(id)}`)
-  } catch (err) {
-    if (err instanceof UnauthorizedError) throw err
-    return null
-  }
+/** Situação da etiqueta no Melhor Envio (pending = no carrinho, ainda não paga). Lança erro se não conseguir consultar. */
+export async function getLabel(accessToken: string, id: string): Promise<{ status?: string }> {
+  return meGet(accessToken, `/orders/${encodeURIComponent(id)}`)
 }
 
-/** Procura no carrinho do Melhor Envio um envio já criado para o pedido (pela etiqueta "Pedido #N"). */
+type CartPage = { data?: { id: string; status?: string; tags?: { tag?: string }[] }[]; last_page?: number }
+const CART_PAGES_MAX = 10
+
+/** Procura no carrinho do Melhor Envio um envio já criado para o pedido (pela etiqueta "Pedido #N"). Erro de consulta é erro: não se cria outro às cegas. */
 export async function findInCart(accessToken: string, tag: string): Promise<string | null> {
-  try {
-    const cart = await meGet<{ data?: { id: string; status?: string; tags?: { tag?: string }[] }[] }>(accessToken, "/cart")
-    const hit = (cart.data ?? []).find((o) => o.status === "pending" && (o.tags ?? []).some((t) => t.tag === tag))
-    return hit?.id ?? null
-  } catch (err) {
-    if (err instanceof UnauthorizedError) throw err
-    return null
+  for (let page = 1; page <= CART_PAGES_MAX; page++) {
+    const cart = await meGet<CartPage>(accessToken, `/cart?page=${page}`)
+    const hit = (cart.data ?? []).find((o) => (o.tags ?? []).some((t) => t.tag === tag) && o.status !== "canceled")
+    if (hit) return hit.id
+    if (page >= (cart.last_page ?? 1)) break
   }
+  return null
 }

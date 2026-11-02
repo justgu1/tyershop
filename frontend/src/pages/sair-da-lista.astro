@@ -23,7 +23,8 @@ if (oneClick) {
         signal: AbortSignal.timeout(8000),
       });
       done = res.ok;
-      invalid = res.status === 400;
+      // Só falha do servidor (5xx) vale tentar de novo; qualquer 4xx é definitivo.
+      invalid = res.status >= 400 && res.status < 500;
       if (invalid) break;
     } catch {
       /* tenta de novo */

@@ -9,7 +9,7 @@ const pg = (scope: MedusaContainer) => scope.resolve(ContainerRegistrationKeys.P
  */
 export async function setMetadataKey(scope: MedusaContainer, orderId: string, key: string, value: unknown) {
   if (value === null) {
-    await pg(scope).raw(`update "order" set metadata = coalesce(metadata, '{}'::jsonb) - ?, updated_at = now() where id = ?`, [key, orderId])
+    await pg(scope).raw(`update "order" set metadata = coalesce(metadata, '{}'::jsonb) - ?::text, updated_at = now() where id = ?`, [key, orderId])
     return
   }
   await pg(scope).raw(
@@ -22,7 +22,7 @@ export async function setMetadataKey(scope: MedusaContainer, orderId: string, ke
 export async function claimMetadataKey(scope: MedusaContainer, orderId: string, key: string, value: unknown): Promise<boolean> {
   const { rowCount } = await pg(scope).raw(
     `update "order" set metadata = jsonb_set(coalesce(metadata, '{}'::jsonb), array[?]::text[], ?::jsonb), updated_at = now()
-      where id = ? and not (coalesce(metadata, '{}'::jsonb) ? ?)`,
+      where id = ? and not jsonb_exists(coalesce(metadata, '{}'::jsonb), ?::text)`,
     [key, JSON.stringify(value), orderId, key]
   )
   return rowCount > 0

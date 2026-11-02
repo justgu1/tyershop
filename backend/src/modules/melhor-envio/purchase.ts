@@ -19,6 +19,7 @@ export type LabelState = {
   /** Etapas já cumpridas no Melhor Envio: uma nova tentativa retoma de onde parou, sem pagar duas vezes. */
   paid?: boolean
   generated?: boolean
+  posted_seen_at?: string
   fulfillment_id?: string
   tracking_code?: string | null
   error?: string
@@ -135,20 +136,31 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string): Pro
       )
       meId = (await addToCart(token, buildCartPayload({ order, cpf, serviceId, sender, pkg: buildPackage(shipments) }))).id
     }
-    await saveState(scope, order, { status: "carrinho", me_order_id: meId })
+    if (meId !== current?.me_order_id) await saveState(scope, order, { status: "carrinho", me_order_id: meId })
 
-    // O estado remoto manda: uma compra ou geração que passou, mas cuja resposta se perdeu, não é refeita.
-    const remote = (await getLabel(token, meId))?.status
-    const paid = current?.paid || (!!remote && remote !== "pending")
-    const generated = current?.generated || (!!remote && ["generated", "posted", "delivered"].includes(remote))
-    if (!paid) {
-      await checkoutLabel(token, meId)
+    // O estado remoto manda: uma compra ou geração que passou, mas cuja resposta se perdeu, não é refeita. Sem conseguir
+    // consultar, não paga: melhor tentar de novo do que cobrar duas vezes.
+    let paid = !!current?.paid
+    let generated = !!current?.generated
+    if (!paid || !generated) {
+      const remote = (await getLabel(token, meId).catch((err) => {
+        if (err instanceof UnauthorizedError) throw err
+        throw new Error("Não consegui conferir a etiqueta no Melhor Envio. Tente de novo em instantes.")
+      })).status
+      if (remote && ["canceled", "undelivered", "paused", "suspended"].includes(remote)) {
+        throw new Error(`A etiqueta está "${remote}" no Melhor Envio. Resolva por lá antes de tentar de novo.`)
+      }
+      paid = paid || (!!remote && remote !== "pending")
+      generated = generated || (!!remote && ["generated", "posted", "delivered"].includes(remote))
     }
-    await saveState(scope, order, { status: "carrinho", paid: true })
-    if (!generated) {
-      await generateLabel(token, meId)
+    if (!current?.paid) {
+      if (!paid) await checkoutLabel(token, meId)
+      await saveState(scope, order, { status: "carrinho", paid: true })
     }
-    await saveState(scope, order, { status: "carrinho", generated: true })
+    if (!current?.generated) {
+      if (!generated) await generateLabel(token, meId)
+      await saveState(scope, order, { status: "carrinho", generated: true })
+    }
 
     const info = (await tracking(token, [meId]).catch(() => ({} as Record<string, any>)))[meId]
     let fulfillmentId = current?.fulfillment_id
@@ -173,6 +185,7 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string): Pro
 }
 
 const TRACKING_CHUNK = 50
+const NO_CODE_WAIT_MS = 6 * 3600 * 1000
 
 /**
  * Acompanha as etiquetas: quando a transportadora registra a postagem cria o envio no Medusa com o rastreio (o cliente
@@ -226,15 +239,19 @@ async function syncShipmentsLocked(scope: MedusaContainer) {
       const state = order.metadata.melhor_envio as LabelState
       const info = infos[state.me_order_id!]
       if (!info?.status) continue
-      const code = info.tracking ?? state.tracking_code ?? null
+      const code = info.tracking ?? state.tracking_code ?? info.melhorenvio_tracking ?? null
 
       const { data: fulfillments } = await query.graph({ entity: "fulfillment", fields: ["id", "shipped_at", "delivered_at"], filters: { id: state.fulfillment_id } })
       const real = fulfillments[0] as any
       if (!real) continue
 
       let status: LabelState["status"] = real.delivered_at ? "entregue" : real.shipped_at ? "postada" : "gerada"
-      // O código de rastreio pode aparecer um pouco depois da postagem: espera pela próxima rodada em vez de avisar sem código.
-      if (status === "gerada" && info.status === "posted" && !code) continue
+      // O código de rastreio pode aparecer um pouco depois da postagem: espera até algumas horas em vez de avisar sem código.
+      if (status === "gerada" && info.status === "posted" && !code) {
+        const seen = state.posted_seen_at ? new Date(state.posted_seen_at).getTime() : Date.now()
+        if (!state.posted_seen_at) await saveState(scope, order, { ...state, posted_seen_at: new Date(seen).toISOString() })
+        if (Date.now() - seen < NO_CODE_WAIT_MS) continue
+      }
       if (status === "gerada" && POSTED.includes(info.status)) {
         await createOrderShipmentWorkflow(scope).run({
           input: {
@@ -275,13 +292,20 @@ export async function resumeStuckPurchases(scope: MedusaContainer) {
         where deleted_at is null and created_at >= now() - interval '1 year'
           and metadata->'melhor_envio'->>'status' = 'carrinho'
           and (metadata->'melhor_envio'->>'updated_at')::timestamptz < now() - interval '15 minutes'
+        order by (metadata->'melhor_envio'->>'updated_at')::timestamptz asc
         limit ?`,
       [MAX_RESUMED_PER_RUN]
     )
   ).rows
   for (const o of stuck) {
-    await purchaseLabel(scope, o.id).catch((err) => {
-      if (!(err instanceof BusyError)) logger.error(`[melhor-envio] retomada: ${err.message}`)
+    await purchaseLabel(scope, o.id).catch(async (err) => {
+      if (err instanceof BusyError) return
+      logger.error(`[melhor-envio] retomada: ${err.message}`)
+      // Sai da fila: sem isso o mesmo pedido, falhando antes de gravar o estado, ocuparia as vagas de todas as rodadas.
+      await pg.raw(
+        `update "order" set metadata = jsonb_set(metadata, '{melhor_envio}', (metadata->'melhor_envio') || jsonb_build_object('status', 'erro', 'error', ?::text, 'updated_at', now()::text)) where id = ?`,
+        [String(err.message).slice(0, 300), o.id]
+      )
     })
   }
 }

@@ -7,8 +7,13 @@ export default async function orderPlacedHandler({ event: { data }, container }:
   if (!order?.email) return
   // O evento pode chegar mais de uma vez: só quem marca primeiro envia a confirmação.
   if (!(await claimMetadataKey(container, data.id, "confirmation_sent_at", new Date().toISOString()))) return
-  const sent = await sendOrderEmail(container, order.email, "order_confirmation", await confirmationData(container, order))
-  if (!sent) await setMetadataKey(container, data.id, "confirmation_sent_at", null)
+  let sent = false
+  try {
+    sent = await sendOrderEmail(container, order.email, "order_confirmation", await confirmationData(container, order))
+  } finally {
+    // Qualquer falha (montar os dados, enviar) devolve a marca, para uma nova entrega do evento tentar de novo.
+    if (!sent) await setMetadataKey(container, data.id, "confirmation_sent_at", null)
+  }
 }
 
 export const config: SubscriberConfig = { event: "order.placed" }
