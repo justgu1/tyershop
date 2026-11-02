@@ -5,10 +5,11 @@ interface Props {
   placeholder?: string;
   successMessage?: string;
 }
+import { SPAM_AVISO } from '../../lib/avisos';
 const { source, cta, placeholder = 'Seu e-mail', successMessage = 'Pronto! Você está na lista.' } = Astro.props;
 ---
 
-<form class="lead" data-lead-form data-source={source} data-success={successMessage} novalidate>
+<form class="lead" data-lead-form data-source={source} data-success={`${successMessage} ${SPAM_AVISO}`} novalidate>
   <div class="lead__row">
     <input class="lead__input" type="email" name="email" placeholder={placeholder} required autocomplete="email" aria-label={placeholder} />
     <button class="lead__btn" type="submit">{cta}</button>

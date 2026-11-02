@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - sealed-secret.yaml
   # NOTES.md tem os detalhes/limitações desse deploy
+  - melhor-envio-config.yaml
   - backend.yaml
   - frontend.yaml
   - api.yaml

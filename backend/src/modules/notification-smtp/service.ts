@@ -3,7 +3,7 @@ import type { Logger, ProviderSendNotificationDTO, ProviderSendNotificationResul
 import nodemailer, { Transporter } from "nodemailer"
 import { LOGO_PNG_BASE64 } from "./logo"
 import { LOGO_CID, renderTemplate } from "./templates"
-import { isUndeliverable, readTestMode, resolveRecipient } from "./test-mode"
+import { applyTestModeNote, envelopeFor, isUndeliverable, readTestMode } from "./test-mode"
 
 type Options = {
   host: string
@@ -60,18 +60,17 @@ class SmtpNotificationProviderService extends AbstractNotificationProviderServic
     }
     const rendered = renderTemplate(notification.template, (notification.data ?? {}) as Record<string, any>)
     // Redefinição de senha é a única que sempre vai ao destinatário real: quem pediu precisa receber.
-    const { to, subject } =
-      notification.template === "password_reset"
-        ? { to: notification.to, subject: rendered.subject }
-        : resolveRecipient(notification.to, rendered.subject, readTestMode(process.env))
+    const { to, subject, redirectedFrom } = envelopeFor(notification.template, notification.to, rendered.subject, readTestMode(process.env))
+    const { html, text } = applyTestModeNote(rendered, redirectedFrom)
 
     const info = await this.transporter_.sendMail({
       from: this.options_.from,
       to,
       subject,
-      html: rendered.html,
-      text: rendered.text,
-      headers: listHeaders(notification.template, (notification.data ?? {}) as Record<string, any>),
+      html,
+      text,
+      // O cabeçalho deixa ver, em "mostrar original", que o e-mail foi redirecionado pelo modo de teste.
+      headers: { ...listHeaders(notification.template, (notification.data ?? {}) as Record<string, any>), ...(redirectedFrom ? { "X-Tyer-Teste": "redirecionado" } : {}) },
       attachments: [
         {
           filename: "tyer.png",
