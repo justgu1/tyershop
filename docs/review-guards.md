@@ -69,6 +69,13 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   Guard: `templates.unit.spec.ts` ("mostra foto, quantidade, endereço completo e pagamento") e `templates.unit.spec.ts`
   ("as redes sociais saem como ícones com texto alternativo").
 
+## Testes e CI
+
+- **A configuração do jest só importa pacotes que o backend declara.** `@medusajs/utils` só existia por acaso na instalação
+  local, e a CI instalou só o backend e quebrou ("Cannot find module").
+  Origem: PR 41, `jest.config.js`.
+  Guard: `checks.yml` (job "Testes unitários do backend", que instala só o workspace do backend).
+
 ## Limites de requisição
 
 - **O multiplicador de limites só vale quando definido, e multiplica todos.**
