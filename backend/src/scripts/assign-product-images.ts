@@ -67,6 +67,16 @@ const PRODUCT_IMAGES: Record<string, ImageEntry> = {
   "shorts-tyer-pro": { images: range("tyer-pro/shorts", 5) },
   "tyer-savage-mode-2-dry-fit": { images: range("exclusivos/tyer-savage-mode/mode-2", 3) },
   tyertech: { images: range("tyer-tech/jaqueta", 7) },
+  "camiseta-tyer-gang": { images: range("exclusivos/tyer-gang/camiseta", 2) },
+  "short-compressao-cacada": { images: range("exclusivos/tyer-cacada/short-compressao", 2) },
+  "calca-cacada": { images: range("exclusivos/tyer-cacada/calca", 2) },
+  "regata-cacada": { images: range("exclusivos/tyer-cacada/regata", 2) },
+  "pulseira-cacada": {
+    byColor: {
+      Preto: range("exclusivos/tyer-cacada/pulseira-preta", 1),
+      Branco: range("exclusivos/tyer-cacada/pulseira-branca", 1),
+    },
+  },
   "pulseira-tyer": {
     byColor: {
       Preto: range("accessorios/pulseira-preta", 4),
