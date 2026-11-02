@@ -16,6 +16,8 @@ spec:
       containers:
         - name: api
           image: ghcr.io/justgu1/tyershop-api:latest
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
           ports:
             - name: http
               containerPort: 3000

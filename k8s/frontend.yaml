@@ -16,6 +16,8 @@ spec:
       containers:
         - name: frontend
           image: ghcr.io/justgu1/tyershop-frontend:latest
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
           ports:
             - name: http
               containerPort: 8080

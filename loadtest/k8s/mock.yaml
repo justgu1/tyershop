@@ -1,0 +1,36 @@
+# Simulador do Mercado Pago e do Melhor Envio, só para o teste de carga. O script do simulador entra pelo ConfigMap
+# "loadtest-mock" (criado por run-in-cluster.sh a partir de loadtest/mock-gateways.mjs).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadtest-mock
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: loadtest-mock }
+  template:
+    metadata:
+      labels: { app: loadtest-mock }
+    spec:
+      containers:
+        - name: mock
+          image: node:22-alpine
+          command: ["node", "/app/mock-gateways.mjs"]
+          ports: [{ containerPort: 8099 }]
+          resources:
+            requests: { cpu: 100m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          volumeMounts: [{ name: script, mountPath: /app }]
+      volumes:
+        - name: script
+          configMap: { name: loadtest-mock }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loadtest-mock
+  namespace: apps
+spec:
+  selector: { app: loadtest-mock }
+  ports: [{ port: 8099, targetPort: 8099 }]
