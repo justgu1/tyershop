@@ -60,8 +60,8 @@ async function withLock<T>(scope: MedusaContainer, key: string, fn: () => Promis
       { timeout: 1 }
     )
   } catch (err) {
-    // Só é "ocupado" se a trava não foi obtida; um erro vindo de dentro de `fn` segue como erro.
-    if (!started) throw new BusyError()
+    // Só é "ocupado" se a trava não foi obtida por contenção; falha do provider ou erro de dentro de `fn` seguem como erro.
+    if (!started && /Failed to acquire lock|Timed-out acquiring lock/i.test((err as Error).message)) throw new BusyError()
     throw err
   }
 }
@@ -92,6 +92,7 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string, orig
   if (!order) throw new Error("Pedido não encontrado.")
   const current = order.metadata?.melhor_envio as LabelState | undefined
   if (current && DONE.includes(current.status)) return current
+  if (current && current.origin !== origin) await saveState(scope, order, { status: current.status, origin })
 
   const fail = async (message: string) => {
     logger.error(`[melhor-envio] pedido #${order.display_id}: ${message}`)
@@ -132,12 +133,17 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string, orig
     // consultar, não paga: melhor tentar de novo do que cobrar duas vezes.
     let paid = !!current?.paid
     let generated = !!current?.generated
-    if (!paid || !generated) {
+    if (!paid || !generated || current?.status === "erro") {
       const remote = (await getLabel(token, meId).catch((err) => {
         if (err instanceof UnauthorizedError) throw err
         throw new Error("Não consegui conferir a etiqueta no Melhor Envio. Tente de novo em instantes.")
       })).status
-      if (remote && ["canceled", "undelivered", "paused", "suspended"].includes(remote)) {
+      if (remote === "canceled") {
+        // Etiqueta cancelada não volta: esquece esta e cria outra no carrinho.
+        await saveState(scope, order, { status: "carrinho", me_order_id: undefined, paid: false, generated: false, tracking_code: null, posted_seen_at: undefined })
+        return purchaseLabelLocked(scope, orderId, origin)
+      }
+      if (remote && ["undelivered", "paused", "suspended"].includes(remote)) {
         throw new Error(`A etiqueta está "${remote}" no Melhor Envio. Resolva por lá antes de tentar de novo.`)
       }
       paid = paid || (!!remote && remote !== "pending")
@@ -224,12 +230,24 @@ async function syncShipmentsLocked(scope: MedusaContainer) {
 
   for (const summary of open) {
     try {
+      // Sem mudança no Melhor Envio não há o que fazer: evita carregar o pedido à toa.
+      const remoteStatus = infos[summary.metadata.melhor_envio.me_order_id]?.status
+      const saved = summary.metadata.melhor_envio as LabelState
+      if (remoteStatus === "canceled") {
+        // Cancelada no Melhor Envio: avisa no pedido; "Retomar a compra" no admin cria outra etiqueta.
+        const order = await loadOrder(scope, summary.id)
+        if (order) await saveState(scope, order, { status: "erro", error: "A etiqueta foi cancelada no Melhor Envio. Use \"Retomar a compra\" para criar outra." })
+        continue
+      }
+      const moves =
+        (saved.status === "gerada" && POSTED.includes(remoteStatus)) || (saved.status === "postada" && DELIVERED.includes(remoteStatus))
+      if (!moves && !(infos[saved.me_order_id!]?.tracking && infos[saved.me_order_id!].tracking !== saved.tracking_code)) continue
       const order = await loadOrder(scope, summary.id)
       if (!order) continue
       const state = order.metadata.melhor_envio as LabelState
       const info = infos[state.me_order_id!]
       if (!info?.status) continue
-      const code = info.tracking || state.tracking_code || info.melhorenvio_tracking || null
+      const code = info.tracking || state.tracking_code || null
 
       const { data: fulfillments } = await query.graph({ entity: "fulfillment", fields: ["id", "shipped_at", "delivered_at"], filters: { id: state.fulfillment_id } })
       const real = fulfillments[0] as any
@@ -294,7 +312,7 @@ export async function resumeStuckPurchases(scope: MedusaContainer) {
       logger.error(`[melhor-envio] retomada: ${err.message}`)
       // Sai da fila: sem isso o mesmo pedido, falhando antes de gravar o estado, ocuparia as vagas de todas as rodadas.
       await pg.raw(
-        `update "order" set metadata = jsonb_set(metadata, '{melhor_envio}', (metadata->'melhor_envio') || jsonb_build_object('status', 'erro', 'error', ?::text, 'updated_at', now()::text)) where id = ?`,
+        `update "order" set metadata = jsonb_set(metadata, '{melhor_envio}', (metadata->'melhor_envio') || jsonb_build_object('status', 'erro', 'error', ?::text, 'updated_at', to_jsonb(now()))) where id = ?`,
         [String(err.message).slice(0, 300), o.id]
       )
     })

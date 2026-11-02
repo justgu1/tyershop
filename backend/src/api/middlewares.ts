@@ -126,6 +126,11 @@ export default defineMiddlewares({
       ],
     },
     {
+      matcher: "/store/order-invoices",
+      method: "GET",
+      middlewares: [requiredCustomer],
+    },
+    {
       matcher: "/store/orders/:id/invoice",
       method: "GET",
       middlewares: [requiredCustomer, rateLimit("invoice", { windowMs: 600_000, max: 60, perIp: false, by: (req) => (req as any).auth_context?.actor_id })],

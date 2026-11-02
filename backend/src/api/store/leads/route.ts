@@ -19,9 +19,15 @@ export async function POST(req: MedusaRequest<StoreCreateLeadBody>, res: MedusaR
   const leads = req.scope.resolve<LeadModuleService>(LEAD_MODULE)
   const { email, name, source } = req.validatedBody
 
-  const drops = req.scope.resolve(DROP_MODULE) as any
-  const current = await drops.retrieveCurrent?.()
-  const phase = current ? resolveDropPhase(current) : null
+  // O drop só decide o status inicial e o texto do e-mail: sem ele (módulo fora do ar, data inválida) o cadastro segue como pendente.
+  let current: any = null
+  let phase: ReturnType<typeof resolveDropPhase> | null = null
+  try {
+    current = await (req.scope.resolve(DROP_MODULE) as any).retrieveCurrent?.()
+    phase = current ? resolveDropPhase(current) : null
+  } catch (err) {
+    req.scope.resolve("logger").warn(`drop atual indisponível no cadastro: ${(err as Error).message}`)
+  }
 
   const [existing] = await leads.listLeads({ email }, { take: 1 })
   const isNew = !existing

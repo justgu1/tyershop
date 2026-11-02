@@ -16,7 +16,7 @@ export default async function ajustesCatalogo({ container }: ExecArgs) {
     (
       await query.graph({
         entity: "product",
-        fields: ["id", "handle", "images.id", "images.url", "images.rank"],
+        fields: ["id", "handle", "collection.handle", "images.id", "images.url", "images.rank"],
         filters: { handle },
       })
     ).data[0] as any;
@@ -45,7 +45,7 @@ export default async function ajustesCatalogo({ container }: ExecArgs) {
     .map((i: any) => ({ url: i.url }));
 
   await updateProductsWorkflow(container).run({
-    input: { products: [{ id: pulseira.id, collection_id: null, category_ids: [categoria.id], images }] },
+    input: { products: [{ id: pulseira.id, ...(pulseira.collection?.handle === "tyer-starter" ? { collection_id: null } : {}), category_ids: [categoria.id], images }] },
   });
   logger.info(`pulseira-tyer: categoria Pulseiras, ${images.length} imagens, fora do Starter`);
 }
