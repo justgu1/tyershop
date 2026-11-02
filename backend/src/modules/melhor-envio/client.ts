@@ -148,7 +148,7 @@ async function meGet<T>(accessToken: string, path: string): Promise<T> {
  * Situação da etiqueta no Melhor Envio (pending = no carrinho, ainda não paga), pela consulta de rastreio: a consulta direta
  * do pedido exige um escopo a mais. Lança erro se não conseguir consultar.
  */
-export async function getLabel(accessToken: string, id: string): Promise<{ status?: string }> {
+export async function getLabel(accessToken: string, id: string): Promise<TrackingInfo> {
   const entry = (await tracking(accessToken, [id]))[id]
   // Sem entrada não dá para saber se a etiqueta foi paga: erro, para quem chama não cobrar de novo às cegas.
   if (!entry?.status) throw new Error("O Melhor Envio não devolveu a situação da etiqueta.")
