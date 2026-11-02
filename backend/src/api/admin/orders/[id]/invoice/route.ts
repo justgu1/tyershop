@@ -1,6 +1,7 @@
 import { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { MedusaError, Modules } from "@medusajs/framework/utils"
 import { baseOrderData, loadOrder, sendOrderEmail } from "../../../../../utils/order-email"
+import { setMetadataKey } from "../../../../../utils/order-metadata"
 
 type Body = { file_id?: string; filename?: string; number?: string }
 
@@ -32,9 +33,11 @@ export async function POST(req: AuthenticatedMedusaRequest<Body>, res: MedusaRes
 
   const { order, metadata } = await currentMetadata(req, req.params.id)
   const invoice = { file_id: fileId, number, filename: String(req.body?.filename ?? "nota-fiscal.pdf").slice(0, 120), issued_at: new Date().toISOString() }
-  await req.scope.resolve(Modules.ORDER).updateOrders(order.id, { metadata: { ...metadata, invoice } })
+  await setMetadataKey(req.scope, order.id, "invoice", invoice)
 
-  if (order.email) {
+  // Reenviar o mesmo arquivo não manda o PDF de novo ao cliente.
+  const previous = (metadata.invoice as { file_id?: string } | undefined)?.file_id
+  if (order.email && previous !== fileId) {
     await sendOrderEmail(
       req.scope,
       order.email,
@@ -47,8 +50,7 @@ export async function POST(req: AuthenticatedMedusaRequest<Body>, res: MedusaRes
 }
 
 export async function DELETE(req: AuthenticatedMedusaRequest, res: MedusaResponse) {
-  const { order, metadata } = await currentMetadata(req, req.params.id)
-  const { invoice: _removed, ...rest } = metadata
-  await req.scope.resolve(Modules.ORDER).updateOrders(order.id, { metadata: rest })
+  const { order } = await currentMetadata(req, req.params.id)
+  await setMetadataKey(req.scope, order.id, "invoice", null)
   res.json({ invoice: null })
 }

@@ -5,10 +5,11 @@ import {
   createOrderShipmentWorkflow,
   markOrderFulfillmentAsDeliveredWorkflow,
 } from "@medusajs/medusa/core-flows"
-import { addToCart, checkoutLabel, generateLabel, tracking, UnauthorizedError } from "./client"
+import { addToCart, checkoutLabel, findInCart, generateLabel, getLabel, tracking, UnauthorizedError } from "./client"
 import { buildCartPayload, DELIVERED, POSTED, senderFromEnv, serviceIdOf } from "./label"
 import { buildPackage, loadShipments } from "./quote"
 import { MELHOR_ENVIO_MODULE } from "./index"
+import { setMetadataKey } from "../../utils/order-metadata"
 import type MelhorEnvioModuleService from "./service"
 
 /** Estado da etiqueta guardado em `order.metadata.melhor_envio`. */
@@ -42,7 +43,7 @@ async function loadFullOrder(scope: MedusaContainer, orderId: string) {
 async function saveState(scope: MedusaContainer, order: { id: string; metadata?: Record<string, any> | null }, state: Omit<LabelState, "updated_at">) {
   const next: LabelState = { ...(order.metadata?.melhor_envio ?? {}), ...state, updated_at: new Date().toISOString() }
   if (state.status !== "erro") delete next.error
-  await scope.resolve(Modules.ORDER).updateOrders(order.id, { metadata: { ...(order.metadata ?? {}), melhor_envio: next } })
+  await setMetadataKey(scope, order.id, "melhor_envio", next)
   order.metadata = { ...(order.metadata ?? {}), melhor_envio: next }
   return next
 }
@@ -121,23 +122,33 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string): Pro
     const token = await scope.resolve<MelhorEnvioModuleService>(MELHOR_ENVIO_MODULE).accessToken()
     if (!token) return await fail("O Melhor Envio não está conectado. Conecte de novo no admin.")
 
+    const tag = `Pedido #${order.display_id}`
     let meId = current?.me_order_id
+    if (!meId) {
+      // Se a resposta de uma tentativa anterior se perdeu, o envio já está no carrinho do Melhor Envio: reaproveita em vez de criar outro.
+      meId = (await findInCart(token, tag)) ?? undefined
+    }
     if (!meId) {
       const shipments = await loadShipments(
         scope,
         order.items.filter((i: any) => i.variant_id).map((i: any) => ({ variant_id: i.variant_id, quantity: i.quantity }))
       )
       meId = (await addToCart(token, buildCartPayload({ order, cpf, serviceId, sender, pkg: buildPackage(shipments) }))).id
-      await saveState(scope, order, { status: "carrinho", me_order_id: meId })
     }
-    if (!current?.paid) {
+    await saveState(scope, order, { status: "carrinho", me_order_id: meId })
+
+    // O estado remoto manda: uma compra ou geração que passou, mas cuja resposta se perdeu, não é refeita.
+    const remote = (await getLabel(token, meId))?.status
+    const paid = current?.paid || (!!remote && remote !== "pending")
+    const generated = current?.generated || (!!remote && ["generated", "posted", "delivered"].includes(remote))
+    if (!paid) {
       await checkoutLabel(token, meId)
-      await saveState(scope, order, { status: "carrinho", paid: true })
     }
-    if (!current?.generated) {
+    await saveState(scope, order, { status: "carrinho", paid: true })
+    if (!generated) {
       await generateLabel(token, meId)
-      await saveState(scope, order, { status: "carrinho", generated: true })
     }
+    await saveState(scope, order, { status: "carrinho", generated: true })
 
     const info = (await tracking(token, [meId]).catch(() => ({} as Record<string, any>)))[meId]
     let fulfillmentId = current?.fulfillment_id
@@ -178,27 +189,16 @@ export async function syncShipments(scope: MedusaContainer) {
 async function syncShipmentsLocked(scope: MedusaContainer) {
   const logger = scope.resolve("logger") as any
   const query = scope.resolve(ContainerRegistrationKeys.QUERY)
-  // Só as etiquetas em aberto dos últimos 60 dias, filtradas no banco: sem etiquetas a rodada custa uma consulta barata.
+  // Só as etiquetas em aberto, filtradas no banco (o prazo longo cobre produção sob encomenda e postagens demoradas): sem etiquetas a rodada custa uma consulta barata.
   const pg = scope.resolve(ContainerRegistrationKeys.PG_CONNECTION) as any
   const rows: { id: string; display_id: number; metadata: any }[] = (
     await pg.raw(
       `select id, display_id, metadata from "order"
-        where deleted_at is null and created_at >= now() - interval '60 days'
+        where deleted_at is null and created_at >= now() - interval '1 year'
           and metadata->'melhor_envio'->>'status' in ('gerada', 'postada')
           and metadata->'melhor_envio'->>'me_order_id' is not null`
     )
   ).rows
-  // Compras que pararam no meio (processo reiniciado, por exemplo) e não deram erro: retoma de onde ficaram.
-  const stuck: { id: string }[] = (
-    await pg.raw(
-      `select id from "order"
-        where deleted_at is null and created_at >= now() - interval '60 days'
-          and metadata->'melhor_envio'->>'status' = 'carrinho'
-          and (metadata->'melhor_envio'->>'updated_at')::timestamptz < now() - interval '15 minutes'`
-    )
-  ).rows
-  for (const o of stuck) await purchaseLabel(scope, o.id).catch((err) => logger.error(`[melhor-envio] retomada: ${err.message}`))
-
   const open = rows.filter((o) => o.metadata.melhor_envio.fulfillment_id)
   for (const o of rows) if (!o.metadata.melhor_envio.fulfillment_id) logger.warn(`[melhor-envio] pedido #${o.display_id}: etiqueta sem envio no Medusa; refaça pelo admin`)
   if (!open.length) return { checked: 0 }
@@ -233,6 +233,8 @@ async function syncShipmentsLocked(scope: MedusaContainer) {
       if (!real) continue
 
       let status: LabelState["status"] = real.delivered_at ? "entregue" : real.shipped_at ? "postada" : "gerada"
+      // O código de rastreio pode aparecer um pouco depois da postagem: espera pela próxima rodada em vez de avisar sem código.
+      if (status === "gerada" && info.status === "posted" && !code) continue
       if (status === "gerada" && POSTED.includes(info.status)) {
         await createOrderShipmentWorkflow(scope).run({
           input: {
@@ -255,4 +257,31 @@ async function syncShipmentsLocked(scope: MedusaContainer) {
     }
   }
   return { checked: open.length }
+}
+
+const MAX_RESUMED_PER_RUN = 5
+
+/**
+ * Retoma compras da compra automática que pararam no meio sem registrar erro (processo reiniciado, por exemplo). Fica fora da
+ * trava do acompanhamento, que não pode esperar por chamadas lentas, e só roda com a compra automática ligada: uma compra
+ * iniciada à mão pelo admin é retomada à mão.
+ */
+export async function resumeStuckPurchases(scope: MedusaContainer) {
+  const logger = scope.resolve("logger") as any
+  const pg = scope.resolve(ContainerRegistrationKeys.PG_CONNECTION) as any
+  const stuck: { id: string }[] = (
+    await pg.raw(
+      `select id from "order"
+        where deleted_at is null and created_at >= now() - interval '1 year'
+          and metadata->'melhor_envio'->>'status' = 'carrinho'
+          and (metadata->'melhor_envio'->>'updated_at')::timestamptz < now() - interval '15 minutes'
+        limit ?`,
+      [MAX_RESUMED_PER_RUN]
+    )
+  ).rows
+  for (const o of stuck) {
+    await purchaseLabel(scope, o.id).catch((err) => {
+      if (!(err instanceof BusyError)) logger.error(`[melhor-envio] retomada: ${err.message}`)
+    })
+  }
 }

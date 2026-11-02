@@ -12,14 +12,14 @@ async function orderOfFulfillment(container: SubscriberArgs<any>["container"], f
   return loadOrder(container, links[0].order_id)
 }
 
-type Event = { id: string; no_notification?: boolean }
+type Event = { id: string; fulfillment_id?: string; no_notification?: boolean }
 
 export default async function orderShippedHandler({ event: { data }, container }: SubscriberArgs<Event>) {
   if (data.no_notification) return
   const query = container.resolve(ContainerRegistrationKeys.QUERY)
-  const order = await orderOfFulfillment(container, data.id)
+  const order = await orderOfFulfillment(container, data.fulfillment_id ?? data.id)
   if (!order?.email) return
-  const { data: fulfillments } = await query.graph({ entity: "fulfillment", fields: ["id", "labels.tracking_number", "labels.tracking_url"], filters: { id: data.id } })
+  const { data: fulfillments } = await query.graph({ entity: "fulfillment", fields: ["id", "labels.tracking_number", "labels.tracking_url"], filters: { id: data.fulfillment_id ?? data.id } })
   const label = fulfillments[0]?.labels?.find((l: any) => l.tracking_number) ?? fulfillments[0]?.labels?.[0]
   const code: string | undefined = label?.tracking_number || undefined
   await sendOrderEmail(container, order.email, "order_shipped", {

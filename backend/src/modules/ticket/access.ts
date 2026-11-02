@@ -15,5 +15,6 @@ export async function hasTicket(scope: MedusaContainer, dropId: string, customer
   if (!ticket?.redeemed_at) return false
 
   const lead = await scope.resolve<LeadModuleService>(LEAD_MODULE).retrieveLead(ticket.lead_id)
+  // "descadastrado" só interrompe os avisos: quem já tem ingresso resgatado mantém o acesso à pré-venda.
   return lead.status !== "negado"
 }

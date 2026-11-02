@@ -131,3 +131,36 @@ export type TrackingInfo = { status?: string; tracking?: string | null; melhoren
 export async function tracking(accessToken: string, ids: string[]): Promise<Record<string, TrackingInfo>> {
   return meRequest(accessToken, "/shipment/tracking", { orders: ids })
 }
+
+async function meGet<T>(accessToken: string, path: string): Promise<T> {
+  const res = await fetch(`${baseUrl()}/api/v2/me${path}`, {
+    headers: { authorization: `Bearer ${accessToken}`, accept: "application/json", "user-agent": userAgent() },
+    signal: AbortSignal.timeout(20_000),
+  })
+  const data = (await res.json().catch(() => ({}))) as any
+  if (res.status === 401 || res.status === 403) throw new UnauthorizedError(String(data?.message ?? "").slice(0, 300))
+  if (!res.ok) throw new Error(`Melhor Envio respondeu ${res.status}`)
+  return data as T
+}
+
+/** Situação da etiqueta no Melhor Envio (pending = no carrinho, ainda não paga). Falha de consulta não impede a compra. */
+export async function getLabel(accessToken: string, id: string): Promise<{ status?: string } | null> {
+  try {
+    return await meGet(accessToken, `/orders/${encodeURIComponent(id)}`)
+  } catch (err) {
+    if (err instanceof UnauthorizedError) throw err
+    return null
+  }
+}
+
+/** Procura no carrinho do Melhor Envio um envio já criado para o pedido (pela etiqueta "Pedido #N"). */
+export async function findInCart(accessToken: string, tag: string): Promise<string | null> {
+  try {
+    const cart = await meGet<{ data?: { id: string; status?: string; tags?: { tag?: string }[] }[] }>(accessToken, "/cart")
+    const hit = (cart.data ?? []).find((o) => o.status === "pending" && (o.tags ?? []).some((t) => t.tag === tag))
+    return hit?.id ?? null
+  } catch (err) {
+    if (err instanceof UnauthorizedError) throw err
+    return null
+  }
+}

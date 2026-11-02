@@ -1,6 +1,7 @@
 import { MedusaContainer } from "@medusajs/framework/types"
 import { Modules } from "@medusajs/framework/utils"
 import { dropRows } from "../modules/drop/access"
+import { presentDrop } from "../modules/drop/present"
 
 const siteUrl = () => (process.env.SITE_URL || "http://localhost:4321").replace(/\/$/, "")
 export const ordersUrl = () => `${siteUrl()}/account/orders`
@@ -27,10 +28,15 @@ export function baseOrderData(order: any) {
   }
 }
 
-/** Produção sob encomenda: pega o maior prazo entre os drops dos itens (peças do Starter têm estoque e não entram). */
+/**
+ * Produção sob encomenda: maior prazo entre os drops dos itens que estão em pré-venda ou venda geral agora. Peças do Starter
+ * (estoque pronto) e de drops encerrados não entram.
+ */
 async function productionDays(scope: MedusaContainer, productIds: string[]): Promise<number | null> {
   const rows = await dropRows(scope)
-  const days = rows.filter((r) => productIds.some((id) => r.productIds.has(id))).map((r) => Number(r.drop.production_days) || 0)
+  const days = rows
+    .filter((r) => ["presale", "general"].includes(presentDrop(r.drop).phase) && productIds.some((id) => r.productIds.has(id)))
+    .map((r) => Number(r.drop.production_days) || 0)
   return days.length ? Math.max(...days) : null
 }
 
@@ -52,7 +58,7 @@ export async function confirmationData(scope: MedusaContainer, order: any) {
   }
 }
 
-export async function sendOrderEmail(scope: MedusaContainer, to: string, template: string, data: Record<string, unknown>, attachments?: { content: string; filename: string; content_type: string }[]) {
+export async function sendOrderEmail(scope: MedusaContainer, to: string, template: string, data: Record<string, unknown>, attachments?: { content: string; filename: string; content_type: string }[]): Promise<boolean> {
   try {
     await scope.resolve(Modules.NOTIFICATION).createNotifications({
       to,
@@ -61,8 +67,10 @@ export async function sendOrderEmail(scope: MedusaContainer, to: string, templat
       data,
       ...(attachments ? { attachments: attachments.map((a) => ({ ...a, disposition: "attachment" as const })) } : {}),
     })
+    return true
   } catch (err) {
     // Falha de e-mail não pode derrubar o pedido nem a ação do admin.
     scope.resolve("logger").error(`E-mail ${template} não enviado: ${(err as Error).message}`)
+    return false
   }
 }
