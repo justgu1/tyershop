@@ -11,6 +11,7 @@ const PROFILE = __ENV.PROFILE || "smoke";
 const USERS = Number(__ENV.USERS || 100);
 const P99_MS = Number(__ENV.P99_MS || 1000);
 const ZIP = "01310-100";
+const HOST = __ENV.HOST_HEADER || "";
 
 // Esta carga cria contas, carrinhos e pedidos de verdade: só roda em ambiente descartável.
 if (__ENV.I_UNDERSTAND_THIS_CREATES_ORDERS !== "yes") {
@@ -45,9 +46,14 @@ const PROFILES = {
     checkout: [{ duration: "5m", target: 1000 }, { duration: "5m", target: 1500 }],
   },
 };
-const profile = PROFILES[PROFILE] || fail(`PROFILE desconhecido: ${PROFILE}`);
+// Degraus de capacidade: [req/s de navegação, finalizações/s]. Cada degrau segura a taxa por STEP_SECONDS.
+const LEVELS = (__ENV.LEVELS || "20:2,50:5,100:10,200:20,400:40,700:100,1000:250,1000:500")
+  .split(",")
+  .map((l) => l.split(":").map(Number));
+const STEP_SECONDS = Number(__ENV.STEP_SECONDS || 90);
+const GAP_SECONDS = 15;
 
-const scenario = (exec, stages, preAllocatedVUs, maxVUs) => ({
+const scenario = (exec, stages, preAllocatedVUs, maxVUs, extra = {}) => ({
   executor: "ramping-arrival-rate",
   startRate: 1,
   timeUnit: "1s",
@@ -55,27 +61,59 @@ const scenario = (exec, stages, preAllocatedVUs, maxVUs) => ({
   preAllocatedVUs,
   maxVUs,
   exec,
+  ...extra,
 });
 
-export const options = {
-  scenarios: {
+const constantStep = (exec, rate, startTime, level, preAllocatedVUs, maxVUs) => ({
+  executor: "constant-arrival-rate",
+  rate,
+  timeUnit: "1s",
+  duration: `${STEP_SECONDS}s`,
+  startTime: `${startTime}s`,
+  preAllocatedVUs,
+  maxVUs,
+  exec,
+  tags: { level },
+});
+
+let scenarios;
+const thresholds = {};
+if (PROFILE === "capacity") {
+  scenarios = {};
+  LEVELS.forEach(([browseRps, checkoutRps], i) => {
+    const level = `L${i + 1}`;
+    const start = i * (STEP_SECONDS + GAP_SECONDS);
+    scenarios[`browse_${level}`] = constantStep("browse", browseRps, start, level, Math.max(10, browseRps), Math.max(50, browseRps * 3));
+    scenarios[`checkout_${level}`] = constantStep("checkout", checkoutRps, start, level, Math.max(10, checkoutRps * 3), Math.max(100, checkoutRps * 12));
+    // Submétricas por degrau: aparecem no resumo e dizem em qual taxa a meta deixou de valer.
+    thresholds[`http_req_duration{level:${level},flow:browse}`] = [`p(99)<${P99_MS}`];
+    thresholds[`http_req_duration{level:${level},flow:checkout}`] = [`p(99)<${P99_MS}`];
+    thresholds[`http_req_failed{level:${level},flow:browse}`] = ["rate<0.01"];
+    thresholds[`http_req_failed{level:${level},flow:checkout}`] = ["rate<0.01"];
+    thresholds[`checkout_total_ms{level:${level}}`] = ["p(99)<999999"];
+    thresholds[`orders_completed{level:${level}}`] = ["count>=0"];
+    thresholds[`dropped_iterations{level:${level}}`] = ["count>=0"];
+  });
+  // Freio de segurança: se quase tudo falha, para o teste em vez de martelar um servidor que já caiu.
+  thresholds["http_req_failed"] = [{ threshold: "rate<0.5", abortOnFail: true, delayAbortEval: "30s" }];
+} else {
+  const profile = PROFILES[PROFILE] || fail(`PROFILE desconhecido: ${PROFILE}`);
+  scenarios = {
     browse: scenario("browse", profile.browse, 200, 3000),
     checkout: scenario("checkout", profile.checkout, 500, 6000),
-  },
-  thresholds: {
-    // Meta: 99% das requisições abaixo de P99_MS, nos dois fluxos.
+  };
+  Object.assign(thresholds, {
     "http_req_duration{flow:browse}": [`p(99)<${P99_MS}`],
     "http_req_duration{flow:checkout}": [`p(99)<${P99_MS}`],
     "http_req_failed{flow:browse}": ["rate<0.01"],
     "http_req_failed{flow:checkout}": ["rate<0.01"],
-    // O gerador conseguiu manter a taxa pedida (iterações que não puderam começar contam como falha de capacidade).
     dropped_iterations: ["count<100"],
-    // Finalização de ponta a ponta (todas as etapas) também precisa fechar a meta de pedidos.
     orders_completed: ["count>0"],
     checks: ["rate>0.99"],
-  },
-  discardResponseBodies: false,
-};
+  });
+}
+
+export const options = { scenarios, thresholds, discardResponseBodies: false };
 
 const ordersCompleted = new Counter("orders_completed");
 const checkoutTotal = new Trend("checkout_total_ms", true);
@@ -89,6 +127,7 @@ const steps = {
 const jsonHeaders = (token) => ({
   "content-type": "application/json",
   "x-publishable-api-key": PK,
+  ...(HOST ? { host: HOST } : {}),
   ...(token ? { authorization: `Bearer ${token}` } : {}),
 });
 
@@ -128,6 +167,7 @@ export function setup() {
   return { region, variants, tokens };
 }
 
+const plain = () => (HOST ? { host: HOST } : {});
 const pick = (list, n) => list[n % list.length];
 
 // 1000 req/s: mistura do que o visitante faz.
@@ -135,13 +175,13 @@ export function browse(data) {
   const roll = Math.random();
   const tags = { flow: "browse" };
   if (roll < 0.35) {
-    http.get(`${FRONT}/`, { tags: { ...tags, page: "home" } });
+    http.get(`${FRONT}/`, { headers: plain(), tags: { ...tags, page: "home" } });
   } else if (roll < 0.5) {
-    http.get(`${FRONT}/drop`, { tags: { ...tags, page: "drop" } });
+    http.get(`${FRONT}/drop`, { headers: plain(), tags: { ...tags, page: "drop" } });
   } else if (roll < 0.8) {
     http.get(`${API}/store/products?limit=12&region_id=${data.region}`, { headers: jsonHeaders(), tags: { ...tags, page: "catalog" } });
   } else if (roll < 0.9) {
-    http.get(`${FRONT}/cart`, { tags: { ...tags, page: "cart" } });
+    http.get(`${FRONT}/cart`, { headers: plain(), tags: { ...tags, page: "cart" } });
   } else {
     const res = post(`${API}/store/shipping/quote`, { postal_code: ZIP, items: [{ variant_id: pick(data.variants, __ITER), quantity: 1 }] }, null, { ...tags, page: "quote" });
     check(res, { "cotação 200": (r) => r.status === 200 });
@@ -207,5 +247,15 @@ export function checkout(data) {
 }
 
 export function handleSummary(data) {
-  return { "loadtest/resultado.json": JSON.stringify(data, null, 2) };
+  const pick = (m) => (m && m.values ? m.values : null);
+  const levels = {};
+  for (const [name, metric] of Object.entries(data.metrics)) {
+    const m = name.match(/^([a-z_]+)\{level:(L\d+)(?:,flow:(\w+))?\}$/);
+    if (!m) continue;
+    const [, metricName, level, flow] = m;
+    levels[level] = levels[level] || {};
+    levels[level][`${metricName}${flow ? `.${flow}` : ""}`] = pick(metric);
+  }
+  const compact = JSON.stringify({ levels, totals: { iterations: pick(data.metrics.iterations), dropped: pick(data.metrics.dropped_iterations), failed: pick(data.metrics.http_req_failed), req: pick(data.metrics.http_reqs) } });
+  return { stdout: `\n###RESULT###${compact}###END###\n`, "loadtest/resultado.json": JSON.stringify(data, null, 2) };
 }
