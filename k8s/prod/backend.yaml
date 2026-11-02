@@ -13,9 +13,8 @@ spec:
               value: "https://tyershop.com"
             - name: MERCADOPAGO_NOTIFICATION_URL
               value: "https://medusa.tyershop.com/hooks/payment/mercadopago"
-            # Ligado até o go-live: com ele nenhum e-mail chega a cliente. Trocar por "false" ao abrir as vendas.
             - name: EMAIL_TEST_MODE
-              value: "true"
+              value: "false"
             - name: MELHOR_ENVIO_ENV
               value: "production"
             - name: MELHOR_ENVIO_REDIRECT_URI
