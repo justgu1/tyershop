@@ -644,9 +644,14 @@ const jsonLd = productFound
               autocomplete="postal-code"
               maxlength="9"
               placeholder="00000-000"
-              aria-describedby="pdp-cep-hint"
+              aria-describedby="pdp-cep-hint-sticky"
             />
+            <button type="button" class="btn btn-outline pdp-cep-btn pdp-cep-btn--sticky" id="pdp-cep-calc-sticky">
+              {t(lang, 'pdp', 'calculate_shipping_cta')}
+            </button>
           </div>
+          <p id="pdp-cep-hint-sticky" class="pdp-cep-hint" role="status"></p>
+          <div class="ship-opts" id="pdp-ship-options-sticky" aria-live="polite"></div>
         </div>
       </div>
     </div>
@@ -2256,9 +2261,15 @@ const jsonLd = productFound
     height: 18px;
   }
   .pdp-sticky-bar__ship {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 4px 8px;
+  }
+  .pdp-sticky-bar__cep-label,
+  .pdp-sticky-bar__drawer .pdp-cep-hint,
+  .pdp-sticky-bar__drawer .ship-opts {
+    grid-column: 1 / -1;
   }
   .pdp-sticky-bar__cep-label {
     font-size: 10px;
