@@ -67,6 +67,12 @@ async function fetchDropsUncached(token?: string): Promise<DropPayload> {
 /** Produtos completos (preço, variantes, estoque) na ordem em que foram pedidos. */
 export async function fetchProductsByIds(ids: string[], token?: string): Promise<any[]> {
   if (!ids.length) return [];
+  // Os ids só chegam aqui para quem o servidor já liberou, e os produtos são os mesmos para todos eles: a lista do drop
+  // fica em cache curto. Só guarda se vier completa (uma sessão vencida devolveria menos produtos e não pode ficar valendo).
+  return cached(`products:${[...ids].sort().join(',')}`, 30_000, () => fetchProductsByIdsUncached(ids, token), (v) => v.length === ids.length);
+}
+
+async function fetchProductsByIdsUncached(ids: string[], token?: string): Promise<any[]> {
   try {
     const url = getMedusaStoreUrl();
     const headers: Record<string, string> = {
