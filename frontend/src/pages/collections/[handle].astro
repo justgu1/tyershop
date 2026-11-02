@@ -115,6 +115,11 @@ const metaDesc =
             <p class="collection-empty">{t(lang, 'collections', 'empty')}</p>
           )}
 
+          <p class="collection-footer">
+            <a href={getPathForLang('/shop', lang)} class="btn btn-outline">
+              {t(lang, 'collections', 'back_shop')}
+            </a>
+          </p>
         </div>
       </main>
     ) : (
