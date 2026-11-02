@@ -85,8 +85,15 @@ spec:
                   key: SMTP_PASSWORD
                   optional: true
             - name: SMTP_FROM
-              value: "Tyer <contato@tyershop.com>"
+              value: "Tyer <suporte@tyershop.com>"
             # Ligado por padrão: homolog e prod são o mesmo deploy, nada sai para cliente real sem desligar aqui.
+            # Multiplicador dos limites de requisição, lido de um ConfigMap que só existe durante uma janela de teste (kubectl, fora do git).
+            - name: RATE_LIMIT_SCALE
+              valueFrom:
+                configMapKeyRef:
+                  name: tyershop-janela-de-teste
+                  key: RATE_LIMIT_SCALE
+                  optional: true
             - name: EMAIL_TEST_MODE
               value: "true"
             - name: EMAIL_TEST_TO

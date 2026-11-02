@@ -61,6 +61,12 @@ export const clientIp = (req: MedusaRequest) => {
   return forwarded[forwarded.length - 1] ?? req.socket?.remoteAddress ?? req.ip ?? ""
 }
 
+/**
+ * Multiplica todos os limites (RATE_LIMIT_SCALE, padrão 1). Serve a uma janela de teste em que muita gente sai do mesmo IP;
+ * fora dela a variável não existe.
+ */
+const scale = () => Math.max(1, Number(process.env.RATE_LIMIT_SCALE) || 1)
+
 /** Limite por janela; responde 429 ao exceder. */
 export function rateLimit(name: string, { windowMs, max, by, globalMax, perIp = true }: Options) {
   return async (req: MedusaRequest, res: MedusaResponse, next: MedusaNextFunction) => {
@@ -72,7 +78,7 @@ export function rateLimit(name: string, { windowMs, max, by, globalMax, perIp = 
     if (extra) keys.push(`${name}|by|${extra.toLowerCase()}`)
 
     for (const key of keys) {
-      if ((await hit(key, windowMs)) > (key.endsWith("|all") ? (globalMax as number) : max)) {
+      if ((await hit(key, windowMs)) > (key.endsWith("|all") ? (globalMax as number) : max) * scale()) {
         res.setHeader("retry-after", Math.ceil(windowMs / 1000))
         return res.status(429).json({ type: "too_many_requests", message: "Muitas tentativas. Aguarde um pouco e tente de novo." })
       }
@@ -84,6 +90,8 @@ export function rateLimit(name: string, { windowMs, max, by, globalMax, perIp = 
 if (process.env.LOAD_TEST_MODE === "true") {
   console.warn("[rate-limit] LOAD_TEST_MODE ligado: limites de requisição desativados. Nunca use em produção.")
 }
+
+if (scale() > 1) console.warn(`[rate-limit] RATE_LIMIT_SCALE=${scale()}: limites multiplicados. Só para janelas de teste.`)
 
 export const bodyEmail = (req: MedusaRequest) => {
   const body = (req.body ?? {}) as Record<string, unknown>
