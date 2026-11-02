@@ -2,6 +2,8 @@
  * Medusa v2: variant prices vêm de `calculated_price` com region_id/currency_code
  * (ver https://docs.medusajs.com/resources/storefront-development/products/price)
  */
+import { cached } from './ssr-cache';
+
 const DEFAULT_FIELDS =
   [
     'id',
@@ -45,6 +47,10 @@ export async function resolveDefaultRegionId(
   // Só aceita um id real de região — placeholders de deploy (ex.: CHANGEME)
   // não podem virar region_id na query da Store API.
   if (fromEnv && fromEnv.startsWith('reg_')) return fromEnv;
+  return cached(`region:${baseUrl}`, 5 * 60_000, () => loadDefaultRegionId(baseUrl, headers, timeout), (v) => !!v);
+}
+
+async function loadDefaultRegionId(baseUrl: string, headers: Record<string, string>, timeout: number): Promise<string | null> {
   try {
     const r = await fetch(`${baseUrl}/store/regions`, {
       headers,

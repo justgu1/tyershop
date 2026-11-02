@@ -1,4 +1,5 @@
 import { getMedusaStoreUrl, getPublishableKey } from './medusa-env';
+import { cached } from './ssr-cache';
 import { getProductListQueryString, resolveDefaultRegionId } from './medusa-pricing';
 
 export type DropPhase = 'coming_soon' | 'presale' | 'general' | 'ended';
@@ -36,6 +37,12 @@ export type DropPayload = {
 const EMPTY: DropPayload = { drop: null, previous: [], access: 'none', product_ids: [] };
 
 export async function fetchDrops(token?: string): Promise<DropPayload> {
+  // Sem conta o resultado é igual para todos: vale guardar por alguns segundos (a fase muda por data, e o cronômetro recarrega a página).
+  if (!token) return cached('drops:anon', 10_000, () => fetchDropsUncached(), (v) => v !== EMPTY);
+  return fetchDropsUncached(token);
+}
+
+async function fetchDropsUncached(token?: string): Promise<DropPayload> {
   try {
     const res = await fetch(`${getMedusaStoreUrl()}/store/drop`, {
       headers: {
@@ -82,6 +89,10 @@ export async function fetchProductsByIds(ids: string[], token?: string): Promise
 const STARTER_HANDLES = ['regata-savage-mode', 'shorts-tyer-pro', 'camiseta-tyer-starter-dry-fit', 'pulseira-tyer'];
 
 export async function fetchStarterProducts(): Promise<any[]> {
+  return cached('starter', 30_000, () => fetchStarterUncached(), (v) => v.length > 0);
+}
+
+async function fetchStarterUncached(): Promise<any[]> {
   try {
     const url = getMedusaStoreUrl();
     const headers = { 'x-publishable-api-key': getPublishableKey() };

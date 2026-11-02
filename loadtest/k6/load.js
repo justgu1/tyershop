@@ -113,7 +113,12 @@ if (PROFILE === "capacity") {
   });
 }
 
-export const options = { scenarios, thresholds, discardResponseBodies: false };
+export const options = {
+  scenarios,
+  thresholds,
+  discardResponseBodies: false,
+  summaryTrendStats: ["avg", "min", "med", "p(90)", "p(95)", "p(99)", "max", "count"],
+};
 
 const ordersCompleted = new Counter("orders_completed");
 const checkoutTotal = new Trend("checkout_total_ms", true);
@@ -168,6 +173,14 @@ export function setup() {
 }
 
 const plain = () => (HOST ? { host: HOST } : {});
+let reported = 0;
+// Primeiras falhas de cada VU no log do k6: sem isso só se sabe que falhou, não por quê.
+function note(step, res) {
+  if (res.status >= 400 && reported < 3) {
+    reported++;
+    console.error(`FALHA ${step} ${res.status} ${String(res.body).slice(0, 220)}`);
+  }
+}
 const pick = (list, n) => list[n % list.length];
 
 // 1000 req/s: mistura do que o visitante faz.
@@ -194,40 +207,45 @@ export function checkout(data) {
   const variant = pick(data.variants, __ITER + __VU);
   const tags = { flow: "checkout" };
   const started = Date.now();
-  const time = (trend, res) => trend.add(res.timings.duration);
+  const time = (trend, res, name) => {
+    trend.add(res.timings.duration);
+    note(name || "etapa", res);
+  };
 
   const cart = post(`${API}/store/carts`, { region_id: data.region }, token, { ...tags, step: "cart" });
-  time(steps.cart, cart);
+  time(steps.cart, cart, "cart");
   const cartId = cart.json("cart.id");
   if (!check(cart, { "carrinho criado": () => !!cartId })) return;
 
   const line = post(`${API}/store/carts/${cartId}/line-items`, { variant_id: variant, quantity: 1 }, token, { ...tags, step: "line_item" });
-  time(steps.line, line);
+  time(steps.line, line, "line_item");
   if (!check(line, { "item adicionado": (r) => r.status === 200 })) return;
 
   const addr = post(`${API}/store/carts/${cartId}`, {
     email: `carga@teste.local`,
     shipping_address: { first_name: "Carga", last_name: "Teste", address_1: "Av Paulista, 1", city: "São Paulo", province: "SP", postal_code: ZIP, country_code: "br" },
   }, token, { ...tags, step: "address" });
-  time(steps.address, addr);
+  time(steps.address, addr, "address");
   if (!check(addr, { "endereço salvo": (r) => r.status === 200 })) return;
 
   const opts = http.get(`${API}/store/shipping-options?cart_id=${cartId}`, { headers: jsonHeaders(token), tags: { ...tags, step: "shipping_options" } });
-  time(steps.options, opts);
-  const option = (opts.json("shipping_options") || []).find((o) => o.provider_id === "melhorenvio_melhorenvio");
+  time(steps.options, opts, "shipping_options");
+  const melhor = (opts.json("shipping_options") || []).filter((o) => o.provider_id === "melhorenvio_melhorenvio");
+  // O simulador cota só alguns serviços: pega o primeiro que o endereço aceita (.Com, depois os demais).
+  const option = melhor.find((o) => o.name === ".Com") || melhor[0];
   if (!check(opts, { "há opção de frete": () => !!option })) return;
 
   const method = post(`${API}/store/carts/${cartId}/shipping-methods`, { option_id: option.id }, token, { ...tags, step: "shipping_method" });
-  time(steps.method, method);
+  time(steps.method, method, "shipping_method");
   if (!check(method, { "frete aplicado": (r) => r.status === 200 })) return;
 
   const col = post(`${API}/store/payment-collections`, { cart_id: cartId }, token, { ...tags, step: "payment_collection" });
-  time(steps.collection, col);
+  time(steps.collection, col, "payment_collection");
   const colId = col.json("payment_collection.id");
   if (!check(col, { "coleção criada": () => !!colId })) return;
 
   const sess = post(`${API}/store/payment-collections/${colId}/payment-sessions`, { provider_id: "pp_mercadopago_mercadopago" }, token, { ...tags, step: "payment_session" });
-  time(steps.session, sess);
+  time(steps.session, sess, "payment_session");
   const sessions = sess.json("payment_collection.payment_sessions") || [];
   const sessionId = sessions.length ? sessions[sessions.length - 1].id : null;
   if (!check(sess, { "sessão criada": () => !!sessionId })) return;
@@ -235,11 +253,11 @@ export function checkout(data) {
   const pay = post(`${API}/store/checkout/mercadopago/card`, {
     payment_session_id: sessionId, token: "token-de-cartao", installments: 1, payer: { email: "carga@teste.local", cpf: "12345678909" },
   }, token, { ...tags, step: "pay" });
-  time(steps.pay, pay);
+  time(steps.pay, pay, "pay");
   if (!check(pay, { "pagamento aprovado": (r) => r.status === 200 && r.json("status") === "approved" })) return;
 
   const done = post(`${API}/store/carts/${cartId}/complete`, {}, token, { ...tags, step: "complete" });
-  time(steps.complete, done);
+  time(steps.complete, done, "complete");
   if (check(done, { "pedido criado": (r) => r.status === 200 && r.json("type") === "order" })) {
     ordersCompleted.add(1);
     checkoutTotal.add(Date.now() - started);
@@ -256,6 +274,9 @@ export function handleSummary(data) {
     levels[level] = levels[level] || {};
     levels[level][`${metricName}${flow ? `.${flow}` : ""}`] = pick(metric);
   }
-  const compact = JSON.stringify({ levels, totals: { iterations: pick(data.metrics.iterations), dropped: pick(data.metrics.dropped_iterations), failed: pick(data.metrics.http_req_failed), req: pick(data.metrics.http_reqs) } });
+  const steps = {};
+  for (const [name, metric] of Object.entries(data.metrics)) if (/^step_.*_ms$/.test(name) || name === "checkout_total_ms") steps[name] = pick(metric);
+  const checks = (data.root_group.checks || []).map((c) => ({ name: c.name, passes: c.passes, fails: c.fails }));
+  const compact = JSON.stringify({ levels, steps, checks, totals: { iterations: pick(data.metrics.iterations), dropped: pick(data.metrics.dropped_iterations), failed: pick(data.metrics.http_req_failed), req: pick(data.metrics.http_reqs) } });
   return { stdout: `\n###RESULT###${compact}###END###\n`, "loadtest/resultado.json": JSON.stringify(data, null, 2) };
 }

@@ -5,7 +5,8 @@ import { t, getPathForLang, type Lang } from '../i18n/utils';
 import Countdown from '../components/drop/Countdown.astro';
 import { getMedusaStoreUrl, getPublishableKey } from '../lib/medusa-env';
 import { fetchDrops, fetchStarterProducts, dropCountdown, PHASE_LABEL } from '../lib/drop';
-import { fetchVisibleCollections } from '../lib/collections';
+import { fetchCollectionsWithCounts } from '../lib/collections';
+import { cached } from '../lib/ssr-cache';
 
 // Home busca catálogo no Medusa: precisa renderizar por requisição —
 // pré-renderizada o HTML congelaria com o estado do build (sem backend).
@@ -18,31 +19,21 @@ const publicApiUrl = (import.meta.env.PUBLIC_API_URL || 'http://localhost:3000')
 let siteConfig: any = null;
 
 try {
-  const scRes = await fetch(`${getMedusaStoreUrl()}/store/site-config`, {
-    headers: { 'x-publishable-api-key': pk },
-    signal: AbortSignal.timeout(5000),
+  siteConfig = await cached('site-config', 60_000, async () => {
+    const scRes = await fetch(`${getMedusaStoreUrl()}/store/site-config`, {
+      headers: { 'x-publishable-api-key': pk },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!scRes.ok) throw new Error('site-config');
+    return (await scRes.json()).site_config ?? null;
   });
-  if (scRes.ok) siteConfig = (await scRes.json()).site_config ?? null;
 } catch {}
 
 const [{ drop, previous }, starter, collections] = await Promise.all([
   fetchDrops(),
   fetchStarterProducts(),
-  fetchVisibleCollections(),
+  fetchCollectionsWithCounts(),
 ]);
-try {
-  const headers = { 'x-publishable-api-key': pk };
-  const counts = await Promise.all(
-    collections.map((c) =>
-      fetch(`${getMedusaStoreUrl()}/store/products?collection_id[]=${c.id}&limit=1`, { headers, signal: AbortSignal.timeout(3000) })
-        .then((r) => r.json())
-        .then((d) => d.count || 0)
-        .catch(() => 0),
-    ),
-  );
-  collections.forEach((c, i) => (c.products_count = counts[i]));
-} catch {}
-
 const getCollectionImage = (col: { handle: string }) => `/collections/${col.handle || 'no-data'}.webp`;
 const getCount = (col: { products_count?: number }) => col.products_count ?? 0;
 
