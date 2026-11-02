@@ -37,7 +37,7 @@ export default async function colecoesPreVenda({ container }: ExecArgs) {
 
   for (const c of COLECOES) {
     const [existente] = await productModule.listProductCollections({ handle: c.handle });
-    const metadata = { ...(c.banner_url ? { banner_url: c.banner_url } : {}), ...(existente?.metadata ?? {}), order: c.order, label: c.label };
+    const metadata = { ...(c.banner_url ? { banner_url: c.banner_url } : {}), ...(existente?.metadata ?? {}), order: c.order, label: c.label, pre_venda: true };
     let colecao = existente;
     if (!colecao) {
       const { result } = await createCollectionsWorkflow(container).run({
