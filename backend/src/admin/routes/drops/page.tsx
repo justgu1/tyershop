@@ -18,6 +18,7 @@ type Drop = {
   general_lot: number | null
   closed_at: string | null
   production_days: number
+  release_leads_in_presale?: boolean
   component_key: string | null
   hero_kind: "community_video" | "drop_video" | "banner"
   hero_url: string | null
@@ -186,6 +187,14 @@ const DropsPage = () => {
           {textField("Instagram (post do drop)", "instagram_url")}
           {textField("Grupo do WhatsApp", "whatsapp_url")}
           {textField("Componente da página /drop (chave)", "component_key")}
+          <label style={ui.label}>
+            <input
+              type="checkbox"
+              checked={!!editing.release_leads_in_presale}
+              onChange={(e) => set({ release_leads_in_presale: e.target.checked })}
+            />{" "}
+            Liberar e enviar o ingresso a quem se cadastrar com a pré-venda aberta
+          </label>
           <label style={ui.label}>
             <input
               type="checkbox"

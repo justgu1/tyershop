@@ -15,6 +15,22 @@ describe("statusOnCapture", () => {
     expect(statusOnCapture("pendente", "coming_soon")).toBe("liberado")
   })
 
+  it("com a pré-venda aberta só libera se o drop ligar o controle", () => {
+    expect(statusOnCapture(null, "presale", true)).toBe("liberado")
+    expect(statusOnCapture(null, "presale", false)).toBe("pendente")
+    expect(statusOnCapture("pendente", "presale", true)).toBe("liberado")
+  })
+
+  it("o controle da pré-venda não libera na venda geral nem depois do encerramento", () => {
+    expect(statusOnCapture(null, "general", true)).toBe("pendente")
+    expect(statusOnCapture(null, "ended", true)).toBe("pendente")
+  })
+
+  it("o controle não reativa quem foi negado ou se descadastrou", () => {
+    expect(statusOnCapture("negado", "presale", true)).toBe("negado")
+    expect(statusOnCapture("descadastrado", "presale", true)).toBe("descadastrado")
+  })
+
   it("quem se descadastrou continua descadastrado, mesmo em um novo cadastro", () => {
     expect(statusOnCapture("descadastrado", "coming_soon")).toBe("descadastrado")
     expect(statusOnCapture("descadastrado", "presale")).toBe("descadastrado")

@@ -121,6 +121,16 @@
           "default": "21",
           "mappedType": "integer"
         },
+        "release_leads_in_presale": {
+          "name": "release_leads_in_presale",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "false",
+          "mappedType": "boolean"
+        },
         "component_key": {
           "name": "component_key",
           "type": "text",
