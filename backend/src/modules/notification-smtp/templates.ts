@@ -205,7 +205,7 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
       paragraphs: [`Recebemos o pagamento do pedido <strong>#${esc(d.display_id)}</strong>. Obrigado por vestir a Tyer!`, prazo],
       blocks,
       cta: { label: "Acompanhar meu pedido", url: d.orders_url },
-      note: "A nota fiscal chega por e-mail assim que for emitida e fica disponível para baixar na página Meus pedidos.",
+      note: "Guarde este e-mail: ele é o comprovante da sua compra. O pedido e a entrega também ficam em Meus pedidos.",
       reason,
     })
     const text = [
@@ -217,7 +217,7 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
       d.address ? `Entrega em: ${d.address}` : "",
       "",
       d.production_days ? `Produção em até ${d.production_days} dias, mais o prazo da transportadora.` : "Você recebe o código de rastreio quando o pedido for despachado.",
-      "A nota fiscal chega por e-mail assim que for emitida e fica em Meus pedidos.",
+      "Guarde este e-mail: ele é o comprovante da sua compra. O pedido e a entrega também ficam em Meus pedidos.",
       `Acompanhar: ${d.orders_url}`,
       footerText(reason),
     ]
