@@ -196,9 +196,25 @@ const c = (key: string) => t(lang, 'checkout', key);
         </div>
 
         <div id="checkout-success" class="checkout-success" hidden>
+          <div class="checkout-success__anim" aria-hidden="true">
+            <span class="checkout-success__ring"></span>
+            <svg class="checkout-success__check" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg>
+          </div>
           <h2>{c('success_title')}</h2>
+          <p class="checkout-success__order" id="checkout-success-order" hidden></p>
           <p>{c('success_text')}</p>
-          <a href={getPathForLang('/', lang)} class="btn btn-primary">{c('back_to_cart')}</a>
+          <ul class="checkout-success__items" id="checkout-success-items" role="list"></ul>
+          <p class="checkout-success__total" id="checkout-success-total" hidden></p>
+          <p class="checkout-success__mail" id="checkout-success-mail" hidden></p>
+          <div class="checkout-success__actions">
+            <a href={getPathForLang('/account/orders', lang)} class="btn btn-primary">Ver meus pedidos</a>
+            <a href={getPathForLang('/', lang)} class="btn btn-outline">Voltar ao início</a>
+          </div>
+          <ul class="checkout-success__social" role="list" aria-label="Redes da Tyer">
+            <li><a href="https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN" target="_blank" rel="noopener noreferrer">Grupo do WhatsApp</a></li>
+            <li><a href="https://www.instagram.com/tyer_br" target="_blank" rel="noopener noreferrer">Instagram</a></li>
+            <li><a href="https://www.youtube.com/@tyer_br" target="_blank" rel="noopener noreferrer">YouTube</a></li>
+          </ul>
         </div>
       </div>
 
@@ -862,8 +878,28 @@ const c = (key: string) => t(lang, 'checkout', key);
   }
   .checkout-success {
     text-align: center;
-    padding: 64px 24px;
+    padding: 56px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
+  .checkout-success__anim { position: relative; display: grid; place-items: center; width: 112px; height: 112px; margin-bottom: 20px; color: var(--c-accent, #e77e23); }
+  .checkout-success__ring { position: absolute; inset: 0; border: 3px solid currentColor; border-radius: 50%; animation: ck-pop 0.7s ease-out both, ck-pulse 2.4s ease-in-out 0.8s infinite; }
+  .checkout-success__check { stroke-dasharray: 30; stroke-dashoffset: 30; animation: ck-draw 0.6s ease-out 0.4s forwards; }
+  .checkout-success .checkout-success__order { font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-accent, #e77e23); margin: 0 0 8px; }
+  .checkout-success__items { list-style: none; margin: 0 0 8px; padding: 0; width: 100%; max-width: 440px; text-align: left; }
+  .checkout-success__items :global(li) { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); color: #fff; font-size: 14px; }
+  .checkout-success__items :global(small) { display: block; color: #9a9a9a; }
+  .checkout-success .checkout-success__total { color: #fff; font-weight: 800; font-size: 18px; margin: 4px 0 16px; }
+  .checkout-success .checkout-success__mail { font-size: 14px; }
+  .checkout-success__actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin: 8px 0 24px; }
+  .checkout-success__social { list-style: none; margin: 0; padding: 0; display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+  .checkout-success__social a { color: #fff; font-weight: 700; font-size: 14px; text-decoration: none; }
+  .checkout-success__social a:hover { color: var(--c-accent, #e77e23); }
+  @keyframes ck-pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes ck-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(231, 126, 35, 0.45); } 50% { box-shadow: 0 0 0 16px rgba(231, 126, 35, 0); } }
+  @keyframes ck-draw { to { stroke-dashoffset: 0; } }
+  @media (prefers-reduced-motion: reduce) { .checkout-success__ring, .checkout-success__check { animation: none; stroke-dashoffset: 0; } }
   .checkout-success h2 {
     font-family: var(--font-title);
     text-transform: uppercase;

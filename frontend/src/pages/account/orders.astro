@@ -15,29 +15,158 @@ const pk = getPublishableKey();
       <a href={getPathForLang('/account', lang)} class="btn btn-outline">Minha conta</a>
     </div>
     <div id="orders-list" class="orders-list" role="list" aria-label={t(lang, 'account', 'order_history')} aria-live="polite">
-      <p class="orders-loading" id="orders-loading">Loading...</p>
+      <p class="orders-loading" id="orders-loading">Carregando seus pedidos...</p>
     </div>
   </div>
 </Layout>
-<style>
+<style is:global>
 .orders-page { padding-block: 64px; }
 .orders-page__head { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom: 24px; flex-wrap:wrap; }
-.orders-page__title { font-family: var(--font-title); font-size: 56px; text-transform: uppercase; margin-bottom: 0; }
+.orders-page__title { font-family: var(--font-title); font-size: clamp(36px, 8vw, 56px); text-transform: uppercase; margin-bottom: 0; }
 .orders-list { display: flex; flex-direction: column; gap: 16px; }
-.order-card { background: var(--c-surface); padding: 24px; border-radius: var(--r-md); display: grid; grid-template-columns: 1fr auto; gap: 16px; }
-.order-card__id { font-size: 12px; color: var(--c-muted); margin-bottom: 4px; }
-.order-card__date { font-size: 14px; font-weight: 500; }
-.order-card__status { display: inline-block; padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-.order-card__status--completed { background: rgba(200,241,53,0.15); color: var(--c-accent); }
-.order-card__status--pending    { background: rgba(255,200,0,0.15); color: #ffc800; }
-.order-card__total { font-size: 18px; font-weight: 700; align-self: center; }
+.order-card { background: var(--c-surface); padding: 24px; border-radius: var(--r-md); display: flex; flex-direction: column; gap: 16px; }
+.order-card__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.order-card__id { font-size: 14px; font-weight: 800; margin: 0 0 4px; }
+.order-card__date { font-size: 13px; color: var(--c-muted); margin: 0; }
+.order-card__status { display: inline-block; padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: rgba(255,255,255,0.1); }
+.order-card__status--delivered { background: rgba(80,200,120,0.18); color: #6ee7a0; }
+.order-card__status--shipped { background: rgba(231,126,35,0.18); color: #e77e23; }
+.order-card__status--preparing, .order-card__status--paid { background: rgba(255,200,0,0.15); color: #ffc800; }
+.order-card__status--pending { background: rgba(255,255,255,0.1); color: #b8b8b8; }
+.order-card__status--canceled { background: rgba(248,113,113,0.15); color: #f87171; }
+.order-card__items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.order-card__items small { color: var(--c-muted); }
+.order-card__foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.order-card__total { font-size: 18px; font-weight: 700; margin: 0; }
+.order-card__actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.order-card__tracking { font-size: 13px; color: var(--c-muted); margin: 0; }
 .orders-empty { color: var(--c-muted); font-size: 14px; padding: 40px 0; }
 .orders-loading { color: var(--c-muted); font-size: 14px; }
 </style>
 <script define:vars={{ pk }}>
+  const FIELDS = 'id,display_id,status,created_at,total,currency_code,payment_status,fulfillment_status,metadata,*items,*fulfillments,*fulfillments.labels';
+  const headers = (token) => ({ Authorization: `Bearer ${token}`, 'x-publishable-api-key': pk });
+
+  // Etapas que o cliente entende, tiradas do pagamento e da entrega do pedido.
+  function statusOf(o) {
+    if (o.status === 'canceled') return ['Cancelado', 'canceled'];
+    const f = o.fulfillment_status;
+    if (f === 'delivered') return ['Entregue', 'delivered'];
+    if (f === 'shipped' || f === 'partially_shipped' || f === 'partially_delivered') return ['Enviado', 'shipped'];
+    if (f === 'fulfilled' || f === 'partially_fulfilled') return ['Preparando o envio', 'preparing'];
+    if (['captured', 'partially_captured', 'authorized'].includes(o.payment_status)) return ['Pagamento confirmado', 'paid'];
+    return ['Aguardando pagamento', 'pending'];
+  }
+
+  function trackingOf(o) {
+    for (const f of o.fulfillments ?? []) {
+      for (const l of f.labels ?? []) {
+        if (l.tracking_number) {
+          return { code: l.tracking_number, url: l.tracking_url || `https://www.melhorrastreio.com.br/rastreio/${encodeURIComponent(l.tracking_number)}` };
+        }
+      }
+    }
+    return null;
+  }
+
+  async function downloadInvoice(order, button, token) {
+    button.disabled = true;
+    try {
+      const res = await fetch(`/store/orders/${encodeURIComponent(order.id)}/invoice`, { headers: headers(token) });
+      if (!res.ok) throw new Error('fail');
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nota-fiscal-pedido-${order.display_id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch {
+      alert('Não foi possível baixar a nota fiscal agora. Tente de novo em instantes.');
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  function card(order, token) {
+    const el = document.createElement('div');
+    el.className = 'order-card';
+    el.setAttribute('role', 'listitem');
+    const money = (v) => Number(v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: String(order.currency_code || 'brl').toUpperCase() });
+    const [label, kind] = statusOf(order);
+
+    const top = document.createElement('div');
+    top.className = 'order-card__top';
+    const left = document.createElement('div');
+    const id = document.createElement('p');
+    id.className = 'order-card__id';
+    id.textContent = `Pedido #${order.display_id}`;
+    const date = document.createElement('p');
+    date.className = 'order-card__date';
+    date.textContent = new Date(order.created_at).toLocaleDateString('pt-BR');
+    left.append(id, date);
+    const status = document.createElement('span');
+    status.className = `order-card__status order-card__status--${kind}`;
+    status.textContent = label;
+    top.append(left, status);
+
+    const items = document.createElement('ul');
+    items.className = 'order-card__items';
+    for (const i of order.items ?? []) {
+      const li = document.createElement('li');
+      li.textContent = `${i.quantity}x ${i.product_title || i.title}`;
+      if (i.subtitle || i.variant_title) {
+        const small = document.createElement('small');
+        small.textContent = ` ${i.variant_title || i.subtitle}`;
+        li.append(small);
+      }
+      items.append(li);
+    }
+
+    const foot = document.createElement('div');
+    foot.className = 'order-card__foot';
+    const total = document.createElement('p');
+    total.className = 'order-card__total';
+    total.textContent = money(order.total);
+    const actions = document.createElement('div');
+    actions.className = 'order-card__actions';
+
+    const tracking = trackingOf(order);
+    if (tracking) {
+      const a = document.createElement('a');
+      a.className = 'btn btn-outline';
+      a.href = tracking.url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = 'Rastrear entrega';
+      actions.append(a);
+    }
+    const invoice = order.metadata?.invoice;
+    if (invoice?.file_id && order.status !== 'canceled') {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn btn-outline';
+      b.textContent = 'Baixar nota fiscal';
+      b.addEventListener('click', () => downloadInvoice(order, b, token));
+      actions.append(b);
+    }
+    foot.append(total, actions);
+
+    el.append(top, items);
+    if (tracking) {
+      const code = document.createElement('p');
+      code.className = 'order-card__tracking';
+      code.textContent = `Código de rastreio: ${tracking.code}`;
+      el.append(code);
+    }
+    el.append(foot);
+    return el;
+  }
+
   async function loadOrders() {
     const container = document.getElementById('orders-list');
-    const loading   = document.getElementById('orders-loading');
+    const loading = document.getElementById('orders-loading');
     if (!(container instanceof HTMLElement)) return;
     const token = localStorage.getItem('tyer_token') || '';
     if (!token) {
@@ -45,12 +174,7 @@ const pk = getPublishableKey();
       return;
     }
     try {
-      const res = await fetch('/store/orders', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'x-publishable-api-key': pk,
-        },
-      });
+      const res = await fetch(`/store/orders?order=-created_at&fields=${encodeURIComponent(FIELDS)}`, { headers: headers(token) });
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) {
           localStorage.removeItem('tyer_token');
@@ -60,34 +184,13 @@ const pk = getPublishableKey();
         }
         throw new Error(`Orders request failed: ${res.status}`);
       }
-      const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        throw new Error('Invalid orders response');
-        return;
-      }
       const { orders } = await res.json();
       if (loading) loading.remove();
       if (!orders?.length) {
-        container.innerHTML = '<p class="orders-empty">No orders yet.</p>';
+        container.innerHTML = '<p class="orders-empty">Você ainda não fez nenhum pedido.</p>';
         return;
       }
-      for (const order of (orders ?? [])) {
-        const el = document.createElement('div');
-        el.className = 'order-card'; el.setAttribute('role', 'listitem');
-        const date = new Date(order.created_at).toLocaleDateString();
-        const total = (order.total / 100).toLocaleString('pt-BR', { style: 'currency', currency: order.currency_code?.toUpperCase() || 'BRL' });
-        el.innerHTML = `
-          <div>
-            <p class="order-card__id">#${order.display_id}</p>
-            <p class="order-card__date">${date}</p>
-          </div>
-          <div style="text-align:right">
-            <span class="order-card__status order-card__status--${order.status}">${order.status}</span>
-            <p class="order-card__total">${total}</p>
-          </div>
-        `;
-        container.appendChild(el);
-      }
+      for (const order of orders) container.appendChild(card(order, token));
     } catch {
       if (loading instanceof HTMLElement) loading.remove();
       container.innerHTML = '<p class="orders-empty">Não foi possível carregar os pedidos agora.</p>';

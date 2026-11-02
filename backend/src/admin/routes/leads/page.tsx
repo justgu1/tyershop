@@ -6,12 +6,12 @@ type Lead = {
   id: string
   email: string
   name: string | null
-  status: "pendente" | "liberado" | "inativo" | "negado"
+  status: "pendente" | "liberado" | "inativo" | "negado" | "descadastrado"
   source: string
   created_at: string
 }
 
-const STATUSES: Lead["status"][] = ["pendente", "liberado", "inativo", "negado"]
+const STATUSES: Lead["status"][] = ["pendente", "liberado", "inativo", "negado", "descadastrado"]
 
 const LeadsPage = () => {
   const [leads, setLeads] = useState<Lead[]>([])
