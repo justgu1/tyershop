@@ -63,21 +63,25 @@ spec:
                 secretKeyRef:
                   name: tyershop-secrets
                   key: SMTP_HOST
+                  optional: true
             - name: SMTP_PORT
               valueFrom:
                 secretKeyRef:
                   name: tyershop-secrets
                   key: SMTP_PORT
+                  optional: true
             - name: SMTP_USER
               valueFrom:
                 secretKeyRef:
                   name: tyershop-secrets
                   key: SMTP_USER
+                  optional: true
             - name: SMTP_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: tyershop-secrets
                   key: SMTP_PASSWORD
+                  optional: true
             - name: SMTP_FROM
               value: "Tyer <contato@tyershop.com>"
             # Ligado por padrão: homolog e prod são o mesmo deploy, nada sai para cliente real sem desligar aqui.

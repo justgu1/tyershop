@@ -274,7 +274,7 @@ export async function validateCartItems(): Promise<{
   const blocked = await fetchBlockedByDrop(current.map((i) => i.variantId));
 
   snapshots.forEach(({ item, snapshot }) => {
-    if (!snapshot.exists || snapshot.soldOut || blocked.has(item.variantId)) {
+    if (!snapshot.exists || blocked.has(item.variantId)) {
       removedVariantIds.push(item.variantId);
       return;
     }

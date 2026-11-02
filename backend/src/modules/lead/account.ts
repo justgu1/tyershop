@@ -31,7 +31,9 @@ export async function ensureAccount(scope: MedusaContainer, email: string, name?
   )
 
   let authIdentity = existing
+  let rotated = false
   if (authIdentity && opts.ownerProved && !authIdentity.app_metadata?.lead_account) {
+    rotated = true
     await authModule.updateProvider("emailpass", { entity_id: email, password: randomBytes(24).toString("hex") })
   }
   if (!authIdentity) {
@@ -54,5 +56,5 @@ export async function ensureAccount(scope: MedusaContainer, email: string, name?
     })
   }
 
-  return { customer, authIdentity }
+  return { customer, authIdentity, passwordReset: rotated }
 }

@@ -6,10 +6,13 @@ import DropModuleService from "../drop/service"
 import { resolveDropPhase } from "../drop/phase"
 import { LEAD_MODULE } from "../lead"
 import LeadModuleService from "../lead/service"
+import { readTestMode } from "../notification-smtp/test-mode"
 import { ensureAccount } from "../lead/account"
 import { TICKET_MODULE } from "./index"
 import TicketModuleService from "./service"
 import { leadsToIssue, ticketsToSend } from "./eligibility"
+
+const sentInTest = new Set<string>()
 
 const newCode = () => randomBytes(9).toString("base64url")
 
@@ -77,7 +80,11 @@ export async function issueTickets(scope: MedusaContainer, dropId: string) {
   let sent = 0
   const failed: { email: string; error: string }[] = []
   const leadsService = scope.resolve<LeadModuleService>(LEAD_MODULE)
+  // Em modo de teste o e-mail vai para o endereço de teste e o ingresso NÃO é marcado como enviado: ao desligar
+  // o modo, os convidados ainda recebem. Cada ingresso vai ao teste uma vez por execução do servidor.
+  const testMode = readTestMode(process.env).enabled
   for (const ticket of pending) {
+    if (testMode && sentInTest.has(ticket.id)) continue
     // O status pode ter mudado desde o carregamento (ex.: admin negou o lead): relê antes de enviar.
     const lead = leadById.get(ticket.lead_id) && (await leadsService.retrieveLead(ticket.lead_id).catch(() => null))
     if (!lead || lead.status === "negado") continue
@@ -98,6 +105,12 @@ export async function issueTickets(scope: MedusaContainer, dropId: string) {
       })
     } catch (e: any) {
       failed.push({ email: lead.email, error: e?.message ?? "falha no envio" })
+      continue
+    }
+
+    if (testMode) {
+      sentInTest.add(ticket.id)
+      sent++
       continue
     }
 

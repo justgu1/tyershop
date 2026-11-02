@@ -35,6 +35,7 @@ export async function POST(req: MedusaRequest<Body>, res: MedusaResponse) {
   const { payment } = await guardedPayment(
     req,
     session as any,
+    amount,
     (idempotencyKey) =>
       client.createCardPayment({
         idempotencyKey,

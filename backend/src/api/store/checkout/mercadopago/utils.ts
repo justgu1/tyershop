@@ -66,6 +66,7 @@ export const toAmount = (v: unknown) => Math.round(Number(v) * 100) / 100;
 export async function guardedPayment(
   req: MedusaRequest,
   session: { id: string; payment_collection_id?: string | null; data?: unknown },
+  amount: number,
   create: (idempotencyKey: string) => Promise<MercadoPagoPayment>,
   persist: (payment: MercadoPagoPayment, attempt: number) => Promise<void>
 ): Promise<{ payment: MercadoPagoPayment; reused: boolean }> {
@@ -85,8 +86,19 @@ export async function guardedPayment(
 
       const prev = (session.data ?? {}) as { mp_payment_id?: number; attempt?: number };
       if (prev.mp_payment_id) {
-        const existing = await getMercadoPagoClient().getPayment(prev.mp_payment_id);
-        if (OPEN_STATUSES.includes(existing.status)) return { payment: existing, reused: true };
+        const client = getMercadoPagoClient();
+        const existing = await client.getPayment(prev.mp_payment_id);
+        if (OPEN_STATUSES.includes(existing.status)) {
+          // O carrinho mudou depois de gerado o pagamento: o antigo não serve mais e é cancelado para dar lugar a um novo.
+          if (Math.abs(Number(existing.transaction_amount) - amount) <= 0.009) return { payment: existing, reused: true };
+          const cancelled = await client.cancelPayment(prev.mp_payment_id).catch(() => null);
+          if (!cancelled || cancelled.status !== "cancelled") {
+            throw new MedusaError(
+              MedusaError.Types.NOT_ALLOWED,
+              "Já existe um pagamento em andamento com outro valor para este pedido. Conclua ou aguarde ele expirar antes de alterar o carrinho."
+            );
+          }
+        }
       }
 
       const { lines } = await loadCart(req.scope, cart.id);

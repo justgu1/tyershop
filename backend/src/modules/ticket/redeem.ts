@@ -37,9 +37,9 @@ export async function redeemTicket(scope: MedusaContainer, code: string) {
   const lead = await leads.retrieveLead(ticket.lead_id)
   if (lead.status === "negado") throw invalid()
 
-  let customer, authIdentity
+  let customer, authIdentity, passwordReset
   try {
-    ;({ customer, authIdentity } = await ensureAccount(scope, lead.email, lead.name, { ownerProved: true }))
+    ;({ customer, authIdentity, passwordReset } = await ensureAccount(scope, lead.email, lead.name, { ownerProved: true }))
   } catch {
     throw invalid()
   }
@@ -59,5 +59,5 @@ export async function redeemTicket(scope: MedusaContainer, code: string) {
   await tickets.updateTickets({ id: ticket.id, customer_id: customer.id, redeemed_at: ticket.redeemed_at ?? new Date() })
   if (lead.customer_id !== customer.id) await leads.updateLeads({ id: lead.id, customer_id: customer.id })
 
-  return { token, drop_handle: drop.handle }
+  return { token, drop_handle: drop.handle, password_reset: !!passwordReset }
 }

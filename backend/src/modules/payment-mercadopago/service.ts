@@ -140,6 +140,9 @@ class MercadoPagoProviderService extends AbstractPaymentProvider<Options> {
     super(cradle, options);
     this.logger_ = cradle.logger;
     this.options_ = options;
+    if (!options.webhookSecret && process.env.NODE_ENV === "production") {
+      this.logger_.warn("[mercadopago] MERCADOPAGO_WEBHOOK_SECRET não definido: notificações sem assinatura são aceitas (o status é sempre reconsultado no Mercado Pago)");
+    }
     this.client_ = new MercadoPagoClient({
       accessToken: options.accessToken,
       notificationUrl: options.notificationUrl,

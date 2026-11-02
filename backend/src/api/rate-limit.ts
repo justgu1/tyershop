@@ -4,7 +4,7 @@ import Redis from "ioredis"
 type Options = {
   windowMs: number
   max: number
-  /** Teto somado de todos os visitantes na mesma janela: segura quem troca de IP a cada requisição. */
+  /** Teto somado de todos os visitantes na mesma janela. Só para quem gasta algo finito (e-mails do SMTP, chamadas ao Melhor Envio): em login e resgate bloquearia usuários legítimos. */
   globalMax?: number
   /** Chave extra além do IP (ex.: e-mail do corpo), para impedir spam contra uma pessoa só. */
   by?: (req: MedusaRequest) => string | undefined
@@ -60,14 +60,15 @@ export const clientIp = (req: MedusaRequest) => {
 }
 
 /** Limite por janela; responde 429 ao exceder. */
-export function rateLimit(name: string, { windowMs, max, by, globalMax = max * 20 }: Options) {
+export function rateLimit(name: string, { windowMs, max, by, globalMax }: Options) {
   return async (req: MedusaRequest, res: MedusaResponse, next: MedusaNextFunction) => {
-    const keys = [`${name}|ip|${clientIp(req)}`, `${name}|all`]
+    const keys = [`${name}|ip|${clientIp(req)}`]
+    if (globalMax) keys.push(`${name}|all`)
     const extra = by?.(req)
     if (extra) keys.push(`${name}|by|${extra.toLowerCase()}`)
 
     for (const key of keys) {
-      if ((await hit(key, windowMs)) > (key.endsWith("|all") ? globalMax : max)) {
+      if ((await hit(key, windowMs)) > (key.endsWith("|all") ? (globalMax as number) : max)) {
         res.setHeader("retry-after", Math.ceil(windowMs / 1000))
         return res.status(429).json({ type: "too_many_requests", message: "Muitas tentativas. Aguarde um pouco e tente de novo." })
       }

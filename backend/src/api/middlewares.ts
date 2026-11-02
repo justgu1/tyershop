@@ -43,7 +43,7 @@ export default defineMiddlewares({
       matcher: "/store/leads",
       method: "POST",
       middlewares: [
-        rateLimit("leads", { windowMs: 600_000, max: 8 }),
+        rateLimit("leads", { windowMs: 600_000, max: 8, globalMax: 100 }),
         rateLimit("leads-email", { windowMs: 3_600_000, max: 3, by: bodyEmail }),
         validateAndTransformBody(StoreCreateLeadSchema),
       ],
@@ -52,7 +52,7 @@ export default defineMiddlewares({
       matcher: "/store/drop/identify",
       method: "POST",
       middlewares: [
-        rateLimit("identify", { windowMs: 600_000, max: 10 }),
+        rateLimit("identify", { windowMs: 600_000, max: 10, globalMax: 300 }),
         rateLimit("identify-email", { windowMs: 3_600_000, max: 5, by: bodyEmail }),
         validateAndTransformBody(IdentifySchema),
       ],
@@ -67,7 +67,7 @@ export default defineMiddlewares({
       matcher: "/auth/customer/emailpass/reset-password",
       method: "POST",
       middlewares: [
-        rateLimit("reset", { windowMs: 600_000, max: 8 }),
+        rateLimit("reset", { windowMs: 600_000, max: 8, globalMax: 40 }),
         rateLimit("reset-email", { windowMs: 3_600_000, max: 3, by: bodyEmail }),
       ],
     },
@@ -99,9 +99,15 @@ export default defineMiddlewares({
       middlewares: [rateLimit("checkout", { windowMs: 600_000, max: 60 }), requiredCustomer],
     },
     {
+      // Notificações do Mercado Pago: cada uma custa uma consulta à API deles; teto alto para não barrar o tráfego legítimo.
+      matcher: "/hooks/payment/*",
+      method: "POST",
+      middlewares: [rateLimit("mp-hook", { windowMs: 60_000, max: 120, globalMax: 600 })],
+    },
+    {
       matcher: "/store/shipping/quote",
       method: "POST",
-      middlewares: [rateLimit("quote", { windowMs: 600_000, max: 40 }), validateAndTransformBody(StoreQuoteSchema)],
+      middlewares: [rateLimit("quote", { windowMs: 600_000, max: 40, globalMax: 600 }), validateAndTransformBody(StoreQuoteSchema)],
     },
     {
       matcher: "/store/melhor-envio/callback",

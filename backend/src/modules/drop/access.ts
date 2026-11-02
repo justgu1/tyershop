@@ -65,20 +65,35 @@ function sumByProduct(orders: Awaited<ReturnType<typeof ordersSince>>, only: Set
   return total
 }
 
+/** Pix e boleto expiram em até 3 dias: carrinho parado há mais que isso não segura mais peças. */
+const PAYMENT_WINDOW_MS = 4 * 24 * 3600 * 1000
+
+/** Todos os carrinhos abertos e recentes (opcionalmente de um cliente), lidos por inteiro em páginas. */
+async function openCarts(scope: MedusaContainer, customerId?: string) {
+  const out: any[] = []
+  const take = 200
+  const since = new Date(Date.now() - PAYMENT_WINDOW_MS)
+  for (let skip = 0; ; skip += take) {
+    const { data } = await query(scope).graph({
+      entity: "cart",
+      fields: ["id", "items.product_id", "items.quantity", "payment_collection.payment_sessions.data"],
+      filters: { ...(customerId ? { customer_id: customerId } : {}), completed_at: null, updated_at: { $gte: since } },
+      pagination: { skip, take, order: { updated_at: "DESC" } },
+    })
+    out.push(...(data as any[]))
+    if ((data as any[]).length < take) break
+  }
+  return out
+}
+
 /** Pagamento criado no Mercado Pago e ainda não recusado nem cancelado. */
 const payingSession = (sessions: any[] | undefined) =>
   (sessions ?? []).some((s) => s.data?.mp_payment_id && !["rejected", "cancelled"].includes(s.data?.mp_status))
 
 /** Peças em pagamento (de qualquer cliente) dos produtos dados: reservam o lote até virarem pedido. */
 async function reservedForLot(scope: MedusaContainer, productIds: Set<string>, excludeCartId?: string) {
-  const { data } = await query(scope).graph({
-    entity: "cart",
-    fields: ["id", "items.product_id", "items.quantity", "payment_collection.payment_sessions.data"],
-    filters: { completed_at: null },
-    pagination: { take: 500 },
-  })
   let total = 0
-  for (const cart of data as any[]) {
+  for (const cart of await openCarts(scope)) {
     if (cart.id === excludeCartId || !payingSession(cart.payment_collection?.payment_sessions)) continue
     for (const it of cart.items ?? []) if (it.product_id && productIds.has(it.product_id)) total += Number(it.quantity)
   }
@@ -101,16 +116,9 @@ export async function lotLockKey(scope: MedusaContainer, lines: CartLine[]): Pro
  * (Pix e boleto levam tempo). Sem isso, dois pagamentos simultâneos furariam o limite por pessoa.
  */
 async function reservedByProduct(scope: MedusaContainer, customerId: string, excludeCartId?: string) {
-  const { data } = await query(scope).graph({
-    entity: "cart",
-    fields: ["id", "items.product_id", "items.quantity", "payment_collection.payment_sessions.data"],
-    filters: { customer_id: customerId, completed_at: null },
-    pagination: { take: 50 },
-  })
   const total = new Map<string, number>()
-  for (const cart of data as any[]) {
-    if (cart.id === excludeCartId) continue
-    if (!payingSession(cart.payment_collection?.payment_sessions)) continue
+  for (const cart of await openCarts(scope, customerId)) {
+    if (cart.id === excludeCartId || !payingSession(cart.payment_collection?.payment_sessions)) continue
     for (const it of cart.items ?? []) {
       if (it.product_id) total.set(it.product_id, (total.get(it.product_id) ?? 0) + Number(it.quantity))
     }
@@ -120,11 +128,24 @@ async function reservedByProduct(scope: MedusaContainer, customerId: string, exc
 
 const soldCache = new Map<string, { at: number; sold: number }>()
 
-/** Peças já vendidas no lote (pedidos não cancelados); o total é guardado por poucos segundos para não varrer os pedidos a cada clique. */
+/** Peças já vendidas no lote, somadas no banco (pedidos não cancelados desde o início da venda geral); guardado por poucos segundos. */
 async function soldInLot(scope: MedusaContainer, dropId: string, from: Date, productIds: Set<string>) {
   const hit = soldCache.get(dropId)
   if (hit && Date.now() - hit.at < DROP_CACHE_MS) return hit.sold
-  const sold = [...sumByProduct(await ordersSince(scope, from, null), productIds).values()].reduce((a, b) => a + b, 0)
+  const pg = scope.resolve(ContainerRegistrationKeys.PG_CONNECTION) as any
+  const result = await pg.raw(
+    `select coalesce(sum(oi.quantity), 0)::float as sold
+       from order_item oi
+       join order_line_item li on li.id = oi.item_id
+       join "order" o on o.id = oi.order_id
+      where li.product_id = any(?)
+        and o.created_at >= ?
+        and o.status <> 'canceled'
+        and oi.deleted_at is null
+        and o.deleted_at is null`,
+    [[...productIds], from]
+  )
+  const sold = Number(result.rows?.[0]?.sold ?? 0)
   soldCache.set(dropId, { at: Date.now(), sold })
   return sold
 }

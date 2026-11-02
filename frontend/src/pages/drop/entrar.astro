@@ -50,6 +50,13 @@ export const prerender = false;
       localStorage.setItem('tyer_token', data.token);
       localStorage.removeItem('tyer_customer');
       syncSessionCookie();
+      if (data.password_reset) {
+        // Conta que já existia com outra senha: por segurança a senha foi trocada; avisa antes de seguir.
+        msg.textContent = 'Você entrou. Por segurança, a senha antiga desta conta foi desativada: use “esqueci minha senha” quando quiser criar uma nova.';
+        back.textContent = 'Continuar para o drop';
+        back.hidden = false;
+        return;
+      }
       location.replace('/drop');
     } catch {
       fail('Não consegui entrar agora. Tente de novo em instantes.');
