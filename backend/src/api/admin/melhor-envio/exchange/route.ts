@@ -6,6 +6,10 @@ import MelhorEnvioModuleService from "../../../../modules/melhor-envio/service"
 export async function POST(req: MedusaRequest<{ code?: string }>, res: MedusaResponse) {
   const code = String(req.body?.code ?? "").trim()
   if (!code) return res.status(400).json({ message: "code é obrigatório." })
-  await req.scope.resolve<MelhorEnvioModuleService>(MELHOR_ENVIO_MODULE).connect(code)
+  try {
+    await req.scope.resolve<MelhorEnvioModuleService>(MELHOR_ENVIO_MODULE).connect(code)
+  } catch (err) {
+    return res.status(400).json({ message: `${(err as Error).message}. O código vale uma vez só e expira em poucos minutos: gere outro pelo painel.` })
+  }
   res.json({ ok: true })
 }

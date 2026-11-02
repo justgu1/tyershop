@@ -1,6 +1,6 @@
 import { AbstractFulfillmentProviderService, MedusaError } from "@medusajs/framework/utils"
 import { container as appContainer } from "@medusajs/framework"
-import { buildPackage, quotePackage, SERVICES } from "../melhor-envio/quote"
+import { buildPackage, loadShipments, quotePackage, SERVICES } from "../melhor-envio/quote"
 
 /**
  * Frete calculado no Melhor Envio. Cada serviço (PAC, SEDEX...) vira uma opção de envio do Medusa; o preço
@@ -32,15 +32,13 @@ class MelhorEnvioFulfillmentService extends AbstractFulfillmentProviderService {
     const zip = context.shipping_address?.postal_code
     if (!zip) throw new MedusaError(MedusaError.Types.INVALID_DATA, "Informe o CEP de entrega para calcular o frete.")
 
-    const items = (context.items ?? []).map((i: any) => ({
-      variant_id: i.variant_id ?? i.variant?.id,
-      quantity: i.quantity,
-      weight: i.variant?.weight,
-      length: i.variant?.length,
-      width: i.variant?.width,
-      height: i.variant?.height,
-    }))
-    const quote = (await quotePackage(appContainer, zip, buildPackage(items))).find((q) => q.id === serviceId)
+    // Peso e medidas vêm sempre das variantes no banco (o contexto do Medusa pode não trazê-los): é a mesma
+    // fonte da cotação pública e da conferência antes de cobrar, então os três preços sempre batem.
+    const shipments = await loadShipments(
+      appContainer,
+      (context.items ?? []).map((i: any) => ({ variant_id: i.variant_id ?? i.variant?.id, quantity: i.quantity })).filter((i: any) => i.variant_id)
+    )
+    const quote = (await quotePackage(appContainer, zip, buildPackage(shipments))).find((q) => q.id === serviceId)
     if (!quote) throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "Este serviço de entrega não atende o CEP informado.")
 
     return { calculated_amount: quote.price, is_calculated_price_tax_inclusive: false }

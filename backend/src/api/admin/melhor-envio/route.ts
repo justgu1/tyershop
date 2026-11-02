@@ -9,10 +9,11 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
   const status = await req.scope.resolve<MelhorEnvioModuleService>(MELHOR_ENVIO_MODULE).status()
   const { clientId, clientSecret, redirectUri } = oauthConfig()
   const configured = !!(clientId && clientSecret && redirectUri)
+  const secretOk = !!process.env.COOKIE_SECRET && process.env.COOKIE_SECRET !== "supersecret"
   res.json({
     ...status,
     configured,
     environment: baseUrl().includes("sandbox") ? "sandbox" : "production",
-    authorize_url: configured ? authorizeUrl(signState()) : null,
+    authorize_url: configured && secretOk ? authorizeUrl(signState()) : null,
   })
 }

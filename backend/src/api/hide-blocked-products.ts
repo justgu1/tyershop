@@ -10,7 +10,8 @@ export async function hideBlockedProducts(req: AuthenticatedMedusaRequest, res: 
   try {
     blocked = await blockedProductIds(req.scope, req.auth_context?.actor_id)
   } catch {
-    return next()
+    // Sem saber o que esconder, não responde: vazar produto de drop fechado é pior que o catálogo indisponível.
+    return res.status(503).json({ type: "service_unavailable", message: "Catálogo indisponível no momento. Tente de novo." })
   }
   if (!blocked.size) return next()
 

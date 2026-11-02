@@ -1,7 +1,7 @@
 import type { MedusaRequest } from "@medusajs/framework/http";
 import { ContainerRegistrationKeys, MedusaError, Modules } from "@medusajs/framework/utils";
 import { assertShippingCurrent } from "../../../../modules/melhor-envio/quote";
-import { assertCartAllowed, loadCart } from "../../../../modules/drop/access";
+import { assertCartAllowed, loadCart, lotLockKey } from "../../../../modules/drop/access";
 import { MercadoPagoClient, type MercadoPagoPayment } from "../../../../modules/payment-mercadopago/client";
 
 /**
@@ -73,8 +73,10 @@ export async function guardedPayment(
   if (!customerId) throw new MedusaError(MedusaError.Types.UNAUTHORIZED, "Entre na sua conta para pagar.");
 
   const locking = req.scope.resolve(Modules.LOCKING) as any;
+  const cartForLock = await cartOfSession(req, session);
+  const lotKey = cartForLock ? await lotLockKey(req.scope, (await loadCart(req.scope, cartForLock.id)).lines) : null;
   return locking.execute(
-    `pay:${customerId}`,
+    lotKey ? [`pay:${customerId}`, lotKey] : `pay:${customerId}`,
     async () => {
       const cart = await cartOfSession(req, session);
       if (!cart || cart.customer_id !== customerId) {

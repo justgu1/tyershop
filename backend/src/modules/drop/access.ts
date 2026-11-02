@@ -1,7 +1,5 @@
 import { MedusaContainer } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
-import { DROP_MODULE } from "./index"
-import DropModuleService from "./service"
 import { presentDrop } from "./present"
 import { hasTicket } from "../ticket/access"
 
@@ -19,15 +17,20 @@ const query = (scope: MedusaContainer) => scope.resolve(ContainerRegistrationKey
 
 const deny = (message: string) => new MedusaError(MedusaError.Types.NOT_ALLOWED, message)
 
-export async function dropRows(scope: MedusaContainer) {
-  const { data } = await query(scope).graph({ entity: "drop", fields: ["id", "products.id"] })
-  const drops = scope.resolve<DropModuleService>(DROP_MODULE)
-  return Promise.all(
-    (data as any[]).map(async (row) => ({
-      drop: await drops.retrieveDrop(row.id),
-      productIds: new Set<string>((row.products ?? []).map((p: { id: string }) => p.id)),
-    }))
-  )
+type DropRow = { drop: any; productIds: Set<string> }
+let dropCache: { at: number; rows: DropRow[] } | null = null
+const DROP_CACHE_MS = 5000
+
+/** Todos os drops com seus produtos em uma consulta só; guardado por poucos segundos (as fases mudam por data). */
+export async function dropRows(scope: MedusaContainer): Promise<DropRow[]> {
+  if (dropCache && Date.now() - dropCache.at < DROP_CACHE_MS) return dropCache.rows
+  const { data } = await query(scope).graph({ entity: "drop", fields: ["*", "products.id"] })
+  const rows = (data as any[]).map((row) => ({
+    drop: row,
+    productIds: new Set<string>((row.products ?? []).map((p: { id: string }) => p.id)),
+  }))
+  dropCache = { at: Date.now(), rows }
+  return rows
 }
 
 /** Pedidos não cancelados a partir de `from` (opcionalmente só de um cliente), paginados. */
@@ -62,6 +65,37 @@ function sumByProduct(orders: Awaited<ReturnType<typeof ordersSince>>, only: Set
   return total
 }
 
+/** Pagamento criado no Mercado Pago e ainda não recusado nem cancelado. */
+const payingSession = (sessions: any[] | undefined) =>
+  (sessions ?? []).some((s) => s.data?.mp_payment_id && !["rejected", "cancelled"].includes(s.data?.mp_status))
+
+/** Peças em pagamento (de qualquer cliente) dos produtos dados: reservam o lote até virarem pedido. */
+async function reservedForLot(scope: MedusaContainer, productIds: Set<string>, excludeCartId?: string) {
+  const { data } = await query(scope).graph({
+    entity: "cart",
+    fields: ["id", "items.product_id", "items.quantity", "payment_collection.payment_sessions.data"],
+    filters: { completed_at: null },
+    pagination: { take: 500 },
+  })
+  let total = 0
+  for (const cart of data as any[]) {
+    if (cart.id === excludeCartId || !payingSession(cart.payment_collection?.payment_sessions)) continue
+    for (const it of cart.items ?? []) if (it.product_id && productIds.has(it.product_id)) total += Number(it.quantity)
+  }
+  return total
+}
+
+/** Drop com lote em venda geral que este carrinho toca: a cobrança precisa ser serializada entre clientes. */
+export async function lotLockKey(scope: MedusaContainer, lines: CartLine[]): Promise<string | null> {
+  const ids = new Set(lines.map((l) => l.product_id))
+  for (const { drop, productIds } of await dropRows(scope)) {
+    if (drop.general_lot && presentDrop(drop).phase === "general" && [...ids].some((id) => productIds.has(id))) {
+      return `lot:${drop.id}`
+    }
+  }
+  return null
+}
+
 /**
  * Peças de carrinhos do cliente que já têm pagamento criado no Mercado Pago e ainda não viraram pedido
  * (Pix e boleto levam tempo). Sem isso, dois pagamentos simultâneos furariam o limite por pessoa.
@@ -76,15 +110,23 @@ async function reservedByProduct(scope: MedusaContainer, customerId: string, exc
   const total = new Map<string, number>()
   for (const cart of data as any[]) {
     if (cart.id === excludeCartId) continue
-    const paying = (cart.payment_collection?.payment_sessions ?? []).some(
-      (s: any) => s.data?.mp_payment_id && !["rejected", "cancelled"].includes(s.data?.mp_status)
-    )
-    if (!paying) continue
+    if (!payingSession(cart.payment_collection?.payment_sessions)) continue
     for (const it of cart.items ?? []) {
       if (it.product_id) total.set(it.product_id, (total.get(it.product_id) ?? 0) + Number(it.quantity))
     }
   }
   return total
+}
+
+const soldCache = new Map<string, { at: number; sold: number }>()
+
+/** Peças já vendidas no lote (pedidos não cancelados); o total é guardado por poucos segundos para não varrer os pedidos a cada clique. */
+async function soldInLot(scope: MedusaContainer, dropId: string, from: Date, productIds: Set<string>) {
+  const hit = soldCache.get(dropId)
+  if (hit && Date.now() - hit.at < DROP_CACHE_MS) return hit.sold
+  const sold = [...sumByProduct(await ordersSince(scope, from, null), productIds).values()].reduce((a, b) => a + b, 0)
+  soldCache.set(dropId, { at: Date.now(), sold })
+  return sold
 }
 
 /**
@@ -130,9 +172,10 @@ export async function assertCartAllowed(
 
     if (phase === "general" && drop.general_lot && mode !== "complete") {
       const from = new Date(drop.general_starts_at ?? drop.preorder_ends_at)
-      const sold = [...sumByProduct(await ordersSince(scope, from, null), productIds).values()].reduce((a, b) => a + b, 0)
+      const sold = await soldInLot(scope, drop.id, from, productIds)
+      const reserved = mode === "pay" ? await reservedForLot(scope, productIds, excludeCartId) : 0
       const wanted = inDrop.reduce((a, id) => a + (qtyByProduct.get(id) ?? 0), 0)
-      if (sold + wanted > drop.general_lot) throw deny("O lote da venda geral esgotou.")
+      if (sold + reserved + wanted > drop.general_lot) throw deny("O lote da venda geral esgotou.")
     }
   }
 }

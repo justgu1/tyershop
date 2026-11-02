@@ -76,9 +76,11 @@ export async function issueTickets(scope: MedusaContainer, dropId: string) {
 
   let sent = 0
   const failed: { email: string; error: string }[] = []
+  const leadsService = scope.resolve<LeadModuleService>(LEAD_MODULE)
   for (const ticket of pending) {
-    const lead = leadById.get(ticket.lead_id)
-    if (!lead) continue
+    // O status pode ter mudado desde o carregamento (ex.: admin negou o lead): relê antes de enviar.
+    const lead = leadById.get(ticket.lead_id) && (await leadsService.retrieveLead(ticket.lead_id).catch(() => null))
+    if (!lead || lead.status === "negado") continue
     try {
       await ensureAccount(scope, lead.email, lead.name)
       await notifications.createNotifications({

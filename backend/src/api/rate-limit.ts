@@ -4,6 +4,8 @@ import Redis from "ioredis"
 type Options = {
   windowMs: number
   max: number
+  /** Teto somado de todos os visitantes na mesma janela: segura quem troca de IP a cada requisição. */
+  globalMax?: number
   /** Chave extra além do IP (ex.: e-mail do corpo), para impedir spam contra uma pessoa só. */
   by?: (req: MedusaRequest) => string | undefined
 }
@@ -44,20 +46,28 @@ async function hit(key: string, windowMs: number): Promise<number> {
   return list.length
 }
 
-const clientIp = (req: MedusaRequest) =>
-  String(req.headers["cf-connecting-ip"] ?? req.headers["x-forwarded-for"] ?? req.ip ?? "")
-    .split(",")[0]
-    .trim()
+/**
+ * IP de quem chamou, sem confiar em cabeçalho que o próprio cliente escreve. Por padrão vale o último
+ * item de `x-forwarded-for` (o que o proxy da frente acrescentou). Com o servidor aberto só à Cloudflare,
+ * defina RATE_LIMIT_IP_HEADER=cf-connecting-ip para limitar por visitante em vez de por ponto de entrada da Cloudflare.
+ */
+export const clientIp = (req: MedusaRequest) => {
+  const custom = process.env.RATE_LIMIT_IP_HEADER?.toLowerCase()
+  const fromCustom = custom ? String(req.headers[custom] ?? "").split(",")[0].trim() : ""
+  if (fromCustom) return fromCustom
+  const forwarded = String(req.headers["x-forwarded-for"] ?? "").split(",").map((p) => p.trim()).filter(Boolean)
+  return forwarded[forwarded.length - 1] ?? req.socket?.remoteAddress ?? req.ip ?? ""
+}
 
 /** Limite por janela; responde 429 ao exceder. */
-export function rateLimit(name: string, { windowMs, max, by }: Options) {
+export function rateLimit(name: string, { windowMs, max, by, globalMax = max * 20 }: Options) {
   return async (req: MedusaRequest, res: MedusaResponse, next: MedusaNextFunction) => {
-    const keys = [`${name}|ip|${clientIp(req)}`]
+    const keys = [`${name}|ip|${clientIp(req)}`, `${name}|all`]
     const extra = by?.(req)
     if (extra) keys.push(`${name}|by|${extra.toLowerCase()}`)
 
     for (const key of keys) {
-      if ((await hit(key, windowMs)) > max) {
+      if ((await hit(key, windowMs)) > (key.endsWith("|all") ? globalMax : max)) {
         res.setHeader("retry-after", Math.ceil(windowMs / 1000))
         return res.status(429).json({ type: "too_many_requests", message: "Muitas tentativas. Aguarde um pouco e tente de novo." })
       }

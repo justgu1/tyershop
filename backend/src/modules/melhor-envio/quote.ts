@@ -59,6 +59,14 @@ export function buildPackage(items: Shipment[]): Package {
 
 const cache = new Map<string, { at: number; quotes: Quote[] }>()
 const TTL_MS = 10 * 60 * 1000
+const CACHE_MAX = 500
+
+function remember(key: string, quotes: Quote[]) {
+  const now = Date.now()
+  for (const [k, v] of cache) if (now - v.at >= TTL_MS) cache.delete(k)
+  while (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value as string)
+  cache.set(key, { at: now, quotes })
+}
 
 /** Cotação do pacote para o CEP; guarda por 10 minutos para não estourar o limite do Melhor Envio. */
 export async function quotePackage(scope: MedusaContainer, toZip: string, pkg: Package): Promise<Quote[]> {
@@ -94,7 +102,7 @@ export async function quotePackage(scope: MedusaContainer, toZip: string, pkg: P
     }))
     .sort((a, b) => a.price - b.price)
 
-  cache.set(key, { at: Date.now(), quotes })
+  remember(key, quotes)
   return quotes
 }
 
