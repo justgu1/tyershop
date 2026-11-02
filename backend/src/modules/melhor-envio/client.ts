@@ -149,8 +149,10 @@ async function meGet<T>(accessToken: string, path: string): Promise<T> {
  * do pedido exige um escopo a mais. Lança erro se não conseguir consultar.
  */
 export async function getLabel(accessToken: string, id: string): Promise<{ status?: string }> {
-  const result = await tracking(accessToken, [id])
-  return result[id] ?? {}
+  const entry = (await tracking(accessToken, [id]))[id]
+  // Sem entrada não dá para saber se a etiqueta foi paga: erro, para quem chama não cobrar de novo às cegas.
+  if (!entry?.status) throw new Error("O Melhor Envio não devolveu a situação da etiqueta.")
+  return entry
 }
 
 type CartPage = { data?: { id: string; status?: string; tags?: { tag?: string }[] }[]; last_page?: number }

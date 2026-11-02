@@ -24,3 +24,17 @@ export function resolveRecipient(original: string, subject: string, cfg: TestMod
 
 /** Endereços do domínio reservado `.invalid` nunca existem: não se envia (nem em modo de teste), só se registra. */
 export const isUndeliverable = (address: string) => /\.invalid$/i.test(address.trim())
+
+const escapeHtml = (v: string) => v.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
+
+/** Em modo de teste avisa, no topo do e-mail, para quem ele iria de verdade (o assunto fica igual ao real). */
+export function applyTestModeNote(mail: { html: string; text: string }, redirectedFrom?: string) {
+  if (!redirectedFrom) return mail
+  const note = `Modo de teste: este e-mail seria enviado para ${redirectedFrom}.`
+  const banner = `<div style="background:#fff7ed;color:#9a3412;font:12px Helvetica,Arial,sans-serif;padding:8px 12px;text-align:center">${escapeHtml(note)}</div>`
+  const withBody = /<body[^>]*>/i
+  return {
+    html: withBody.test(mail.html) ? mail.html.replace(withBody, (m) => `${m}${banner}`) : `${banner}${mail.html}`,
+    text: `${note}\n\n${mail.text}`,
+  }
+}

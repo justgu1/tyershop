@@ -111,7 +111,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
             <div class="hero__countdown-unit"><span class="hero__countdown-num" data-cd="s">00</span><span class="hero__countdown-u">s</span></div>
           </div>
           {siteConfig?.countdown?.presaveEnabled && (
-            <form class="hero__presave" id="hero-presave-form" novalidate data-api-url={publicApiUrl}>
+            <form class="hero__presave" id="hero-presave-form" novalidate data-api-url={publicApiUrl} data-aviso={SPAM_AVISO}>
               <input type="email" name="email" required class="hero__presave-input" placeholder="seu@email.com" aria-label="E-mail" autocomplete="email" />
               <button type="submit" class="hero__presave-btn">{siteConfig.countdown.presaveCta || 'Pre-save o drop'}</button>
             </form>
@@ -1131,7 +1131,7 @@ a.past__card:hover img { border-color: var(--c-accent, #e77e23); }
             body: JSON.stringify({ email }),
           });
           if (!res.ok) throw new Error('fail');
-          if (feedback) { feedback.hidden = false; feedback.textContent = 'Pre-save feito! Avisamos você por e-mail (olhe também o spam ou Promoções).'; feedback.className = 'hero__presave-feedback is-ok'; }
+          if (feedback) { feedback.hidden = false; feedback.textContent = 'Pre-save feito! Avisamos você por e-mail. ' + (form.dataset.aviso || ''); feedback.className = 'hero__presave-feedback is-ok'; }
           form.hidden = true;
         } catch {
           if (feedback) { feedback.hidden = false; feedback.textContent = 'Não deu certo agora. Tente de novo.'; feedback.className = 'hero__presave-feedback is-err'; }

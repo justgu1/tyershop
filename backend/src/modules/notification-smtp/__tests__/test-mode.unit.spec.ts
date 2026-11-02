@@ -1,4 +1,4 @@
-import { isUndeliverable, readTestMode, resolveRecipient } from "../test-mode"
+import { applyTestModeNote, isUndeliverable, readTestMode, resolveRecipient } from "../test-mode"
 
 describe("readTestMode", () => {
   it("is on by default", () => {
@@ -45,5 +45,25 @@ describe("isUndeliverable", () => {
     expect(isUndeliverable("cliente@clientes-teste.invalid")).toBe(true)
     expect(isUndeliverable(" Cliente@Teste.INVALID ")).toBe(true)
     expect(isUndeliverable("cliente@gmail.com")).toBe(false)
+  })
+})
+
+describe("applyTestModeNote", () => {
+  const mail = { html: "<!doctype html><html><BODY class=\"x\"><p>oi</p></BODY></html>", text: "oi" }
+
+  it("sem redirecionamento não muda nada", () => {
+    expect(applyTestModeNote(mail)).toEqual(mail)
+  })
+
+  it("põe o aviso logo depois do corpo, mesmo em maiúsculas", () => {
+    const r = applyTestModeNote(mail, "cliente@x.com")
+    expect(r.html).toMatch(/<BODY class="x"><div[^>]*>Modo de teste: este e-mail seria enviado para cliente@x\.com\./)
+    expect(r.text.startsWith("Modo de teste")).toBe(true)
+  })
+
+  it("sem tag de corpo, o aviso vai no começo e o endereço é escapado", () => {
+    const r = applyTestModeNote({ html: "<p>oi</p>", text: "oi" }, "a<b>@x.com")
+    expect(r.html.startsWith("<div")).toBe(true)
+    expect(r.html).not.toContain("<b>")
   })
 })

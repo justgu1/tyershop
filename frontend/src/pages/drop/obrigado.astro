@@ -1,6 +1,7 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { fetchDrops } from '../../lib/drop';
+import { SPAM_AVISO } from '../../lib/avisos';
 
 export const prerender = false;
 
@@ -19,7 +20,7 @@ const YOUTUBE_URL = 'https://www.youtube.com/@tyer_br';
     </div>
     <h1 class="thanks__title">Valeu pelo interesse!</h1>
     <p class="thanks__text">
-      Seu e-mail está na lista{drop ? <> do drop <strong>{drop.title}</strong></> : ''}. Enviamos uma confirmação para o seu e-mail. Se não encontrar, olhe a caixa de spam ou a aba Promoções e marque como "não é spam".
+      Seu e-mail está na lista{drop ? <> do drop <strong>{drop.title}</strong></> : ''}. Enviamos uma confirmação para o seu e-mail. {SPAM_AVISO}
       Os avisos saem primeiro na comunidade: entre no grupo e acompanhe a Tyer nas redes.
     </p>
     <a class="thanks__cta" href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer">Entrar no grupo do WhatsApp</a>
