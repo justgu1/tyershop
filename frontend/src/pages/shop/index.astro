@@ -1,5 +1,1753 @@
 ---
-// A loja foi substituída pelo drop atual (/drop) e pela linha Starter na home.
+import Layout from '../../layouts/Layout.astro';
+import ProductCarousel from '../../components/ProductCarousel.astro';
+import { getLangFromUrl, getPathForLang, t } from '../../i18n/utils';
+import type { Lang } from '../../i18n/utils';
+import { getProductListQueryString, resolveDefaultRegionId } from '../../lib/medusa-pricing';
+import { getMedusaStoreUrl, getPublishableKey } from '../../lib/medusa-env';
+
+// Catálogo dinâmico: renderiza por requisição (ver index.astro).
 export const prerender = false;
-return Astro.redirect('/drop', 301);
+
+const lang: Lang = getLangFromUrl(Astro.url);
+const showEmptyCheckoutToast = Astro.url.searchParams.get('empty_checkout') === '1';
+const pk = getPublishableKey();
+const headers = { 'x-publishable-api-key': pk };
+const base = getMedusaStoreUrl();
+
+let regionId: string | null = null;
+let newProducts: any[] = [];
+let famousProducts: any[] = [];
+let collections: { id: string; title: string; handle: string; products: any[] }[] = [];
+let totalCatalogCount = 0;
+const knownIds: string[] = [];
+
+function createdAtScore(product: any): number {
+  return new Date(product?.created_at ?? 0).getTime() || 0;
+}
+
+function salesScore(product: any): number {
+  const md = product?.metadata ?? {};
+  const candidates = [
+    md.sales_count,
+    md.total_sales,
+    md.sold_count,
+    md.units_sold,
+    md.order_count,
+    md.orders,
+    product?.sales_count,
+    product?.total_sales,
+    product?.sold_count,
+  ];
+  for (const val of candidates) {
+    const num = Number(val);
+    if (Number.isFinite(num) && num > 0) return num;
+  }
+  return 0;
+}
+
+try {
+  regionId = await resolveDefaultRegionId(base, headers);
+  const q = getProductListQueryString(regionId);
+
+  const [cRes, mainRes, countRes] = await Promise.all([
+    fetch(`${base}/store/collections?limit=50`, { headers, signal: AbortSignal.timeout(8000) }),
+    fetch(`${base}/store/products?${q}&limit=32`, { headers, signal: AbortSignal.timeout(8000) }),
+    fetch(`${base}/store/products?${q}&limit=1&offset=0`, { headers, signal: AbortSignal.timeout(5000) }),
+  ]);
+
+  if (countRes.ok) {
+    const d = await countRes.json();
+    totalCatalogCount = d.count ?? 0;
+  }
+
+  let mainList: any[] = [];
+  if (mainRes.ok) {
+    const d = await mainRes.json();
+    mainList = d.products ?? [];
+  }
+  const sortedByNewest = [...mainList].sort((a, b) => createdAtScore(b) - createdAtScore(a));
+  const sortedByPopularity = [...mainList].sort((a, b) => {
+    const scoreDiff = salesScore(b) - salesScore(a);
+    if (scoreDiff !== 0) return scoreDiff;
+    return createdAtScore(b) - createdAtScore(a);
+  });
+  newProducts = sortedByNewest.slice(0, 4);
+  famousProducts = sortedByPopularity.slice(0, 4);
+  const collectionProductLimit = 20;
+
+  for (const p of [...newProducts, ...famousProducts]) {
+    if (p?.id) knownIds.push(p.id);
+  }
+
+  let colList: any[] = [];
+  if (cRes.ok) {
+    colList = (await cRes.json()).collections ?? [];
+  }
+
+  const colWith = await Promise.all(
+    colList.map((c) =>
+      fetch(`${base}/store/products?${q}&collection_id[]=${c.id}&limit=${collectionProductLimit}`, {
+        headers,
+        signal: AbortSignal.timeout(8000),
+      })
+        .then((r) => (r.ok ? r.json() : { products: [] }))
+        .then((d) => ({ ...c, products: d.products ?? [] }))
+    )
+  );
+  collections = colWith.map((c) => {
+    for (const p of c.products) {
+      if (p?.id) knownIds.push(p.id);
+    }
+    return { id: c.id, title: c.title, handle: c.handle, products: c.products };
+  });
+} catch { /* medusa off */ }
+
+const productQuery = getProductListQueryString(regionId);
+const knownIdsUnique = [...new Set(knownIds)];
+const topNewIds = [...new Set(newProducts.map((p) => p?.id).filter(Boolean))].slice(0, 10);
+const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolean))].slice(0, 10);
 ---
+
+<Layout
+  title={t(lang, 'nav', 'shop')}
+  description={t(lang, 'shop', 'meta_description')}
+  lang={lang}
+  bodyClass="page-shop"
+>
+  {showEmptyCheckoutToast && (
+    <div class="shop-toast" id="shop-empty-toast" role="status" aria-live="polite">
+      <span>Adicione produtos para ir para o checkout.</span>
+      <button type="button" class="shop-toast__close" id="shop-empty-toast-close" aria-label="Fechar aviso">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <script is:inline>
+      (function () {
+        var toast = document.getElementById('shop-empty-toast');
+        if (!toast) return;
+        // Tira o ?empty_checkout=1 da URL — não deve voltar a aparecer num refresh.
+        try {
+          var url = new URL(window.location.href);
+          url.searchParams.delete('empty_checkout');
+          window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+        } catch (e) {}
+        var dismiss = function () { toast.remove(); };
+        document.getElementById('shop-empty-toast-close')?.addEventListener('click', dismiss);
+        window.setTimeout(dismiss, 6000);
+      })();
+    </script>
+  )}
+
+  <div class="shop-layout" id="shop-top">
+    <div
+      class="shop-sidebar-backdrop"
+      id="shop-sidebar-backdrop"
+      hidden
+      aria-hidden="true"
+    />
+    <aside class="shop-sidebar" id="shop-sidebar" aria-label={t(lang, 'shop', 'filters')}>
+      <div class="shop-sidebar__sticky">
+      <div class="shop-sidebar__inner">
+        <h2 class="shop-sidebar__title">{t(lang, 'shop', 'filters')}</h2>
+
+        <nav class="shop-toc" aria-label="Seções da loja">
+          <p class="shop-toc__label" id="toc-nav-label">Navegação</p>
+          <ul class="shop-toc__list" role="list" aria-labelledby="toc-nav-label">
+            <li>
+              <button type="button" class="shop-toc__btn" data-scroll-target="shop-novos">
+                {t(lang, 'shop', 'section_novos')}
+              </button>
+            </li>
+            <li>
+              <button type="button" class="shop-toc__btn" data-scroll-target="shop-populares">
+                {t(lang, 'shop', 'section_famosos')}
+              </button>
+            </li>
+            {collections.map((c) => (
+              <li>
+                <button
+                  type="button"
+                  class="shop-toc__btn"
+                  data-scroll-target={`shop-col-${c.id}`}
+                >
+                  {c.title}
+                </button>
+              </li>
+            ))}
+            <li>
+              <button type="button" class="shop-toc__btn" data-scroll-target="shop-infinite">
+                {t(lang, 'shop', 'more_products')}
+              </button>
+            </li>
+          </ul>
+        </nav>
+        <span class="shop-header__count" id="shop-count" aria-live="polite"
+          >{totalCatalogCount} {t(lang, 'shop', 'count_items')}</span>
+      </div>
+      </div>
+    </aside>
+
+    <main class="shop-main" id="shop-main">
+      <div class="shop-mobile-bar">
+        <button type="button" class="shop-header__filter-toggle btn btn-outline" id="filter-toggle">
+          {t(lang, 'shop', 'filters')}
+        </button>
+      </div>
+      <section class="shop-block" id="shop-novos" aria-labelledby="shop-novos-title">
+        {newProducts.length > 0 ? (
+          <ProductCarousel
+            products={newProducts}
+            lang={lang}
+            title={t(lang, 'shop', 'section_novos')}
+            headingId="shop-novos-title"
+            cardBadges={(p) => ({ isNew: topNewIds.includes(p?.id) })}
+          />
+        ) : (
+          <>
+            <h2 class="shop-block__title" id="shop-novos-title">{t(lang, 'shop', 'section_novos')}</h2>
+            <p class="shop-block__empty">—</p>
+          </>
+        )}
+      </section>
+
+      <section class="shop-block" id="shop-populares" aria-labelledby="shop-populares-title">
+        {famousProducts.length > 0 ? (
+          <ProductCarousel
+            products={famousProducts}
+            lang={lang}
+            title={t(lang, 'shop', 'section_famosos')}
+            headingId="shop-populares-title"
+            cardBadges={(p) => ({ isPopular: topPopularIds.includes(p?.id) })}
+          />
+        ) : (
+          <>
+            <h2 class="shop-block__title" id="shop-populares-title">{t(lang, 'shop', 'section_famosos')}</h2>
+            <p class="shop-block__empty">—</p>
+          </>
+        )}
+      </section>
+
+      {collections.map((c) => (
+        <section
+          class="shop-block"
+          id={`shop-col-${c.id}`}
+          aria-labelledby={`shop-col-title-${c.id}`}
+        >
+          {c.products.length > 0 ? (
+            <ProductCarousel products={c.products} lang={lang} title={c.title} headingId={`shop-col-title-${c.id}`} ariaLabel={c.title}>
+              <a slot="actions" href={getPathForLang(`/collections/${c.handle}`, lang)} class="shop-col__drop-link btn btn-outline btn-sm">
+                Ver drop
+              </a>
+            </ProductCarousel>
+          ) : (
+            <>
+              <div class="shop-col__head">
+                <h2 class="shop-block__title shop-block__title--row" id={`shop-col-title-${c.id}`}>{c.title}</h2>
+                <a href={getPathForLang(`/collections/${c.handle}`, lang)} class="shop-col__drop-link btn btn-outline btn-sm">
+                  Ver drop
+                </a>
+              </div>
+              <p class="shop-block__empty">—</p>
+            </>
+          )}
+        </section>
+      ))}
+
+      <section class="shop-block shop-block--infinite" id="shop-infinite" aria-labelledby="shop-infinite-title">
+        <h2 class="shop-block__title" id="shop-infinite-title">{t(lang, 'shop', 'more_products')}</h2>
+        <div class="shop-grid" id="shop-infinite-grid" role="list" aria-label={t(lang, 'shop', 'more_products')}>
+        </div>
+      </section>
+
+      <div class="shop-sentinel" id="shop-sentinel" aria-hidden="true" />
+
+      <div class="shop-loading" id="shop-loading" aria-live="polite" aria-label={t(lang, 'shop', 'loading')} hidden>
+        <span class="shop-loading__spinner" aria-hidden="true" />
+        <span>{t(lang, 'shop', 'loading')}</span>
+      </div>
+
+      <p class="shop-end" id="shop-end" hidden>Sem mais produtos a exibir</p>
+    </main>
+  </div>
+</Layout>
+
+<style is:global>
+  /** Tema claro só dentro da loja — não alterar :root (header, mega, footer mantêm o escuro). */
+  body.page-shop {
+    background: #f8f8f8;
+  }
+  body.page-shop main {
+    background: #f8f8f8;
+    /* `overflow-x: hidden` no main quebra `position: sticky` na sidebar (filho do mesmo grid). */
+    overflow-x: visible;
+    overflow-y: visible;
+  }
+  /* Sticky falha com `overflow-x: hidden` em html/body — na loja relaxamos só o eixo horizontal. */
+  html:has(body.page-shop) {
+    overflow-x: visible;
+    max-width: 100%;
+  }
+  body.page-shop {
+    overflow-x: visible;
+  }
+  body.page-shop .shop-layout {
+    max-width: 100%;
+    min-width: 0;
+    --c-bg: #f8f8f8;
+    --c-surface: #ffffff;
+    --c-surface2: #f0f0f0;
+    --c-border: #e8e8e8;
+    --c-text: #0a0a0a;
+    --c-muted: #5c5c5c;
+    --c-bg-mute: #ececec;
+    --pc-price-current: #0a0a0a;
+    --pc-price-striked: rgba(10, 10, 10, 0.45);
+    --pc-name-color: #0a0a0a;
+    --pc-muted-text: rgba(10, 10, 10, 0.55);
+    --pc-muted-text-strong: rgba(10, 10, 10, 0.72);
+    --pc-divider: rgba(10, 10, 10, 0.1);
+    --pc-ok-text: #16a34a;
+    --pc-err-text: #dc2626;
+  }
+  body.page-shop .shop-main {
+    background: var(--c-bg);
+  }
+  body.page-shop .shop-block__title {
+    color: #0a0a0a;
+  }
+  body.page-shop .shop-layout .pc__quick-add img {
+    filter: brightness(0) invert(1);
+    opacity: 1;
+  }
+  body.page-shop .shop-sidebar {
+    background: #141414;
+    border-right-color: #2a2a2a;
+  }
+  body.page-shop .shop-sidebar__title {
+    color: #f5f5f5;
+  }
+  body.page-shop .shop-toc__label {
+    color: rgba(255, 255, 255, 0.45);
+  }
+  body.page-shop .shop-toc__btn {
+    color: rgba(255, 255, 255, 0.72);
+  }
+  body.page-shop .shop-toc__btn:hover,
+  body.page-shop .shop-toc__btn:focus-visible {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  body.page-shop .shop-toc__btn.is-active {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 2px 0 0 var(--c-accent);
+  }
+  body.page-shop .shop-sidebar .shop-header__count {
+    color: rgba(255, 255, 255, 0.55);
+  }
+  body.page-shop .btn-outline {
+    color: var(--c-text);
+    border-color: #c8c8c8;
+  }
+  body.page-shop .btn-outline:hover {
+    background: var(--c-surface2);
+    border-color: #b0b0b0;
+  }
+  /* .shop-col-carousel* removido — <ProductCarousel> usa var(--c-border)/
+     var(--c-text), que já assumem os valores de tema claro definidos logo
+     acima (body.page-shop), sem precisar de override específico daqui. */
+  body.page-shop .pc__variants-divider {
+    border-top-color: rgba(0, 0, 0, 0.08);
+  }
+  body.page-shop .pc__variant-heading {
+    color: rgba(0, 0, 0, 0.5);
+  }
+  body.page-shop .pc__variant-heading-k {
+    color: rgba(0, 0, 0, 0.62);
+  }
+  body.page-shop .pc__variant-hit--swatch {
+    border-color: rgba(0, 0, 0, 0.22);
+  }
+  body.page-shop .pc__variant-hit--size {
+    border-color: rgba(0, 0, 0, 0.2);
+    color: var(--c-text);
+  }
+  body.page-shop .pc__variant-hit--size:hover:not(.is-unavailable) {
+    border-color: rgba(0, 0, 0, 0.38);
+  }
+</style>
+
+<style>
+.shop-toast {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 12px 20px;
+  background: #171717;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.shop-toast__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  background: none;
+  border: 0;
+  color: #b8b8b8;
+  cursor: pointer;
+  padding: 2px;
+}
+.shop-toast__close:hover {
+  color: #fff;
+}
+
+.shop-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: calc(100svh - var(--header-h));
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: visible;
+}
+@media (max-width: 900px) {
+  .shop-layout { grid-template-columns: 1fr; }
+}
+
+.shop-sidebar {
+  position: relative;
+  align-self: stretch;
+  min-height: 0;
+  border-right: 1px solid var(--c-border);
+  padding: 0;
+  background: var(--c-surface);
+}
+.shop-sidebar__sticky {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+@media (min-width: 901px) {
+  .shop-sidebar__sticky {
+    position: sticky;
+    top: var(--header-h);
+    max-height: calc(100svh - var(--header-h));
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 32px 24px;
+    box-sizing: border-box;
+  }
+}
+@media (max-width: 900px) {
+  .shop-sidebar-backdrop {
+    position: fixed; inset: 0; z-index: 460;
+    background: rgba(0, 0, 0, 0.55);
+    border: 0; padding: 0; margin: 0; cursor: pointer;
+  }
+  .shop-sidebar-backdrop[hidden] { display: none !important; }
+  .shop-sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 470;
+    width: 280px; transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    height: 100dvh;
+    border-right: none;
+  }
+  .shop-sidebar.is-open { transform: translateX(0); }
+  .shop-sidebar__sticky {
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 32px 24px;
+    box-sizing: border-box;
+  }
+}
+.shop-sidebar__title { font-family: var(--font-title); font-size: 22px; text-transform: uppercase; margin-bottom: 20px; }
+.shop-sidebar__inner { min-height: 100%; display: flex; flex-direction: column; }
+
+.shop-toc__label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c-muted); margin-bottom: 10px;
+}
+.shop-toc__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.shop-toc__btn {
+  text-align: left; padding: 8px 12px; font-size: 13px; color: var(--c-muted); border-radius: var(--r); width: 100%;
+  transition: color var(--ease), background var(--ease); background: transparent; border: none; cursor: pointer; font: inherit;
+}
+.shop-toc__btn:hover, .shop-toc__btn:focus-visible {
+  color: var(--c-text); background: var(--c-surface2); outline: none;
+}
+.shop-toc__btn.is-active {
+  color: var(--c-text);
+  background: var(--c-surface2);
+  box-shadow: inset 2px 0 0 var(--c-accent);
+}
+
+.shop-main {
+  padding: 32px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+@media (max-width: 900px) { .shop-main { padding: 24px 16px; } }
+
+.shop-mobile-bar {
+  display: none; margin-bottom: 20px;
+}
+@media (max-width: 900px) {
+  /* Sem sticky, o botão só existe uma vez no topo de .shop-main e some
+     assim que rola pra baixo — obriga voltar ao topo pra abrir os
+     filtros. Mesma propriedade (`top: var(--header-h)`) que a sidebar de
+     desktop já usa pra grudar sob o header, unificando o critério em vez
+     de cada parte da página inventar seu próprio sticky. */
+  .shop-mobile-bar {
+    display: flex;
+    align-items: center;
+    position: sticky;
+    top: var(--header-h);
+    z-index: 30;
+    background: #f8f8f8;
+    padding-block: 12px;
+    margin-bottom: 8px;
+  }
+}
+.shop-col__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  margin-bottom: 16px;
+}
+.shop-block__title--row { margin-bottom: 0; flex: 1; min-width: 0; }
+.shop-col__drop-link { flex-shrink: 0; white-space: nowrap; margin-left: auto; }
+.shop-header { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
+.shop-header__title { font-family: var(--font-title); font-size: 48px; text-transform: uppercase; flex: 1; }
+.shop-header__filter-toggle { display: none; }
+@media (max-width: 900px) { .shop-header__filter-toggle { display: inline-flex; } }
+.shop-header__count { font-size: 12px; color: var(--c-muted); }
+.shop-sidebar .shop-header__count { margin-top: auto; padding-top: 18px; display: block; }
+
+.shop-block {
+  margin-bottom: 48px;
+  scroll-margin-top: calc(var(--header-h) + 16px);
+  min-width: 0;
+  max-width: 100%;
+}
+.shop-block__title {
+  font-family: var(--font-title); font-size: clamp(22px, 3vw, 32px); text-transform: uppercase; margin: 0 0 20px; letter-spacing: 0.02em;
+}
+.shop-block__empty { color: var(--c-muted); font-size: 14px; }
+.shop-block--infinite { margin-bottom: 24px; }
+
+.shop-sentinel { height: 1px; }
+
+.shop-loading {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 40px; color: var(--c-muted); font-size: 13px;
+}
+.shop-loading[hidden] { display: none !important; }
+.shop-loading__spinner {
+  width: 18px; height: 18px; border: 2px solid var(--c-border);
+  border-top-color: var(--c-accent); border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.shop-end { text-align: center; padding: 40px; color: var(--c-muted); font-size: 13px; }
+@media (max-width: 900px) {
+  .shop-col__head { align-items: flex-start; flex-wrap: wrap; gap: 10px; }
+  .shop-block__title--row { width: 100%; }
+  .shop-col__drop-link { margin-left: 0; }
+}
+</style>
+
+<!-- Estilos para cards inseridos via JS (escopo do ProductCard não aplica) -->
+<style is:global>
+#shop-infinite-grid .pc {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  /* height:auto (não 100%) — align-items:stretch do grid só estica um
+     item com height especificado como auto; mesma correção aplicada em
+     ProductCard.astro. */
+  height: auto;
+  min-height: 100%;
+  transition: transform 0.3s ease;
+}
+#shop-infinite-grid .pc:hover { transform: translateY(-4px); }
+#shop-infinite-grid .pc__link { display: block; }
+#shop-infinite-grid .pc__img-wrap {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--c-bg-mute, #1a1a1a);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+#shop-infinite-grid .pc__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#shop-infinite-grid .pc:hover .pc__img { transform: scale(1.06); }
+#shop-infinite-grid .pc__img--secondary {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease, transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#shop-infinite-grid .pc__img-wrap.is-hover-ready:hover .pc__img--secondary { opacity: 1; }
+#shop-infinite-grid .pc__img-wrap.is-hover-ready:hover .pc__img--primary { opacity: 0; }
+#shop-infinite-grid .pc__img--primary.is-swapping { opacity: 0; }
+#shop-infinite-grid .pc__gallery-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(10, 10, 10, 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+#shop-infinite-grid .pc__img-wrap:hover .pc__gallery-arrow { opacity: 1; }
+#shop-infinite-grid .pc__gallery-arrow:hover { background: rgba(10, 10, 10, 0.85); }
+#shop-infinite-grid .pc__gallery-arrow--prev { left: 8px; }
+#shop-infinite-grid .pc__gallery-arrow--next { right: 8px; }
+#shop-infinite-grid .pc__gallery-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+#shop-infinite-grid .pc__gallery-dots span {
+  width: 12px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+  transition: background 0.15s ease, width 0.15s ease;
+}
+#shop-infinite-grid .pc__gallery-dots span.is-active {
+  background: var(--c-accent);
+  width: 18px;
+}
+#shop-infinite-grid .pc__tags { position: absolute; left: 8px; display: flex; flex-direction: column; gap: 4px; }
+#shop-infinite-grid .pc__tags--priority { top: 8px; }
+#shop-infinite-grid .pc__tags--category { top: 8px; left: auto; right: 8px; align-items: flex-end; }
+#shop-infinite-grid .pc__tag {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: var(--r);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+#shop-infinite-grid .pc__tag--soldout { background: #000; }
+#shop-infinite-grid .pc__tag--discount { background: #16a34a; }
+#shop-infinite-grid .pc__tag--exclusive { background: #6d28d9; }
+#shop-infinite-grid .pc__tag--popular { background: #db2777; }
+#shop-infinite-grid .pc__tag--new { background: var(--c-accent); color: #fff; }
+#shop-infinite-grid .pc__body {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+#shop-infinite-grid .pc__body-link { text-decoration: none; display: block; }
+#shop-infinite-grid .pc__name {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--pc-name-color, var(--c-text));
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.6em;
+}
+#shop-infinite-grid .pc__bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  margin-top: auto;
+  padding-bottom: 8px;
+}
+#shop-infinite-grid .pc__price-box {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+#shop-infinite-grid .pc__price-striked {
+  font-size: 12px;
+  text-decoration: line-through;
+  color: var(--pc-price-striked, rgba(255, 255, 255, 0.58));
+  line-height: 1;
+}
+#shop-infinite-grid .pc__price-current {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--pc-price-current, #fff);
+  line-height: 1;
+}
+#shop-infinite-grid .pc__price-box--discount .pc__price-current { color: var(--c-accent); }
+#shop-infinite-grid .pc__quick-add {
+  position: static;
+  transform: none;
+  width: 100%;
+  background: var(--c-accent);
+  border: 1px solid var(--c-accent);
+  border-radius: var(--r-md, 8px);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  flex-shrink: 0;
+}
+#shop-infinite-grid .pc__quick-add img {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+#shop-infinite-grid .pc__quick-add__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  white-space: nowrap;
+}
+#shop-infinite-grid .pc__quick-add:hover {
+  background: var(--c-accent-d);
+  border-color: var(--c-accent-d);
+}
+#shop-infinite-grid .pc__quick-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+#shop-infinite-grid .pc__quick-add:disabled:hover {
+  background: #991b1b;
+  border-color: #ef4444;
+}
+#shop-infinite-grid .pc__bottom--oos .pc__price-box,
+#shop-infinite-grid .pc__bottom--oos .pc__quick-add {
+  display: none;
+}
+#shop-infinite-grid .pc__stock-notify {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+#shop-infinite-grid .pc__stock-notify__intro {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.72);
+}
+#shop-infinite-grid .pc__stock-notify__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: stretch;
+}
+#shop-infinite-grid .pc__stock-notify__input {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-size: 13px;
+}
+#shop-infinite-grid .pc__stock-notify__btn {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+#shop-infinite-grid .pc__stock-notify__feedback {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+#shop-infinite-grid .pc__stock-notify__feedback.is-ok {
+  color: #7dffb2;
+}
+#shop-infinite-grid .pc__stock-notify__feedback.is-err {
+  color: #ff8a8a;
+}
+#shop-infinite-grid .pc__variants {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+#shop-infinite-grid .pc__variants-divider {
+  height: 0;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 2px 0 4px;
+}
+#shop-infinite-grid .pc__variant-heading {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+}
+#shop-infinite-grid .pc__variant-heading-k {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+}
+#shop-infinite-grid .pc__variant-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+#shop-infinite-grid .pc__variant-values--swatch {
+  gap: 10px;
+}
+#shop-infinite-grid .pc__variant-hit--swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+}
+#shop-infinite-grid .pc__variant-hit--swatch.is-selected {
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+#shop-infinite-grid .pc__variant-swatch-inner {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+#shop-infinite-grid .pc__variant-hit--size {
+  min-width: 30px;
+  height: 28px;
+  padding: 0 7px;
+  border-radius: var(--r-md, 6px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: var(--c-text);
+  font-size: 10px;
+  font-weight: 600;
+}
+#shop-infinite-grid .pc__variant-hit--size.is-selected {
+  background: #0a0a0a;
+  border-color: #0a0a0a;
+  color: #fff;
+}
+#shop-infinite-grid .pc__variant-hit--size.is-unavailable {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+#shop-infinite-grid .pc__variant-hit--size.is-unavailable .pc__variant-size-text {
+  text-decoration: line-through;
+}
+#shop-infinite-grid .pc__variant-hit--swatch.is-unavailable {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+  body.shop-sidebar-open #nav-collections-wrap { pointer-events: none; }
+  body.shop-sidebar-open .mega { display: none !important; opacity: 0 !important; visibility: hidden !important; }
+</style>
+
+<script
+  define:vars={{
+    publicKey: pk,
+    knownProductIds: knownIdsUnique,
+    productQuery,
+    topNewIds,
+    topPopularIds,
+  }}
+>
+  (function () {
+    var offset = 0;
+    var loading = false;
+    var done = false;
+    var known = new Set(knownProductIds);
+    var grid = document.getElementById("shop-infinite-grid");
+    var loadEl = document.getElementById("shop-loading");
+    var endEl = document.getElementById("shop-end");
+    var sentinel = document.getElementById("shop-sentinel");
+    var scrollObserver = null;
+    var uncataloguedStall = 0;
+    var topNew = new Set(topNewIds);
+    var topPopular = new Set(topPopularIds);
+    var prefetchedImages = new Set();
+    var fetchHeaders = { "x-publishable-api-key": publicKey };
+    var shopSidebar = document.getElementById("shop-sidebar");
+    var shopSidebarBackdrop = document.getElementById("shop-sidebar-backdrop");
+    function setShopSidebarOpen(open) {
+      document.body.classList.toggle("shop-sidebar-open", !!open);
+      if (shopSidebar) shopSidebar.classList.toggle("is-open", !!open);
+      if (shopSidebarBackdrop) {
+        if (open) {
+          shopSidebarBackdrop.removeAttribute("hidden");
+          shopSidebarBackdrop.hidden = false;
+        } else {
+          shopSidebarBackdrop.setAttribute("hidden", "");
+          shopSidebarBackdrop.hidden = true;
+        }
+      }
+    }
+
+    function priceFromVariant(v) {
+      function toNumber(value) {
+        if (value === null || value === undefined) return null;
+        if (typeof value === "number" && isFinite(value)) return value;
+        if (typeof value === "string") {
+          var normalized = value.replace(",", ".").trim();
+          if (!normalized) return null;
+          var parsed = Number(normalized);
+          return isFinite(parsed) ? parsed : null;
+        }
+        return null;
+      }
+      function normalizeToCents(value) {
+        if (arguments.length > 1) {
+          var raw = arguments[1];
+          if (raw && raw.value !== undefined && raw.value !== null) {
+            var rawNum = toNumber(raw.value);
+            if (rawNum !== null && rawNum > 0) return Math.round(rawNum * 100);
+          }
+        }
+        var num = toNumber(value);
+        if (num === null || num <= 0) return null;
+        if (num > 0 && num < 1000 && Math.floor(num) !== num) return Math.round(num * 100);
+        if (num < 1000) return Math.round(num * 100);
+        return Math.round(num);
+      }
+      if (!v) return { display: "", cents: 0, original: "", originalCents: 0 };
+      var cp = v.calculated_price;
+      if (cp) {
+        var ccy = (cp.currency_code || "BRL").toString().toUpperCase();
+        var cents = normalizeToCents(cp.calculated_amount, cp.raw_calculated_amount);
+        if (!cents || cents <= 0) return { display: "", cents: 0, original: "", originalCents: 0 };
+        var display = (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: ccy });
+        var orig = "";
+        var origCents = normalizeToCents(cp.original_amount, cp.raw_original_amount);
+        if (!origCents && Array.isArray(v.prices)) {
+          var candidates = v.prices
+            .filter(function (price) {
+              return String(price && price.currency_code || "").toUpperCase() === ccy;
+            })
+            .map(function (price) {
+              return normalizeToCents(price && price.amount, price && price.raw_amount);
+            })
+            .filter(function (val) {
+              return typeof val === "number" && val > 0;
+            });
+          if (candidates.length) {
+            var maxBase = Math.max.apply(Math, candidates);
+            if (maxBase > cents) origCents = maxBase;
+          }
+        }
+        if (origCents && origCents > cents) {
+          orig = (origCents / 100).toLocaleString("pt-BR", { style: "currency", currency: ccy });
+        }
+        return { display: display, cents: cents, original: orig, originalCents: origCents || 0 };
+      }
+      var p = v.prices && v.prices[0];
+      var fallbackCents = normalizeToCents(p && p.amount, p && p.raw_amount);
+      if (p && fallbackCents) {
+        var cur = (p.currency_code || "BRL").toString().toUpperCase();
+        return {
+          display: (fallbackCents / 100).toLocaleString("pt-BR", { style: "currency", currency: cur }),
+          cents: fallbackCents,
+          original: "",
+          originalCents: 0,
+        };
+      }
+      return { display: "", cents: 0, original: "", originalCents: 0 };
+    }
+
+    function escapeHtml(s) {
+      if (!s) return "";
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function optionMapFromVariant(v) {
+      var map = {};
+      var opts = (v && v.options) || [];
+      for (var i = 0; i < opts.length; i++) {
+        var opt = opts[i] || {};
+        var key = String(opt.option_id || opt.id || "").trim();
+        if (!key) continue;
+        map[key] = String(opt.value || "").trim();
+      }
+      return map;
+    }
+
+    function encodedJsonAttr(value) {
+      try {
+        return encodeURIComponent(JSON.stringify(value));
+      } catch {
+        return "";
+      }
+    }
+
+    function sumNestedStockedQuantity(v) {
+      return (v.inventory_items || []).reduce(function (sum, item) {
+        var levels = (item && item.inventory && item.inventory.location_levels) || [];
+        return (
+          sum +
+          levels.reduce(function (inner, level) {
+            var raw = Number(level && level.stocked_quantity);
+            return isFinite(raw) ? inner + raw : inner;
+          }, 0)
+        );
+      }, 0);
+    }
+
+    function resolveVariantQtyRaw(v) {
+      var items = v.inventory_items || [];
+      if (items.length > 0) {
+        return { qtyRaw: sumNestedStockedQuantity(v), fromNested: true };
+      }
+      var qtyRaw = v.inventory_quantity;
+      if (qtyRaw === undefined || qtyRaw === null) qtyRaw = v.calculated_inventory_quantity;
+      if (qtyRaw === undefined || qtyRaw === null) qtyRaw = v.stocked_quantity;
+      return { qtyRaw: qtyRaw, fromNested: false };
+    }
+
+    function isVariantSoldOut(v, enforceQtyWhenPresent) {
+      if (!v) return true;
+      var r = resolveVariantQtyRaw(v);
+      var qtyRaw = r.qtyRaw;
+      var fromNested = r.fromNested;
+      var qty = Number(qtyRaw);
+      var hasQty = isFinite(qty);
+      var allowBackorder = v.allow_backorder === true;
+      var status = String(v.inventory_status || v.availability_status || "").toLowerCase();
+
+      if (status.indexOf("out") >= 0 || status.indexOf("sold") >= 0) return true;
+      if (status.indexOf("in_stock") >= 0 || status.indexOf("available") >= 0) return false;
+      if (v.available_for_sale === true || v.in_stock === true) return false;
+      if (v.available_for_sale === false || v.in_stock === false) return true;
+
+      if (hasQty && qty > 0) return false;
+      if (hasQty && qty <= 0 && allowBackorder) return false;
+      if (hasQty && qty <= 0 && !allowBackorder && (fromNested || enforceQtyWhenPresent)) return true;
+      return false;
+    }
+
+    function getVariantMaxQty(v) {
+      if (!v) return null;
+      if (v.allow_backorder === true) return null;
+      var r = resolveVariantQtyRaw(v);
+      var qty = Number(r.qtyRaw);
+      if (!isFinite(qty)) return null;
+      return Math.max(0, Math.floor(qty));
+    }
+
+    function toImageUrlList(input) {
+      if (!Array.isArray(input)) return [];
+      return input
+        .map(function (entry) {
+          if (typeof entry === "string") return entry.trim();
+          if (entry && typeof entry.url === "string") return entry.url.trim();
+          if (entry && typeof entry.src === "string") return entry.src.trim();
+          return "";
+        })
+        .filter(Boolean);
+    }
+
+    function imageBelongsToVariant(image, variantId) {
+      if (!image || !variantId) return false;
+      var id = String(variantId);
+      if (image.variant_id && String(image.variant_id) === id) return true;
+      var vids = image.variant_ids;
+      if (Array.isArray(vids) && vids.some(function (x) { return String(x) === id; })) return true;
+      var vars = image.variants;
+      if (Array.isArray(vars)) {
+        return vars.some(function (v) { return String(v && v.id != null ? v.id : v) === id; });
+      }
+      return false;
+    }
+
+    function collectProductImageUrlsForVariant(p, variantId) {
+      var list = p && p.images;
+      if (!Array.isArray(list) || !variantId) return [];
+      var out = [];
+      for (var i = 0; i < list.length; i++) {
+        var img = list[i];
+        if (!imageBelongsToVariant(img, variantId)) continue;
+        var u = img && typeof img.url === "string" ? img.url.trim() : "";
+        if (u) out.push(u);
+      }
+      return out;
+    }
+
+    function pushDistinctOrder(order, u) {
+      u = String(u || "").trim();
+      if (!u || order.indexOf(u) >= 0) return;
+      order.push(u);
+    }
+
+    function getMetadataUrlsList(variant) {
+      var md = (variant && variant.metadata) || {};
+      var candidates = [md.variant_gallery, md.gallery, md.images, md.image_gallery, md.variant_images];
+      for (var c = 0; c < candidates.length; c++) {
+        var urls = toImageUrlList(candidates[c]);
+        if (urls.length) return urls;
+      }
+      return [];
+    }
+
+    function buildVariantImageOrder(variant, p) {
+      var order = [];
+      var m, u, j, k, a;
+      var meta = getMetadataUrlsList(variant);
+      for (m = 0; m < meta.length; m++) pushDistinctOrder(order, meta[m]);
+      if (variant) {
+        pushDistinctOrder(order, variant.thumbnail);
+        if (Array.isArray(variant.images)) {
+          for (j = 0; j < variant.images.length; j++) {
+            a = variant.images[j];
+            u = typeof a === "string" ? a.trim() : String((a && a.url) || "").trim();
+            pushDistinctOrder(order, u);
+          }
+        }
+      }
+      var forVar = collectProductImageUrlsForVariant(p, String((variant && variant.id) || ""));
+      for (k = 0; k < forVar.length; k++) pushDistinctOrder(order, forVar[k]);
+      if (p && p.thumbnail) pushDistinctOrder(order, p.thumbnail);
+      if (p && Array.isArray(p.images)) {
+        for (j = 0; j < p.images.length; j++) {
+          u = p.images[j] && p.images[j].url;
+          pushDistinctOrder(order, u);
+        }
+      }
+      return order;
+    }
+
+    function productGallerySlice(p) {
+      return buildVariantImageOrder(null, p).slice(0, 2);
+    }
+
+    /** [principal, secundária distinta] — alinhado a product-variant-gallery.ts */
+    function getVariantGalleryUrlsForProduct(variant, p) {
+      if (!variant) {
+        var s = productGallerySlice(p);
+        var p0 = s[0] || "/no-data.webp";
+        var p1 = s[1] && s[1] !== p0 ? s[1] : "";
+        return [p0, p1];
+      }
+      var order = buildVariantImageOrder(variant, p);
+      var primary = order[0] || "/no-data.webp";
+      for (var i = 1; i < order.length; i++) {
+        if (order[i] !== primary) return [primary, order[i]];
+      }
+      return [primary, ""];
+    }
+
+    function getVariantImageArrayForJson(variant, p) {
+      var pr = getVariantGalleryUrlsForProduct(variant, p);
+      return pr[1] ? [pr[0], pr[1]] : [pr[0]];
+    }
+
+    /** Galeria completa (nao só as 2 primeiras) — alinhado a getVariantSlideUrls. */
+    function getVariantSlideArrayForJson(variant, p) {
+      var order = buildVariantImageOrder(variant, p);
+      if (order.length) return order;
+      var t = String((p && p.thumbnail) || "").trim();
+      return [t || "/no-data.webp"];
+    }
+
+    function optionRowKindShop(title) {
+      var t = String(title || "").trim();
+      if (!t) return "other";
+      if (/\b(cor|color|colour|cores)\b/i.test(t)) return "color";
+      if (/\b(tamanho|size|tam\.?|medida)\b/i.test(t)) return "size";
+      return "other";
+    }
+    function shortLabelShop(title, kind) {
+      if (kind === "color") return "Cor";
+      if (kind === "size") return "Tamanho";
+      var t = String(title || "").trim();
+      if (!t) return "Opção";
+      return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+    }
+    function swatchFillShop(val) {
+      var raw = String(val || "").trim().toLowerCase();
+      var collapsed = raw.replace(/\s+/g, "");
+      var m = {
+        preto: "#1a1a1a",
+        preta: "#1a1a1a",
+        black: "#1a1a1a",
+        branco: "#f5f5f5",
+        branca: "#f5f5f5",
+        white: "#f5f5f5",
+        amarelo: "#eab308",
+        amarela: "#eab308",
+        yellow: "#eab308",
+        vermelho: "#dc2626",
+        vermelha: "#dc2626",
+        red: "#dc2626",
+        azul: "#2563eb",
+        blue: "#2563eb",
+        verde: "#16a34a",
+        green: "#16a34a",
+        cinza: "#9ca3af",
+        grey: "#9ca3af",
+        gray: "#9ca3af",
+        rosa: "#ec4899",
+        pink: "#ec4899",
+        roxo: "#7c3aed",
+        lilas: "#a855f7",
+        laranja: "#ea580c",
+        orange: "#ea580c",
+        bege: "#d6c4a8",
+        beige: "#d6c4a8",
+        marrom: "#78350f",
+        brown: "#78350f",
+        dourado: "#ca8a04",
+        dourada: "#ca8a04",
+        gold: "#ca8a04",
+        navy: "#1e3a8a",
+        azulmarinho: "#1e3a8a",
+        nude: "#e8d5c4",
+        creme: "#faf5eb",
+        cream: "#faf5eb",
+      };
+      if (/\b(multi|estampa|print|misto)\b/i.test(raw)) {
+        return { fill: "linear-gradient(135deg,#ef4444,#eab308,#22c55e,#3b82f6)", g: true };
+      }
+      if (m[collapsed]) return { fill: m[collapsed], g: false };
+      return { fill: null, g: false };
+    }
+    function sortSizesShop(values) {
+      if (!values || values.length < 2) return values.slice();
+      var ORDER = ["PP", "P", "M", "G", "GG", "XG", "XGG"];
+      function norm(s) {
+        return String(s || "")
+          .trim()
+          .toUpperCase()
+          .replace(/\./g, "")
+          .replace(/[\u0300-\u036f]/g, "");
+      }
+      function rank(v) {
+        var k = norm(v);
+        var idx = ORDER.indexOf(k);
+        if (idx >= 0) return idx;
+        if (k === "PE" || k === "XS" || k === "XP") return 0.25;
+        if (k === "G1") return 4.1;
+        if (k === "G2") return 4.9;
+        return 1000;
+      }
+      return values.slice().sort(function (a, b) {
+        var d = rank(a) - rank(b);
+        return d !== 0 ? d : norm(a).localeCompare(norm(b));
+      });
+    }
+    function buildVariantRowsHtml(optionRows, selectedDefault, handle) {
+      if (!optionRows || !optionRows.length) return "";
+      var colorRows = [];
+      var sizeRows = [];
+      var otherRows = [];
+      var i;
+      for (i = 0; i < optionRows.length; i++) {
+        var rw = optionRows[i];
+        var kk = optionRowKindShop(rw.title);
+        if (kk === "color") colorRows.push(rw);
+        else if (kk === "size") sizeRows.push(rw);
+        else otherRows.push(rw);
+      }
+      var showDiv = colorRows.length > 0 && sizeRows.length > 0;
+      var safeH = String(handle || "p").replace(/[^a-zA-Z0-9_-]/g, "");
+      function rowHtml(row) {
+        var kind = optionRowKindShop(row.title);
+        var shortL = shortLabelShop(row.title, kind);
+        var safeR = String(row.id || "").replace(/[^a-zA-Z0-9_-]/g, "");
+        var headingId = "pc-h-" + safeH + "-" + safeR;
+        var cur = String(selectedDefault[row.id] || "").trim();
+        var disp = cur || "—";
+        var isSw = kind === "color";
+        var vals = row.values;
+        if (!isSw && kind === "size") vals = sortSizesShop(row.values);
+        var values = vals
+          .map(function (value) {
+            var selected = selectedDefault[row.id] === value;
+            var selCls = selected ? " is-selected" : "";
+            if (isSw) {
+              var sf = swatchFillShop(value);
+              var neu = !sf.fill ? " pc__variant-hit--swatch-neutral" : "";
+              var lit = "";
+              if (sf.fill && !sf.g) {
+                var fl = sf.fill.toLowerCase();
+                if (fl === "#f5f5f5" || fl === "#ffffff" || fl === "#fff" || fl === "#f0f0f0" || fl === "#faf5eb") {
+                  lit = " pc__variant-hit--swatch-light";
+                }
+              }
+              var innerStyle = "";
+              if (sf.g && sf.fill) innerStyle = ' style="background:' + sf.fill + '"';
+              else if (sf.fill) innerStyle = ' style="background-color:' + sf.fill + '"';
+              return (
+                '<button type="button" class="pc__variant-hit pc__variant-hit--swatch' +
+                selCls +
+                neu +
+                lit +
+                '" data-option-id="' +
+                escapeHtml(row.id) +
+                '" data-option-value="' +
+                escapeHtml(value) +
+                '" title="' +
+                escapeHtml(value) +
+                '" aria-label="' +
+                escapeHtml(row.title + ": " + value) +
+                '" aria-checked="' +
+                (selected ? "true" : "false") +
+                '"><span class="pc__variant-swatch-inner"' +
+                innerStyle +
+                "></span></button>"
+              );
+            }
+            return (
+              '<button type="button" class="pc__variant-hit pc__variant-hit--size' +
+              selCls +
+              '" data-option-id="' +
+              escapeHtml(row.id) +
+              '" data-option-value="' +
+              escapeHtml(value) +
+              '" aria-label="' +
+              escapeHtml(row.title + ": " + value) +
+              '" aria-checked="' +
+              (selected ? "true" : "false") +
+              '"><span class="pc__variant-size-text">' +
+              escapeHtml(value) +
+              "</span></button>"
+            );
+          })
+          .join("");
+        var vclass = isSw ? "pc__variant-values pc__variant-values--swatch" : "pc__variant-values pc__variant-values--pill";
+        return (
+          '<div class="pc__variant-block" data-variant-block="' +
+          escapeHtml(row.id) +
+          '"><p class="pc__variant-heading" id="' +
+          escapeHtml(headingId) +
+          '"><span class="pc__variant-heading-k">' +
+          escapeHtml(shortL) +
+          ':</span> <span class="pc__variant-heading-value" data-heading-for="' +
+          escapeHtml(row.id) +
+          '">' +
+          escapeHtml(disp) +
+          '</span></p><div class="' +
+          vclass +
+          '" role="radiogroup" aria-labelledby="' +
+          escapeHtml(headingId) +
+          '">' +
+          values +
+          "</div></div>"
+        );
+      }
+      var parts = [];
+      for (i = 0; i < colorRows.length; i++) parts.push(rowHtml(colorRows[i]));
+      if (showDiv) parts.push('<div class="pc__variants-divider" role="presentation" aria-hidden="true"></div>');
+      for (i = 0; i < sizeRows.length; i++) parts.push(rowHtml(sizeRows[i]));
+      for (i = 0; i < otherRows.length; i++) parts.push(rowHtml(otherRows[i]));
+      return '<div class="pc__variants">' + parts.join("") + "</div>";
+    }
+
+    function buildCard(p) {
+      var variants = Array.isArray(p.variants) ? p.variants : [];
+      var hasPositiveQtySignal = variants.some(function (variant) {
+        var items = (variant && variant.inventory_items) || [];
+        if (items.length > 0) {
+          var nested = sumNestedStockedQuantity(variant);
+          if (nested > 0) return true;
+        }
+        var qtyCandidate = variant && variant.inventory_quantity;
+        if (qtyCandidate === undefined || qtyCandidate === null) qtyCandidate = variant && variant.calculated_inventory_quantity;
+        if (qtyCandidate === undefined || qtyCandidate === null) qtyCandidate = variant && variant.stocked_quantity;
+        var q = Number(qtyCandidate);
+        return isFinite(q) && q > 0;
+      });
+      var hasLinkedInventoryItems = variants.some(function (variant) {
+        return ((variant && variant.inventory_items) || []).length > 0;
+      });
+      var hasExplicitNumericQtyField = variants.some(function (variant) {
+        var raw = variant && variant.inventory_quantity;
+        if (raw === undefined || raw === null) raw = variant && variant.calculated_inventory_quantity;
+        if (raw === undefined || raw === null) raw = variant && variant.stocked_quantity;
+        if (raw == null || raw === "") return false;
+        return isFinite(Number(raw));
+      });
+      var hasBooleanStockSignal = variants.some(function (variant) {
+        return (
+          (variant && (variant.available_for_sale === true || variant.available_for_sale === false)) ||
+          (variant && (variant.in_stock === true || variant.in_stock === false))
+        );
+      });
+      var hasStatusSignal = variants.some(function (variant) {
+        var status = String(variant && (variant.inventory_status || variant.availability_status) || "").toLowerCase();
+        return status.indexOf("out") >= 0 || status.indexOf("sold") >= 0 || status.indexOf("in_stock") >= 0 || status.indexOf("available") >= 0;
+      });
+      var stockSignalsAreReliable =
+        hasPositiveQtySignal ||
+        hasLinkedInventoryItems ||
+        hasExplicitNumericQtyField ||
+        hasBooleanStockSignal ||
+        hasStatusSignal;
+      var v = variants.find(function (variant) { return !isVariantSoldOut(variant, stockSignalsAreReliable); }) || variants[0];
+      var pr = priceFromVariant(v);
+      var title = p.title || "";
+      var handle = p.handle || "";
+      var sold = variants.length
+        ? variants.every(function (variant) { return isVariantSoldOut(variant, stockSignalsAreReliable); })
+        : isVariantSoldOut(v, stockSignalsAreReliable);
+      var md = p.metadata || {};
+      var exclusiveRaw = String(md.exclusive || md.is_exclusive || "").toLowerCase();
+      var isExclusive = exclusiveRaw === "true" || exclusiveRaw === "1" || exclusiveRaw === "yes" || exclusiveRaw === "sim";
+      var discountPct = 0;
+      if (pr.originalCents && pr.cents && pr.originalCents > pr.cents) {
+        discountPct = Math.round(((pr.originalCents - pr.cents) / pr.originalCents) * 100);
+      }
+      var priceStr = pr.display;
+      var origStr = pr.original;
+      var normalizedVariants = variants.map(function (variant) {
+        var prV = priceFromVariant(variant);
+        var discV = 0;
+        if (prV.originalCents && prV.cents && prV.originalCents > prV.cents) {
+          discV = Math.round(((prV.originalCents - prV.cents) / prV.originalCents) * 100);
+        }
+        return {
+          id: variant && variant.id ? variant.id : "",
+          title: variant && variant.title ? variant.title : "",
+          price: prV.cents || 0,
+          soldOut: isVariantSoldOut(variant, stockSignalsAreReliable),
+          allowBackorder: variant && variant.allow_backorder === true,
+          maxQty: getVariantMaxQty(variant),
+          options: optionMapFromVariant(variant),
+          images: getVariantImageArrayForJson(variant, p),
+          slideUrls: getVariantSlideArrayForJson(variant, p),
+          priceDisplay: prV.display || "",
+          originalDisplay: prV.original || null,
+          discountPercent: discV,
+        };
+      });
+      var pair = getVariantGalleryUrlsForProduct(v, p);
+      var thumb = pair[0] || "/no-data.webp";
+      var hover = pair[1] || "";
+      var selectedDefault = optionMapFromVariant(v);
+      var options = Array.isArray(p.options) ? p.options : [];
+      var optionRows = options.map(function (opt) {
+        var optionId = String(opt && opt.id || "");
+        var seen = {};
+        var values = [];
+        for (var i = 0; i < normalizedVariants.length; i++) {
+          var raw = normalizedVariants[i] && normalizedVariants[i].options ? normalizedVariants[i].options[optionId] : "";
+          var value = String(raw || "").trim();
+          if (!value || seen[value]) continue;
+          seen[value] = true;
+          values.push(value);
+        }
+        return { id: optionId, title: String(opt && opt.title || ""), values: values };
+      }).filter(function (row) {
+        return row.values && row.values.length > 0 && String(row.title || "").trim().toLowerCase() !== "title";
+      });
+      if (!optionRows.length) {
+        var fallbackMap = {};
+        for (var nvIndex = 0; nvIndex < normalizedVariants.length; nvIndex++) {
+          var nv = normalizedVariants[nvIndex];
+          var nvOpts = (nv && nv.options) || {};
+          Object.keys(nvOpts).forEach(function (optId) {
+            var rawValue = nvOpts[optId];
+            var value = String(rawValue || "").trim();
+            if (!value) return;
+            if (!fallbackMap[optId]) {
+              fallbackMap[optId] = { id: optId, title: optId, values: [] };
+            }
+            if (fallbackMap[optId].values.indexOf(value) === -1) {
+              fallbackMap[optId].values.push(value);
+            }
+          });
+        }
+        optionRows = Object.keys(fallbackMap).map(function (key) {
+          return fallbackMap[key];
+        }).filter(function (row) {
+          return String(row.title || "").trim().toLowerCase() !== "title";
+        });
+      }
+      var snMsgsEnc = encodedJsonAttr({
+        ok: "Pedido registado. Entraremos em contacto quando houver stock.",
+        err: "Não foi possível registar. Tente de novo.",
+      });
+      var stockNotifyHtml =
+        '<div class="pc__stock-notify" hidden>' +
+        '<p class="pc__stock-notify__intro">' +
+        escapeHtml("Sem esta variação no momento. Deixe o e-mail e avisamos quando voltar.") +
+        "</p>" +
+        '<div class="pc__stock-notify__row">' +
+        '<input type="email" class="pc__stock-notify__input" autocomplete="email" inputmode="email" placeholder="email@exemplo.com" aria-label="' +
+        escapeHtml("E-mail para aviso de stock") +
+        '" />' +
+        '<button type="button" class="btn btn-outline pc__stock-notify__btn">' +
+        escapeHtml("Avisar-me") +
+        '</button></div><p class="pc__stock-notify__feedback" hidden role="status"></p></div>';
+      var variantRows = buildVariantRowsHtml(optionRows, selectedDefault, handle);
+      var defaultVariantTitle = optionRows.map(function (row) {
+        var value = String(selectedDefault[row.id] || "").trim();
+        if (!value) return "";
+        return String(row.title || row.id) + ": " + value;
+      }).filter(Boolean).join(" | ");
+      var soldoutTagHtml =
+        '<span class="pc__tag pc__tag--soldout" data-pc-soldout-tag' +
+        (sold ? "" : " hidden") +
+        '><img src="/icons/cross.svg" alt="" width="12" height="12" />Esgotado</span>';
+      var discountTagHtml =
+        '<span class="pc__tag pc__tag--discount" data-pc-discount-tag' +
+        (!sold && discountPct > 0 ? "" : ' style="display:none"') +
+        ">" + (discountPct > 0 ? discountPct + "% off" : "") + "</span>";
+      var categoryTags = [];
+      if (!sold && isExclusive) categoryTags.push('<span class="pc__tag pc__tag--exclusive">Exclusivo</span>');
+      if (!sold && topPopular.has(p.id)) categoryTags.push('<span class="pc__tag pc__tag--popular"><img src="/icons/em-alta.svg" alt="" width="12" height="12" />Em alta</span>');
+      if (!sold && topNew.has(p.id)) categoryTags.push('<span class="pc__tag pc__tag--new"><img src="/icons/novo.svg" alt="" width="12" height="12" />Novo</span>');
+
+      var tagBlock =
+        '<div class="pc__tags pc__tags--priority">' + soldoutTagHtml + discountTagHtml + "</div>" +
+        '<div class="pc__tags pc__tags--category" data-pc-category-tags' + (sold ? " hidden" : "") + ">" +
+        categoryTags.join("") + "</div>";
+
+      return (
+        '<article class="pc" role="listitem" data-stock-reliable="' +
+        (stockSignalsAreReliable ? "true" : "false") +
+        '" data-product-id="' +
+        escapeHtml(p.id || "") +
+        '" data-product-handle="' +
+        escapeHtml(handle) +
+        '" data-product-title="' +
+        escapeHtml(title) +
+        '" data-stock-notify-msgs="' +
+        snMsgsEnc +
+        '" data-variants="' +
+        encodedJsonAttr(normalizedVariants) +
+        '" data-option-rows="' +
+        encodedJsonAttr(optionRows) +
+        '">' +
+        '<div class="pc__img-wrap">' +
+        '<a href="/product/' +
+        escapeHtml(handle) +
+        '" class="pc__link" aria-label="' +
+        escapeHtml(title) +
+        '"><img src="' +
+        escapeHtml(thumb) +
+        '" alt="' +
+        escapeHtml(title) +
+        '" class="pc__img pc__img--primary" width="480" height="480" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=\'/no-data.webp\'" />' +
+        tagBlock +
+        "</a>" +
+        '<button type="button" class="pc__gallery-arrow pc__gallery-arrow--prev" data-gallery-prev aria-label="Imagem anterior" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg></button>' +
+        '<button type="button" class="pc__gallery-arrow pc__gallery-arrow--next" data-gallery-next aria-label="Próxima imagem" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg></button>' +
+        '<div class="pc__gallery-dots" data-gallery-dots hidden></div>' +
+        "</div>" +
+        '<div class="pc__body"><a href="/product/' +
+        escapeHtml(handle) +
+        '" class="pc__body-link"><h3 class="pc__name">' +
+        escapeHtml(title) +
+        "</h3></a>" +
+        variantRows +
+        '<div class="pc__bottom"><div class="pc__price-box' +
+        (discountPct > 0 ? ' pc__price-box--discount' : '') +
+        '">' +
+        (origStr
+          ? '<span class="pc__price-striked">' + escapeHtml(origStr) + "</span>"
+          : "") +
+        (priceStr ? '<span class="pc__price-current">' + escapeHtml(priceStr) + "</span>" : "") +
+        "</div>" +
+        '<button type="button" class="pc__quick-add" data-variant-id="' +
+        escapeHtml(v && v.id ? v.id : "") +
+        '" data-title="' +
+        escapeHtml(title) +
+        '" data-price="' +
+        (pr.cents || "") +
+        '" data-thumbnail="' +
+        escapeHtml(thumb) +
+        '" data-variant-title="' +
+        escapeHtml(defaultVariantTitle || (v && v.title ? v.title : "")) +
+        '" data-max-qty="' +
+        escapeHtml(String(getVariantMaxQty(v) || "")) +
+        '"' +
+        (sold ? ' disabled="disabled"' : "") +
+        '><img src="/icons/bag.svg" alt="" width="18" height="18" /><span class="pc__quick-add__label">Adicionar à bag</span>' +
+        "</button></div>" +
+        stockNotifyHtml +
+        "</div></article>"
+      );
+    }
+
+    function hideLoadIndicator() {
+      if (!loadEl) return;
+      loadEl.hidden = true;
+      loadEl.setAttribute("hidden", "");
+    }
+
+    function productIsUncatalogued(p) {
+      if (!p) return false;
+      var cid = p.collection_id;
+      if (cid !== undefined && cid !== null && String(cid).trim() !== "") return false;
+      var c = p.collection;
+      if (c && (c.id || c.handle)) return false;
+      return true;
+    }
+
+    function loadMore() {
+      if (loading || done) return;
+      loading = true;
+      if (loadEl) { loadEl.hidden = false; loadEl.removeAttribute("hidden"); }
+      var url = "/store/products?" + productQuery + "&limit=24&offset=" + offset;
+      fetch(url, { headers: fetchHeaders })
+        .then(function (r) {
+          if (!r.ok) throw new Error("bad");
+          return r.json();
+        })
+        .then(function (data) {
+          var prods = data.products || [];
+          var count = data.count;
+          var added = 0;
+          for (var i = 0; i < prods.length; i++) {
+            var p = prods[i];
+            if (!productIsUncatalogued(p)) continue;
+            if (known.has(p.id)) continue;
+            known.add(p.id);
+            added += 1;
+            if (grid) {
+              var el = document.createElement("div");
+              el.innerHTML = buildCard(p);
+              var card = el.firstElementChild;
+              if (card) {
+                grid.appendChild(card);
+              }
+            }
+          }
+          offset += prods.length;
+          if (!prods.length) {
+            done = true;
+            if (endEl) { endEl.hidden = false; }
+          } else if (typeof count === "number" && offset >= count) {
+            done = true;
+            if (endEl) endEl.hidden = false;
+          } else if (typeof count !== "number" && prods.length < 24) {
+            done = true;
+            if (endEl) endEl.hidden = false;
+          }
+          if (added === 0 && prods.length) uncataloguedStall += 1;
+          else uncataloguedStall = 0;
+          if (!done && uncataloguedStall > 15) {
+            done = true;
+            if (endEl) endEl.hidden = false;
+          }
+          if (done && scrollObserver) {
+            try { scrollObserver.disconnect(); } catch (e) {}
+            scrollObserver = null;
+          }
+          if (done) hideLoadIndicator();
+        })
+        .catch(function () {})
+        .then(function () {
+          loading = false;
+          hideLoadIndicator();
+        });
+    }
+
+    if (sentinel) {
+      scrollObserver = new IntersectionObserver(
+        function (entries) {
+          if (done) return;
+          if (entries[0] && entries[0].isIntersecting) loadMore();
+        },
+        { rootMargin: "400px" }
+      );
+      scrollObserver.observe(sentinel);
+    }
+
+    document.querySelectorAll("[data-scroll-target]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-scroll-target");
+        if (!id) return;
+        document.querySelectorAll(".shop-toc__btn").forEach(function (item) {
+          item.classList.remove("is-active");
+        });
+        btn.classList.add("is-active");
+        var el = document.getElementById(id);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        setShopSidebarOpen(false);
+      });
+    });
+
+    var scrollButtons = Array.from(document.querySelectorAll(".shop-toc__btn"));
+    var blocks = Array.from(document.querySelectorAll(".shop-block"));
+    if (scrollButtons.length && blocks.length && "IntersectionObserver" in window) {
+      var targetMap = {};
+      scrollButtons.forEach(function (btn) {
+        var targetId = btn.getAttribute("data-scroll-target");
+        if (targetId) targetMap[targetId] = btn;
+      });
+      var sectionObserver = new IntersectionObserver(function (entries) {
+        var visible = entries
+          .filter(function (entry) { return entry.isIntersecting; })
+          .sort(function (a, b) { return b.intersectionRatio - a.intersectionRatio; });
+        if (!visible.length) return;
+        var top = visible[0].target;
+        if (!(top instanceof HTMLElement) || !top.id) return;
+        scrollButtons.forEach(function (btn) { btn.classList.remove("is-active"); });
+        if (targetMap[top.id]) targetMap[top.id].classList.add("is-active");
+      }, { rootMargin: "-35% 0px -45% 0px", threshold: [0.1, 0.3, 0.6] });
+      blocks.forEach(function (block) { sectionObserver.observe(block); });
+    }
+
+    var filterToggle = document.getElementById("filter-toggle");
+    if (filterToggle) {
+      filterToggle.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (!shopSidebar) return;
+        setShopSidebarOpen(!shopSidebar.classList.contains("is-open"));
+      });
+    }
+    if (shopSidebarBackdrop) {
+      shopSidebarBackdrop.addEventListener("click", function () { setShopSidebarOpen(false); });
+    }
+
+    // Setas/scroll das fileiras de coleção agora são do <ProductCarousel>
+    // (product-carousel-client.ts, importado globalmente no Layout).
+  })();
+</script>
