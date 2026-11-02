@@ -115,6 +115,17 @@ export default defineMiddlewares({
       middlewares: [rateLimit("me-callback", { windowMs: 600_000, max: 20 })],
     },
     {
+      // Conclusão do pedido: só a conta dona do carrinho (a rota confere o dono).
+      matcher: "/store/checkout/complete",
+      method: "POST",
+      // Primeiro a conta (o limite é por cliente, não por IP: várias pessoas atrás do mesmo IP não disputam o mesmo balde).
+      middlewares: [
+        requiredCustomer,
+        rateLimit("checkout-complete", { windowMs: 600_000, max: 300 }),
+        rateLimit("checkout-complete-conta", { windowMs: 600_000, max: 20, perIp: false, by: (req) => (req as any).auth_context?.actor_id }),
+      ],
+    },
+    {
       matcher: "/store/products*",
       method: "GET",
       middlewares: [optionalCustomer, hideBlockedProducts],

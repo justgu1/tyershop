@@ -18,14 +18,17 @@ spec:
             - { name: FRONT_URL, value: "${FRONT_URL}" }
             - { name: API_URL, value: "${API_URL}" }
             - { name: PUBLISHABLE_KEY, value: "${PUBLISHABLE_KEY}" }
-            - { name: PROFILE, value: "capacity" }
+            - { name: PROFILE, value: "${PROFILE}" }
+            - { name: PEOPLE, value: "${PEOPLE}" }
+            - { name: HOLD_SECONDS, value: "${HOLD_SECONDS}" }
+            - { name: THINK_SCALE, value: "${THINK_SCALE}" }
             - { name: USERS, value: "${USERS}" }
             - { name: STEP_SECONDS, value: "${STEP_SECONDS}" }
             - { name: LEVELS, value: "${LEVELS}" }
             - { name: I_UNDERSTAND_THIS_CREATES_ORDERS, value: "yes" }
             - { name: ALLOW_TYERSHOP_HOST, value: "yes" }
           resources:
-            requests: { cpu: "1", memory: 512Mi }
+            requests: { cpu: 100m, memory: 256Mi }
             limits: { cpu: "2", memory: 3Gi }
           volumeMounts: [{ name: script, mountPath: /scripts }]
       volumes:

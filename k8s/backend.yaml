@@ -17,7 +17,7 @@ spec:
         - name: backend
           image: ghcr.io/justgu1/tyershop-backend:latest
           resources:
-            requests: { cpu: 500m, memory: 768Mi }
+            requests: { cpu: 250m, memory: 768Mi }
           ports:
             - name: http
               containerPort: 9000
@@ -123,6 +123,10 @@ spec:
               value: "https://homolog.tyershop.com/melhor-envio/callback"
             - name: MELHOR_ENVIO_FROM_ZIP
               value: "06365210"
+            # Conexões por réplica. Réplicas x este valor precisa ficar abaixo do max_connections do PostgreSQL menos o que os
+            # outros apps usam (hoje ~20); o ajuste do banco no repo de infra sobe o limite para 150.
+            - name: DB_POOL_MAX
+              value: "15"
             - name: STORE_CORS
               value: "https://homolog.tyershop.com,https://tyershop.com,https://www.tyershop.com"
             - name: ADMIN_CORS

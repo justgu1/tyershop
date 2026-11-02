@@ -8,6 +8,8 @@ type Options = {
   globalMax?: number
   /** Chave extra além do IP (ex.: e-mail do corpo), para impedir spam contra uma pessoa só. */
   by?: (req: MedusaRequest) => string | undefined
+  /** Falso: conta só pela chave `by` (limite por conta, sem somar quem divide o mesmo IP). */
+  perIp?: boolean
 }
 
 /** Contador compartilhado entre réplicas quando há Redis; sem ele (dev), cai para memória. */
@@ -60,11 +62,11 @@ export const clientIp = (req: MedusaRequest) => {
 }
 
 /** Limite por janela; responde 429 ao exceder. */
-export function rateLimit(name: string, { windowMs, max, by, globalMax }: Options) {
+export function rateLimit(name: string, { windowMs, max, by, globalMax, perIp = true }: Options) {
   return async (req: MedusaRequest, res: MedusaResponse, next: MedusaNextFunction) => {
     // Só no ambiente de teste de carga: um gerador de carga sai de poucos IPs e bateria nos limites.
     if (process.env.LOAD_TEST_MODE === "true") return next()
-    const keys = [`${name}|ip|${clientIp(req)}`]
+    const keys = perIp ? [`${name}|ip|${clientIp(req)}`] : []
     if (globalMax) keys.push(`${name}|all`)
     const extra = by?.(req)
     if (extra) keys.push(`${name}|by|${extra.toLowerCase()}`)

@@ -360,7 +360,8 @@ function init() {
   }
 
   async function completeCart() {
-    const data = await medusaFetch(`/store/carts/${cartId}/complete`, { method: 'POST' });
+    // Rota própria: a original responde 409 enquanto o pedido ainda está sendo concluído em compras simultâneas.
+    const data = await medusaFetch('/store/checkout/complete', { method: 'POST', body: JSON.stringify({ cart_id: cartId }) });
     if (data?.type === 'order') {
       stopPolling();
       clearCart();
