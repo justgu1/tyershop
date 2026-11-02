@@ -1,5 +1,6 @@
 import type { MedusaRequest } from "@medusajs/framework/http";
 import { ContainerRegistrationKeys, MedusaError, Modules } from "@medusajs/framework/utils";
+import { assertShippingCurrent } from "../../../../modules/melhor-envio/quote";
 import { assertCartAllowed, loadCart } from "../../../../modules/drop/access";
 import { MercadoPagoClient, type MercadoPagoPayment } from "../../../../modules/payment-mercadopago/client";
 
@@ -35,6 +36,20 @@ export async function getMercadoPagoPaymentSession(req: MedusaRequest, paymentSe
   return { paymentModuleService, session };
 }
 
+/** Carrinho dono da coleção de pagamento da sessão (pela ligação entre carrinho e pagamento). */
+async function cartOfSession(req: MedusaRequest, session: { payment_collection_id?: string | null }) {
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY);
+  const { data: links } = await query.graph({
+    entity: "cart_payment_collection",
+    fields: ["cart_id"],
+    filters: { payment_collection_id: session.payment_collection_id ?? "" },
+  });
+  const cartId = (links as any[])[0]?.cart_id as string | undefined;
+  if (!cartId) return null;
+  const { data } = await query.graph({ entity: "cart", fields: ["id", "customer_id"], filters: { id: cartId } });
+  return ((data as any[])[0] as { id: string; customer_id: string | null } | undefined) ?? null;
+}
+
 const OPEN_STATUSES = ["approved", "authorized", "pending", "in_process", "in_mediation"];
 
 /** Valor em reais com 2 casas, como o Mercado Pago espera e como a autorização compara. */
@@ -61,13 +76,7 @@ export async function guardedPayment(
   return locking.execute(
     `pay:${customerId}`,
     async () => {
-      const query = req.scope.resolve(ContainerRegistrationKeys.QUERY);
-      const { data } = await query.graph({
-        entity: "cart",
-        fields: ["id", "customer_id"],
-        filters: { payment_collection: { id: session.payment_collection_id ?? "" } } as any,
-      });
-      const cart = (data as any[])[0];
+      const cart = await cartOfSession(req, session);
       if (!cart || cart.customer_id !== customerId) {
         throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "Esta sessão de pagamento não pertence à sua conta.");
       }
@@ -80,6 +89,7 @@ export async function guardedPayment(
 
       const { lines } = await loadCart(req.scope, cart.id);
       await assertCartAllowed(req.scope, { customerId, lines, mode: "pay", excludeCartId: cart.id });
+      await assertShippingCurrent(req.scope, cart.id);
 
       const attempt = (prev.attempt ?? 0) + 1;
       const payment = await create(`${session.id}-${attempt}`);
@@ -94,13 +104,8 @@ export async function guardedPayment(
 export async function assertSessionOwner(req: MedusaRequest, session: { payment_collection_id?: string | null }) {
   const customerId = (req as any).auth_context?.actor_id as string | undefined;
   if (!customerId) throw new MedusaError(MedusaError.Types.UNAUTHORIZED, "Entre na sua conta.");
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY);
-  const { data } = await query.graph({
-    entity: "cart",
-    fields: ["id", "customer_id"],
-    filters: { payment_collection: { id: session.payment_collection_id ?? "" } } as any,
-  });
-  if ((data as any[])[0]?.customer_id !== customerId) {
+  const cart = await cartOfSession(req, session);
+  if (cart?.customer_id !== customerId) {
     throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "Esta sessão de pagamento não pertence à sua conta.");
   }
 }

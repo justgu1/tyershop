@@ -98,6 +98,25 @@ spec:
                   name: tyershop-secrets
                   key: MERCADOPAGO_WEBHOOK_SECRET
                   optional: true
+            # Melhor Envio (cálculo de frete). Client id/secret entram no secret; sandbox até a virada.
+            - name: MELHOR_ENVIO_ENV
+              value: "sandbox"
+            - name: MELHOR_ENVIO_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MELHOR_ENVIO_CLIENT_ID
+                  optional: true
+            - name: MELHOR_ENVIO_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MELHOR_ENVIO_CLIENT_SECRET
+                  optional: true
+            - name: MELHOR_ENVIO_REDIRECT_URI
+              value: "https://homolog.tyershop.com/melhor-envio/callback"
+            - name: MELHOR_ENVIO_FROM_ZIP
+              value: "06365210"
             - name: STORE_CORS
               value: "https://homolog.tyershop.com,https://tyershop.com,https://www.tyershop.com"
             - name: ADMIN_CORS

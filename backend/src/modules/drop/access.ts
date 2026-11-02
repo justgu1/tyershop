@@ -19,7 +19,7 @@ const query = (scope: MedusaContainer) => scope.resolve(ContainerRegistrationKey
 
 const deny = (message: string) => new MedusaError(MedusaError.Types.NOT_ALLOWED, message)
 
-async function dropRows(scope: MedusaContainer) {
+export async function dropRows(scope: MedusaContainer) {
   const { data } = await query(scope).graph({ entity: "drop", fields: ["id", "products.id"] })
   const drops = scope.resolve<DropModuleService>(DROP_MODULE)
   return Promise.all(

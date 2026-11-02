@@ -1,4 +1,5 @@
 import { addToCartWorkflow, completeCartWorkflow, updateLineItemInCartWorkflow } from "@medusajs/medusa/core-flows"
+import { assertShippingCurrent } from "../../modules/melhor-envio/quote"
 import { assertCartAllowed, linesFromVariants, loadCart } from "../../modules/drop/access"
 
 /** Regras do drop valendo no servidor (acesso, limite por pessoa, lote): não dá para burlar pela API. */
@@ -23,4 +24,5 @@ updateLineItemInCartWorkflow.hooks.validate(async ({ input }, { container }) => 
 completeCartWorkflow.hooks.validate(async ({ cart }, { container }) => {
   const current = await loadCart(container, (cart as any).id)
   await assertCartAllowed(container, { customerId: current.customerId, lines: current.lines, mode: "complete" })
+  await assertShippingCurrent(container, (cart as any).id)
 })

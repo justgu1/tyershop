@@ -4,6 +4,7 @@ import { SetDropProductsSchema } from "./admin/drops/[id]/products/validators"
 import { CreateLeadSchema, UpdateLeadSchema } from "./admin/leads/validators"
 import { StoreCreateLeadSchema } from "./store/leads/validators"
 import { IdentifySchema } from "./store/drop/identify/validators"
+import { StoreQuoteSchema } from "./store/shipping/quote/validators"
 import { RedeemTicketSchema } from "./store/tickets/redeem/validators"
 import { bodyEmail, rateLimit } from "./rate-limit"
 import { hideBlockedProducts } from "./hide-blocked-products"
@@ -96,6 +97,16 @@ export default defineMiddlewares({
       // Cobrança sempre em nome da conta logada, dona do carrinho.
       matcher: "/store/checkout/mercadopago/*",
       middlewares: [rateLimit("checkout", { windowMs: 600_000, max: 60 }), requiredCustomer],
+    },
+    {
+      matcher: "/store/shipping/quote",
+      method: "POST",
+      middlewares: [rateLimit("quote", { windowMs: 600_000, max: 40 }), validateAndTransformBody(StoreQuoteSchema)],
+    },
+    {
+      matcher: "/store/melhor-envio/callback",
+      method: "POST",
+      middlewares: [rateLimit("me-callback", { windowMs: 600_000, max: 20 })],
     },
     {
       matcher: "/store/products*",

@@ -35,6 +35,7 @@ module.exports = defineConfig({
     },
   modules: {
     drop: { resolve: "./src/modules/drop" },
+    melhorEnvio: { resolve: "./src/modules/melhor-envio" },
     lead: { resolve: "./src/modules/lead" },
     ticket: { resolve: "./src/modules/ticket" },
     // Sem SMTP configurado o provider não é registrado (a validação das opções derrubaria o boot).
@@ -62,6 +63,15 @@ module.exports = defineConfig({
           },
         }
       : {}),
+    fulfillment: {
+      resolve: "@medusajs/fulfillment",
+      options: {
+        providers: [
+          { resolve: "@medusajs/fulfillment-manual", id: "manual" },
+          { resolve: "./src/modules/fulfillment-melhorenvio", id: "melhorenvio" },
+        ],
+      },
+    },
     payment: {
       resolve: "@medusajs/payment",
       options: {
