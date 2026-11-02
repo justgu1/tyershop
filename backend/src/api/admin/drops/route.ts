@@ -14,7 +14,7 @@ export async function POST(req: MedusaRequest<CreateDropBody>, res: MedusaRespon
   const drops = req.scope.resolve<DropModuleService>(DROP_MODULE)
   const { is_current, ...data } = req.validatedBody
 
-  const created = await drops.createDrops({ ...data, is_current: false })
+  const created = await drops.createDrops({ ...data, is_current: false } as any)
   if (is_current) await drops.makeCurrent(created.id)
 
   const fresh = await drops.retrieveDrop(created.id)

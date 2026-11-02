@@ -9,6 +9,9 @@ import { ensureAccount } from "../lead/account"
 import { TICKET_MODULE } from "./index"
 import TicketModuleService from "./service"
 
+/** Depois do primeiro uso o link ainda funciona por alguns minutos (recarregar, trocar de aba); depois disso só a senha entra. */
+const REUSE_WINDOW_MS = 10 * 60 * 1000
+
 const invalid = () => new MedusaError(MedusaError.Types.NOT_FOUND, "Convite inválido ou expirado")
 
 /**
@@ -20,6 +23,12 @@ export async function redeemTicket(scope: MedusaContainer, code: string) {
   const tickets = scope.resolve<TicketModuleService>(TICKET_MODULE)
   const [ticket] = await tickets.listTickets({ code }, { take: 1 })
   if (!ticket) throw invalid()
+  if (ticket.redeemed_at && Date.now() - new Date(ticket.redeemed_at).getTime() > REUSE_WINDOW_MS) {
+    throw new MedusaError(
+      MedusaError.Types.NOT_ALLOWED,
+      "Esse link já foi usado. Entre com a sua senha ou use “esqueci minha senha” para criar uma."
+    )
+  }
 
   const drop = await scope.resolve<DropModuleService>(DROP_MODULE).retrieveDrop(ticket.drop_id)
   if (resolveDropPhase(drop) === "ended") throw invalid()

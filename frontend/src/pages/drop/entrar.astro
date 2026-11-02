@@ -44,6 +44,7 @@ export const prerender = false;
       });
       if (res.status === 404) return fail('Convite inválido ou expirado.');
       const data = await res.json();
+      if (res.status === 400 && data?.message) return fail(data.message);
       if (!res.ok || !data.token) throw new Error('fail');
 
       localStorage.setItem('tyer_token', data.token);

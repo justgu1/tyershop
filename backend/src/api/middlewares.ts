@@ -79,6 +79,15 @@ export default defineMiddlewares({
       ],
     },
     {
+      // Login do admin também fica na internet: sem teto, dá para tentar senhas à vontade.
+      matcher: "/auth/user/emailpass",
+      method: "POST",
+      middlewares: [
+        rateLimit("admin-login", { windowMs: 600_000, max: 10 }),
+        rateLimit("admin-login-email", { windowMs: 600_000, max: 5, by: bodyEmail }),
+      ],
+    },
+    {
       matcher: "/auth/customer/emailpass/register",
       method: "POST",
       middlewares: [rateLimit("register", { windowMs: 3_600_000, max: 10 })],

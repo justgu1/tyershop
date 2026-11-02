@@ -73,6 +73,7 @@ module.exports = defineConfig({
               accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN,
               publicKey: process.env.PUBLIC_MERCADOPAGO_PUBLIC_KEY,
               notificationUrl: process.env.MERCADOPAGO_NOTIFICATION_URL,
+              webhookSecret: process.env.MERCADOPAGO_WEBHOOK_SECRET,
             },
           },
         ],

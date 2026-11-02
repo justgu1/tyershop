@@ -14,7 +14,7 @@ export async function POST(req: MedusaRequest<UpdateDropBody>, res: MedusaRespon
   const drops = req.scope.resolve<DropModuleService>(DROP_MODULE)
   const { is_current, ...data } = req.validatedBody
 
-  if (Object.keys(data).length) await drops.updateDrops({ id: req.params.id, ...data })
+  if (Object.keys(data).length) await drops.updateDrops({ id: req.params.id, ...data } as any)
   if (is_current === true) await drops.makeCurrent(req.params.id)
   if (is_current === false) await drops.updateDrops({ id: req.params.id, is_current: false })
 

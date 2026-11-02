@@ -63,6 +63,31 @@ function sumByProduct(orders: Awaited<ReturnType<typeof ordersSince>>, only: Set
 }
 
 /**
+ * Peças de carrinhos do cliente que já têm pagamento criado no Mercado Pago e ainda não viraram pedido
+ * (Pix e boleto levam tempo). Sem isso, dois pagamentos simultâneos furariam o limite por pessoa.
+ */
+async function reservedByProduct(scope: MedusaContainer, customerId: string, excludeCartId?: string) {
+  const { data } = await query(scope).graph({
+    entity: "cart",
+    fields: ["id", "items.product_id", "items.quantity", "payment_collection.payment_sessions.data"],
+    filters: { customer_id: customerId, completed_at: null },
+    pagination: { take: 50 },
+  })
+  const total = new Map<string, number>()
+  for (const cart of data as any[]) {
+    if (cart.id === excludeCartId) continue
+    const paying = (cart.payment_collection?.payment_sessions ?? []).some(
+      (s: any) => s.data?.mp_payment_id && !["rejected", "cancelled"].includes(s.data?.mp_status)
+    )
+    if (!paying) continue
+    for (const it of cart.items ?? []) {
+      if (it.product_id) total.set(it.product_id, (total.get(it.product_id) ?? 0) + Number(it.quantity))
+    }
+  }
+  return total
+}
+
+/**
  * Regras de compra dos produtos de drop para um carrinho (já com tudo que ficaria nele):
  * em breve não vende; encerrado só deixa concluir pedido já pago; pré-venda exige ingresso resgatado
  * e limita a 2 peças por produto por pessoa, contando o que ela já comprou na pré-venda;
@@ -70,9 +95,9 @@ function sumByProduct(orders: Awaited<ReturnType<typeof ordersSince>>, only: Set
  */
 export async function assertCartAllowed(
   scope: MedusaContainer,
-  input: { customerId?: string | null; lines: CartLine[]; mode: CartCheckMode }
+  input: { customerId?: string | null; lines: CartLine[]; mode: CartCheckMode; excludeCartId?: string }
 ) {
-  const { customerId, lines, mode } = input
+  const { customerId, lines, mode, excludeCartId } = input
   if (!lines.length) return
 
   const qtyByProduct = new Map<string, number>()
@@ -95,8 +120,9 @@ export async function assertCartAllowed(
       const bought = customerId
         ? sumByProduct(await ordersSince(scope, new Date(drop.preorder_starts_at), new Date(until), customerId), productIds)
         : new Map<string, number>()
+      const reserved = customerId && mode === "pay" ? await reservedByProduct(scope, customerId, excludeCartId) : new Map<string, number>()
       for (const id of inDrop) {
-        if ((bought.get(id) ?? 0) + (qtyByProduct.get(id) ?? 0) > MAX_PER_PRODUCT_PRESALE) {
+        if ((bought.get(id) ?? 0) + (reserved.get(id) ?? 0) + (qtyByProduct.get(id) ?? 0) > MAX_PER_PRODUCT_PRESALE) {
           throw deny(`Limite de ${MAX_PER_PRODUCT_PRESALE} peças de cada produto por pessoa na pré-venda.`)
         }
       }
