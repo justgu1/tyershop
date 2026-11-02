@@ -17,6 +17,7 @@ const dropFields = {
   general_lot: z.number().int().positive().nullable().optional(),
   closed_at: date.nullable().optional(),
   production_days: z.number().int().positive().optional(),
+  release_leads_in_presale: z.boolean().optional(),
   component_key: optionalText,
   hero_kind: z.enum(["community_video", "drop_video", "banner"]).optional(),
   hero_url: optionalText,

@@ -13,6 +13,7 @@ const Drop = model.define("drop", {
   general_lot: model.number().nullable(),
   closed_at: model.dateTime().nullable(),
   production_days: model.number().default(21),
+  release_leads_in_presale: model.boolean().default(false),
   component_key: model.text().nullable(),
   hero_kind: model.enum(["community_video", "drop_video", "banner"]).default("banner"),
   hero_url: model.text().nullable(),
