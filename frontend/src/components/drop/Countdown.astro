@@ -1,0 +1,74 @@
+---
+interface Props {
+  targetIso: string;
+  label?: string;
+  align?: 'center' | 'start';
+  compact?: boolean;
+}
+const { targetIso, label, align = 'center', compact = false } = Astro.props;
+---
+
+<div class:list={['cd', { 'cd--start': align === 'start', 'cd--compact': compact }]} data-countdown data-target-iso={targetIso} role="timer" aria-live="off">
+  {label && <p class="cd__label">{label}</p>}
+  <div class="cd__clock">
+    <div class="cd__unit"><span class="cd__num" data-cd="d">00</span><span class="cd__u">dias</span></div>
+    <div class="cd__unit"><span class="cd__num" data-cd="h">00</span><span class="cd__u">h</span></div>
+    <div class="cd__unit"><span class="cd__num" data-cd="m">00</span><span class="cd__u">min</span></div>
+    <div class="cd__unit"><span class="cd__num" data-cd="s">00</span><span class="cd__u">s</span></div>
+  </div>
+</div>
+
+<style>
+  .cd { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .cd--start { align-items: flex-start; }
+  .cd__label { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--c-accent, #e77e23); margin: 0; }
+  .cd__clock { display: flex; gap: 18px; }
+  .cd__unit { display: flex; flex-direction: column; align-items: center; min-width: 56px; }
+  .cd__num { font-family: var(--font-title); font-size: 44px; line-height: 1; }
+  .cd__u { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); margin-top: 4px; }
+  .cd--compact { flex-direction: row; gap: 8px; align-items: center; }
+  .cd--compact .cd__label { font-size: 11px; letter-spacing: 0.12em; white-space: nowrap; color: inherit; }
+  .cd--compact .cd__clock { gap: 6px; }
+  .cd--compact .cd__unit { flex-direction: row; align-items: baseline; gap: 2px; min-width: 0; }
+  .cd--compact .cd__num { font-family: inherit; font-size: 13px; font-weight: 800; color: #fff; }
+  .cd--compact .cd__u { font-size: 9px; margin-top: 0; }
+  .cd.is-over .cd__clock { opacity: 0.4; }
+  @media (max-width: 640px) {
+    .cd__clock { gap: 10px; }
+    .cd__unit { min-width: 44px; }
+    .cd__num { font-size: 32px; }
+  }
+</style>
+
+<script>
+  const pad = (n: number) => String(Math.max(0, n)).padStart(2, '0');
+
+  document.querySelectorAll<HTMLElement>('[data-countdown]').forEach((box) => {
+    const target = new Date(box.dataset.targetIso || '').getTime();
+    if (!Number.isFinite(target)) return;
+    const cell = (k: string) => box.querySelector<HTMLElement>(`[data-cd="${k}"]`);
+    const [d, h, m, s] = ['d', 'h', 'm', 's'].map(cell);
+
+    function tick() {
+      const diff = target - Date.now();
+      if (diff <= 0) {
+        [d, h, m, s].forEach((el) => el && (el.textContent = '00'));
+        box.classList.add('is-over');
+        clearInterval(timer);
+        // A fase muda no servidor quando a data passa: recarrega uma vez para refletir.
+        if (!sessionStorage.getItem('drop_reloaded_' + target)) {
+          sessionStorage.setItem('drop_reloaded_' + target, '1');
+          setTimeout(() => location.reload(), 1500);
+        }
+        return;
+      }
+      const total = Math.floor(diff / 1000);
+      if (d) d.textContent = pad(Math.floor(total / 86400));
+      if (h) h.textContent = pad(Math.floor((total % 86400) / 3600));
+      if (m) m.textContent = pad(Math.floor((total % 3600) / 60));
+      if (s) s.textContent = pad(total % 60);
+    }
+    tick();
+    const timer = setInterval(tick, 1000);
+  });
+</script>

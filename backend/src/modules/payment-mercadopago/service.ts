@@ -27,13 +27,30 @@ import type {
   UpdatePaymentOutput,
   WebhookActionResult,
 } from "@medusajs/framework/types";
+import { createHmac, timingSafeEqual } from "crypto";
 import { MercadoPagoClient, type MercadoPagoPayment } from "./client";
+
+/** Confere o cabeçalho `x-signature` (HMAC-SHA256 de `id;request-id;ts`) e recusa timestamps antigos. */
+export function isValidMpSignature(secret: string, headers: Record<string, any> | undefined, dataId: string, now = Date.now()) {
+  const header = String(headers?.["x-signature"] ?? "");
+  const requestId = String(headers?.["x-request-id"] ?? "");
+  const parts = Object.fromEntries(header.split(",").map((p) => p.trim().split("=") as [string, string]));
+  if (!parts.ts || !parts.v1 || !dataId) return false;
+  if (Math.abs(now - Number(parts.ts)) > 10 * 60 * 1000) return false;
+  const manifest = `id:${dataId.toLowerCase()};request-id:${requestId};ts:${parts.ts};`;
+  const expected = createHmac("sha256", secret).update(manifest).digest("hex");
+  const given = Buffer.from(parts.v1, "hex");
+  const want = Buffer.from(expected, "hex");
+  return given.length === want.length && timingSafeEqual(given, want);
+}
 
 type Options = {
   accessToken: string;
   publicKey: string;
   /** URL pública do backend p/ o webhook, ex.: https://api.tyershop.com/hooks/payment/mercadopago */
   notificationUrl?: string;
+  /** Segredo de assinatura das notificações (painel do Mercado Pago). Com ele, notificação sem assinatura válida é ignorada. */
+  webhookSecret?: string;
 };
 
 type InjectedDependencies = {
@@ -123,6 +140,9 @@ class MercadoPagoProviderService extends AbstractPaymentProvider<Options> {
     super(cradle, options);
     this.logger_ = cradle.logger;
     this.options_ = options;
+    if (!options.webhookSecret && process.env.NODE_ENV === "production") {
+      this.logger_.warn("[mercadopago] MERCADOPAGO_WEBHOOK_SECRET não definido: notificações sem assinatura são aceitas (o status é sempre reconsultado no Mercado Pago)");
+    }
     this.client_ = new MercadoPagoClient({
       accessToken: options.accessToken,
       notificationUrl: options.notificationUrl,
@@ -162,7 +182,21 @@ class MercadoPagoProviderService extends AbstractPaymentProvider<Options> {
     }
 
     const confirmed = data as ConfirmedSessionData;
+
+    // O carrinho mudou depois do pagamento (ex.: item novo): o valor cobrado não cobre mais o pedido.
+    const expected = Number((data as any).amount)
+    const charged = Number((data as any).mp_amount)
+    if (!Number.isFinite(charged) || !Number.isFinite(expected) || Math.abs(expected - charged) > 0.009) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        "O valor pago não confere com o total do pedido. Refaça o pagamento."
+      );
+    }
+
     const payment = await this.client_.getPayment(confirmed.mp_payment_id);
+    if (Math.abs(Number(payment.transaction_amount) - charged) > 0.009) {
+      throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "O valor do pagamento no Mercado Pago não confere com o pedido.");
+    }
     const status = mapMpStatusToMedusa(payment.status);
 
     return {
@@ -220,6 +254,10 @@ class MercadoPagoProviderService extends AbstractPaymentProvider<Options> {
     const body = payload.data as { type?: string; action?: string; data?: { id?: string } };
     try {
       if (body?.type !== "payment" || !body?.data?.id) {
+        return { action: "not_supported", data: { session_id: "", amount: new BigNumber(0) } };
+      }
+      if (this.options_.webhookSecret && !isValidMpSignature(this.options_.webhookSecret, payload.headers as any, String(body.data.id))) {
+        this.logger_.warn("[mercadopago] notificação com assinatura inválida ignorada");
         return { action: "not_supported", data: { session_id: "", amount: new BigNumber(0) } };
       }
 

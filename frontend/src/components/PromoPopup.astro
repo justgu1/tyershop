@@ -87,12 +87,22 @@ const { lang = 'pt' } = Astro.props;
       }
       if (submitBtn instanceof HTMLButtonElement) submitBtn.disabled = true;
       try {
-        const res = await fetch(publicApiUrl + '/api/newsletter', {
+        const res = await fetch('/store/leads', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
+          headers: {
+            'Content-Type': 'application/json',
+            'x-publishable-api-key': (window as any).__MEDUSA_PK__ || '',
+          },
+          body: JSON.stringify({ email, source: 'popup' }),
         });
         if (!res.ok) throw new Error('fail');
+        try {
+          sessionStorage.setItem(KEY, '1');
+        } catch {
+          /* ignore */
+        }
+        location.assign('/drop/obrigado');
+        return;
         if (feedback instanceof HTMLElement) {
           feedback.hidden = false;
           feedback.textContent = 'Cadastrado! Fique de olho no seu e-mail.';

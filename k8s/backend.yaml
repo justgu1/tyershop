@@ -58,12 +58,75 @@ spec:
                   key: PUBLIC_MERCADOPAGO_PUBLIC_KEY
             - name: MERCADOPAGO_NOTIFICATION_URL
               value: "https://medusa.homolog.tyershop.com/hooks/payment/mercadopago"
-            - name: STORE_CORS
+            - name: SMTP_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: SMTP_HOST
+                  optional: true
+            - name: SMTP_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: SMTP_PORT
+                  optional: true
+            - name: SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: SMTP_USER
+                  optional: true
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: SMTP_PASSWORD
+                  optional: true
+            - name: SMTP_FROM
+              value: "Tyer <contato@tyershop.com>"
+            # Ligado por padrão: homolog e prod são o mesmo deploy, nada sai para cliente real sem desligar aqui.
+            - name: EMAIL_TEST_MODE
+              value: "true"
+            - name: EMAIL_TEST_TO
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: EMAIL_TEST_TO
+                  optional: true
+            - name: SITE_URL
               value: "https://homolog.tyershop.com"
+            # Segredo de assinatura das notificações do Mercado Pago (opcional até ser criado no painel).
+            - name: MERCADOPAGO_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MERCADOPAGO_WEBHOOK_SECRET
+                  optional: true
+            # Melhor Envio (cálculo de frete). Client id/secret entram no secret; sandbox até a virada.
+            - name: MELHOR_ENVIO_ENV
+              value: "sandbox"
+            - name: MELHOR_ENVIO_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MELHOR_ENVIO_CLIENT_ID
+                  optional: true
+            - name: MELHOR_ENVIO_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MELHOR_ENVIO_CLIENT_SECRET
+                  optional: true
+            - name: MELHOR_ENVIO_REDIRECT_URI
+              value: "https://homolog.tyershop.com/melhor-envio/callback"
+            - name: MELHOR_ENVIO_FROM_ZIP
+              value: "06365210"
+            - name: STORE_CORS
+              value: "https://homolog.tyershop.com,https://tyershop.com,https://www.tyershop.com"
             - name: ADMIN_CORS
               value: "https://medusa.homolog.tyershop.com"
             - name: AUTH_CORS
-              value: "https://homolog.tyershop.com,https://medusa.homolog.tyershop.com"
+              value: "https://homolog.tyershop.com,https://tyershop.com,https://www.tyershop.com,https://medusa.homolog.tyershop.com"
             - name: AWS_BUCKET
               value: tyershop
             - name: AWS_DEFAULT_REGION

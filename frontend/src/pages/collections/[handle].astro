@@ -3,6 +3,7 @@ import Layout from '../../layouts/Layout.astro';
 import CollectionMosaicItem from '../../components/CollectionMosaicItem.astro';
 import { getLangFromUrl, t, getPathForLang } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
+import { isHiddenCollection } from '../../lib/collections';
 import { getMedusaStoreUrl, getPublishableKey } from '../../lib/medusa-env';
 import { getProductListQueryString, resolveDefaultRegionId } from '../../lib/medusa-pricing';
 
@@ -29,7 +30,7 @@ try {
   });
   if (listRes.ok) {
     const list = ((await listRes.json()).collections ?? []) as any[];
-    collection = list.find((c) => String(c?.handle ?? '') === h) ?? null;
+    collection = list.find((c) => String(c?.handle ?? '') === h && !isHiddenCollection(c)) ?? null;
   }
 
   if (collection?.id) {
@@ -111,11 +112,6 @@ const metaDesc =
             <p class="collection-empty">{t(lang, 'collections', 'empty')}</p>
           )}
 
-          <p class="collection-footer">
-            <a href={getPathForLang('/shop', lang)} class="btn btn-outline">
-              {t(lang, 'collections', 'back_shop')}
-            </a>
-          </p>
         </div>
       </main>
     ) : (

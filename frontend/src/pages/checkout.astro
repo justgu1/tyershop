@@ -158,6 +158,12 @@ const c = (key: string) => t(lang, 'checkout', key);
                   </div>
                 </div>
 
+                <div id="ck-shipping" class="checkout-shipping" hidden>
+                  <p class="checkout-shipping__title">Entrega</p>
+                  <p id="ck-ship-hint" class="checkout-hint" role="status"></p>
+                  <div class="ship-opts" id="ck-ship-options" aria-live="polite"></div>
+                </div>
+
                 <div id="checkout-login-needed" class="checkout-login-needed" hidden>
                   <p>Esse e-mail já tem conta na Tyer. Digite sua senha pra continuar.</p>
                   <label class="checkout-field">

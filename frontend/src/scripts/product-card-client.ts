@@ -403,6 +403,7 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
     if (btn instanceof HTMLButtonElement && btn.disabled) return;
     const variantId = btn.getAttribute('data-variant-id');
     const title = btn.getAttribute('data-title') || '';
+    const handle = btn.getAttribute('data-handle') || undefined;
     const price = btn.getAttribute('data-price') || '0';
     const thumbnail = btn.getAttribute('data-thumbnail') || '';
     const variantTitle = btn.getAttribute('data-variant-title') || '';
@@ -411,6 +412,7 @@ if (document.documentElement.dataset.pcInitDone === 'true') {
     if (!variantId) return;
     addItem({
       variantId,
+      handle,
       title,
       variantTitle,
       price: Number(price),

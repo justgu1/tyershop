@@ -1,6 +1,7 @@
 /**
  * Cliente PDP: variantes, galeria, carrinho, sticky. Módulo único (evita TS/`OptionRow` no HTML).
  */
+import { fetchShippingQuote, isCep, renderShippingOptions } from '../lib/shipping';
 import { addItem, getCart, hasOutOfStockItems, CART_MAX_WHEN_UNKNOWN } from '../lib/cart';
 
 type OptionRow = { id: string; title: string; values: string[] };
@@ -89,7 +90,6 @@ if (root) {
   const stockNotifyFeedback = document.getElementById('pdp-stock-notify-feedback');
   const cepInput = document.getElementById('pdp-cep-input') as HTMLInputElement | null;
   const cepSticky = document.getElementById('pdp-cep-input-sticky') as HTMLInputElement | null;
-  const cepHint = document.getElementById('pdp-cep-hint');
   const stickyBar = document.getElementById('pdp-sticky-bar') as HTMLElement | null;
   const stickyPriceCurrent = document.getElementById('pdp-sticky-price-current');
   const stickyPriceOriginal = document.getElementById('pdp-sticky-price-original') as HTMLElement | null;
@@ -488,6 +488,7 @@ if (root) {
     if (qtyInc instanceof HTMLButtonElement) qtyInc.disabled = oos;
     if (cepInput) cepInput.disabled = oos;
     if (cepSticky) cepSticky.disabled = oos;
+    document.querySelectorAll<HTMLButtonElement>('#pdp-cep-calc-sticky').forEach((b) => (b.disabled = oos));
   }
 
   function update() {
@@ -575,7 +576,7 @@ if (root) {
   function addCurrentToCart(options?: { openSideCart?: boolean }) {
     const openSide = options?.openSideCart !== false;
     if (!atcBtn) return Promise.resolve();
-    const { variantId, title, price, thumbnail, variantTitle, maxQty, qty } = atcBtn.dataset;
+    const { variantId, title, handle, price, thumbnail, variantTitle, maxQty, qty } = atcBtn.dataset;
     if (!variantId || atcBtn.disabled) return Promise.resolve();
     const parsedMax = Number(maxQty || '');
     const maxQuantity = Number.isFinite(parsedMax) && parsedMax > 0 ? Math.floor(parsedMax) : undefined;
@@ -583,6 +584,7 @@ if (root) {
     return Promise.resolve().then(() => {
       addItem({
         variantId,
+        handle: handle || undefined,
         title: title ?? '',
         variantTitle: variantTitle ?? '',
         price: Number(price ?? 0),
@@ -622,7 +624,7 @@ if (root) {
     if (cepInput && cepInput.value !== next) cepInput.value = next;
     if (cepSticky && cepSticky.value !== next) cepSticky.value = next;
     const ok = next.replace(/\D/g, '').length === 8;
-    if (cepHint) cepHint.textContent = ok || next.length === 0 ? '' : 'CEP inválido';
+    document.querySelectorAll('#pdp-cep-hint, #pdp-cep-hint-sticky').forEach((h) => (h.textContent = ok || next.length === 0 ? '' : 'CEP inválido'));
     // CEP digitado aqui pré-preenche o checkout — evita perguntar de novo
     // quando "Comprar agora" leva direto pra lá.
     if (ok) {
@@ -643,17 +645,48 @@ if (root) {
     const next = formatCep(cur);
     applyCepToInputs(next);
   });
-  /* Não existe cálculo de frete real hoje (nenhum endpoint de shipping-rate
-     é chamado) — o botão só torna explícito o mesmo fluxo de validar/formatar
-     e salvar o CEP que já rodava sozinho ao digitar, pra não parecer que
-     "não faz nada" ao clicar. */
-  const cepCalcBtn = document.getElementById('pdp-cep-calc');
-  cepCalcBtn?.addEventListener('click', () => {
-    if (!cepInput) return;
-    const next = formatCep(cepInput.value);
+  // Campo e resultado existem duas vezes (bloco do produto e gaveta da barra flutuante): os dois ficam em sincronia.
+  const shipLists = ['pdp-ship-options', 'pdp-ship-options-sticky']
+    .map((id) => document.getElementById(id))
+    .filter((el): el is HTMLElement => !!el);
+  const hints = ['pdp-cep-hint', 'pdp-cep-hint-sticky'].map((id) => document.getElementById(id)).filter((el): el is HTMLElement => !!el);
+  const calcButtons = ['pdp-cep-calc', 'pdp-cep-calc-sticky']
+    .map((id) => document.getElementById(id) as HTMLButtonElement | null)
+    .filter((el): el is HTMLButtonElement => !!el);
+  const setHint = (text: string) => hints.forEach((h) => (h.textContent = text));
+
+  async function calculateShipping(source: HTMLInputElement | null) {
+    if (!source || !shipLists.length) return;
+    const next = formatCep(source.value);
     applyCepToInputs(next);
-    const ok = next.replace(/\D/g, '').length === 8;
-    if (ok && cepHint) cepHint.textContent = 'Frete calculado no checkout.';
+    if (!isCep(next)) {
+      setHint('CEP inválido');
+      return;
+    }
+    const variantId = atcBtn?.dataset.variantId || '';
+    if (!variantId) return;
+    setHint('Calculando…');
+    calcButtons.forEach((b) => (b.disabled = true));
+    try {
+      const quote = await fetchShippingQuote(next, [{ variant_id: variantId, quantity: Math.max(1, Number(atcBtn?.dataset.qty) || 1) }]);
+      shipLists.forEach((list) => renderShippingOptions(list, quote));
+      setHint('');
+    } catch (err) {
+      shipLists.forEach((list) => list.replaceChildren());
+      setHint(err instanceof Error ? err.message : 'Não foi possível calcular o frete agora.');
+    } finally {
+      calcButtons.forEach((b) => (b.disabled = false));
+    }
+  }
+  [[cepInput, 'pdp-cep-calc'], [cepSticky, 'pdp-cep-calc-sticky']].forEach(([input, btnId]) => {
+    const field = input as HTMLInputElement | null;
+    document.getElementById(btnId as string)?.addEventListener('click', () => void calculateShipping(field));
+    field?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        void calculateShipping(field);
+      }
+    });
   });
 
   document.querySelectorAll('[data-modal-target]').forEach((el) => {

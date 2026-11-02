@@ -1,0 +1,103 @@
+---
+interface Props {
+  cta?: string;
+}
+const { cta = 'Continuar' } = Astro.props;
+---
+
+<form class="access" data-access-form novalidate>
+  <div class="access__row">
+    <input class="access__input" type="email" name="email" placeholder="Seu e-mail" required autocomplete="email" aria-label="Seu e-mail" />
+    <button class="access__btn" type="submit" data-submit>{cta}</button>
+  </div>
+  <div class="access__pass" data-pass hidden>
+    <input class="access__input" type="password" name="password" minlength="8" autocomplete="current-password" aria-label="Senha" />
+  </div>
+  <p class="access__msg" role="status" aria-live="polite"></p>
+</form>
+
+<style>
+  .access { width: 100%; max-width: 440px; }
+  .access__row { display: flex; gap: 8px; }
+  .access__pass { margin-top: 8px; }
+  .access__pass .access__input { width: 100%; box-sizing: border-box; }
+  .access__input { flex: 1; min-width: 0; padding: 14px 16px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.06); color: #fff; font-size: 15px; }
+  .access__btn { padding: 14px 20px; border: 0; border-radius: 8px; background: var(--c-accent, #e77e23); color: #fff; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; font-size: 13px; cursor: pointer; white-space: nowrap; }
+  .access__btn:disabled { opacity: 0.6; cursor: wait; }
+  .access__msg { min-height: 20px; margin: 8px 0 0; font-size: 13px; color: rgba(255, 255, 255, 0.75); }
+  .access__msg.is-error { color: #f87171; }
+  @media (max-width: 480px) { .access__row { flex-direction: column; } }
+</style>
+
+<script>
+  const headers = () => ({
+    'content-type': 'application/json',
+    'x-publishable-api-key': (window as any).__MEDUSA_PK__ || '',
+  });
+  const post = (url: string, body: unknown, extra: Record<string, string> = {}) =>
+    fetch(url, { method: 'POST', headers: { ...headers(), ...extra }, body: JSON.stringify(body) });
+
+  document.querySelectorAll<HTMLFormElement>('[data-access-form]').forEach((form) => {
+    const email = form.querySelector<HTMLInputElement>('input[name="email"]')!;
+    const password = form.querySelector<HTMLInputElement>('input[name="password"]')!;
+    const passBox = form.querySelector<HTMLElement>('[data-pass]')!;
+    const btn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
+    const msg = form.querySelector<HTMLElement>('.access__msg')!;
+    let mode: 'identify' | 'login' | 'register' = 'identify';
+
+    const say = (text: string, error = true) => {
+      msg.textContent = text;
+      msg.classList.toggle('is-error', error);
+    };
+
+    async function login() {
+      const res = await post('/auth/customer/emailpass', { email: email.value.trim(), password: password.value });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.token) throw new Error('E-mail ou senha inválidos.');
+      return data.token as string;
+    }
+
+    async function register() {
+      const body = { email: email.value.trim(), password: password.value };
+      const reg = await post('/auth/customer/emailpass/register', body);
+      const regData = await reg.json().catch(() => ({}));
+      if (!reg.ok || !regData.token) throw new Error(regData?.message || 'Não foi possível criar a conta.');
+      const created = await post('/store/customers', { email: body.email }, { authorization: `Bearer ${regData.token}` });
+      if (!created.ok) throw new Error('Não foi possível criar a conta.');
+      return login();
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!/^\S+@\S+\.\S+$/.test(email.value.trim())) return say('Digite um e-mail válido.');
+      if (mode !== 'identify' && password.value.length < 8) return say('A senha precisa ter ao menos 8 caracteres.');
+
+      btn.disabled = true;
+      say('', false);
+      try {
+        if (mode === 'identify') {
+          const res = await post('/store/drop/identify', { email: email.value.trim() });
+          if (!res.ok) throw new Error('Não consegui verificar agora. Tente de novo.');
+          const { exists } = await res.json();
+          mode = exists ? 'login' : 'register';
+          password.autocomplete = exists ? 'current-password' : 'new-password';
+          password.placeholder = exists ? 'Sua senha' : 'Crie uma senha';
+          passBox.hidden = false;
+          email.readOnly = true;
+          btn.textContent = exists ? 'Entrar' : 'Criar conta';
+          say('Digite sua senha. Se ainda não definiu uma, entre pelo link do ingresso que enviamos ao seu e-mail.', false);
+          password.focus();
+          return;
+        }
+        const token = mode === 'login' ? await login() : await register();
+        localStorage.setItem('tyer_token', token);
+        localStorage.removeItem('tyer_customer');
+        window.dispatchEvent(new Event('tyer:auth'));
+      } catch (err) {
+        say(err instanceof Error ? err.message : 'Algo deu errado. Tente de novo.');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+</script>

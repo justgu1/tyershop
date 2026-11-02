@@ -6,7 +6,8 @@
  * Docs: https://www.mercadopago.com.br/developers/pt/reference/payments/_payments/post
  */
 
-const MP_API_BASE = "https://api.mercadopago.com";
+/** `MERCADOPAGO_API_BASE` só existe para apontar o simulador no teste de carga. */
+const MP_API_BASE = process.env.MERCADOPAGO_API_BASE?.replace(/\/$/, "") || "https://api.mercadopago.com";
 
 export type MercadoPagoClientOptions = {
   accessToken: string;

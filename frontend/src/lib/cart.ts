@@ -6,6 +6,8 @@ import { getVariantPriceInfo } from './medusa-pricing';
 
 export interface CartItem {
   variantId: string;
+  /** Handle do produto, para o título da bag levar à página dele. */
+  handle?: string;
   title: string;
   variantTitle?: string;
   thumbnail?: string;
@@ -148,6 +150,7 @@ type VariantSnapshot = {
   soldOut: boolean;
   maxQuantity?: number;
   title?: string;
+  handle?: string;
   variantTitle?: string;
   thumbnail?: string;
   price?: number;
@@ -184,6 +187,7 @@ const VARIANT_SNAPSHOT_FIELDS = [
   '+inventory_items.inventory.location_levels.stocked_quantity',
   'product.id',
   'product.title',
+  'product.handle',
   'product.thumbnail',
   '*product.images',
 ].join(',');
@@ -200,7 +204,7 @@ async function fetchVariantSnapshot(variantId: string): Promise<VariantSnapshot>
     const qs = new URLSearchParams({ fields });
     if (regionId) qs.set('region_id', regionId);
     const res = await fetch(`${base}/store/product-variants/${variantId}?${qs.toString()}`, {
-      headers: { 'x-publishable-api-key': key },
+      headers: { 'x-publishable-api-key': key, ...(storedToken() ? { authorization: `Bearer ${storedToken()}` } : {}) },
     });
     // 404 ou rota indisponível: não esvaziar o carrinho no F5 (localStorage).
     if (res.status === 404) return { exists: true, soldOut: false };
@@ -211,6 +215,7 @@ async function fetchVariantSnapshot(variantId: string): Promise<VariantSnapshot>
     const product = variant?.product || data?.product;
     const thumb = product?.thumbnail || product?.images?.[0]?.url || undefined;
     const title = product?.title || undefined;
+    const handle = product?.handle || undefined;
     const optionTitle = String(variant?.title || '').trim() || undefined;
     // `calculated_amount`/`prices[].amount` não vêm garantidamente em centavos
     // (depende de como o preço foi cadastrado) — mesma normalização usada na
@@ -225,12 +230,34 @@ async function fetchVariantSnapshot(variantId: string): Promise<VariantSnapshot>
       soldOut: isVariantSoldOutFromProduct(variant, true),
       maxQuantity,
       title,
+      handle,
       variantTitle: optionTitle,
       thumbnail: thumb,
       price: typeof price === 'number' && price > 0 ? price : undefined,
     };
   } catch {
     return { exists: true, soldOut: false };
+  }
+}
+
+/** Variantes de drop fora de venda (ou sem ingresso na pré-venda). Falha de rede não esvazia a bag. */
+async function fetchBlockedByDrop(variantIds: string[]): Promise<Set<string>> {
+  try {
+    const { base, key } = getStoreConfig();
+    const token = localStorage.getItem('tyer_token');
+    const res = await fetch(`${base}/store/drop/gate`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-publishable-api-key': key,
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ variant_ids: variantIds }),
+    });
+    if (!res.ok) return new Set();
+    return new Set((await res.json()).blocked_variant_ids ?? []);
+  } catch {
+    return new Set();
   }
 }
 
@@ -250,14 +277,17 @@ export async function validateCartItems(): Promise<{
   const removedVariantIds: string[] = [];
   const outOfStockVariantIds: string[] = [];
 
+  const blocked = await fetchBlockedByDrop(current.map((i) => i.variantId));
+
   snapshots.forEach(({ item, snapshot }) => {
-    if (!snapshot.exists) {
+    if (!snapshot.exists || blocked.has(item.variantId)) {
       removedVariantIds.push(item.variantId);
       return;
     }
     const merged: CartItem = {
       ...item,
       title: snapshot.title || item.title,
+      handle: snapshot.handle || item.handle,
       variantTitle: snapshot.variantTitle || item.variantTitle,
       thumbnail: snapshot.thumbnail || item.thumbnail,
       price: Number.isFinite(Number(snapshot.price)) && Number(snapshot.price) > 0 ? Number(snapshot.price) : item.price,
@@ -284,4 +314,12 @@ export async function validateCartItems(): Promise<{
 
 export function hasOutOfStockItems(items: CartItem[] = read()): boolean {
   return items.some((item) => item.stockState === 'out_of_stock');
+}
+
+function storedToken(): string {
+  try {
+    return localStorage.getItem('tyer_token') || '';
+  } catch {
+    return '';
+  }
 }

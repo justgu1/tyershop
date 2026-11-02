@@ -262,13 +262,16 @@ function renderCart() {
     el.className = 'sc-item';
     el.setAttribute('role', 'listitem');
     const titleH = escHtml(item.title || '');
+    const nameH = item.handle
+      ? `<a class="sc-item__name sc-item__name--link" href="/product/${encodeURIComponent(item.handle)}">${titleH}</a>`
+      : `<span class="sc-item__name">${titleH}</span>`;
     const variantH = item.variantTitle ? escHtml(formatVariantLabel(item.variantTitle)) : '';
-    const thumb = item.thumbnail || '/logo.webp';
+    const thumb = escHtml(item.thumbnail || '/logo.webp');
     const maxQty = maxOrderableUnits(item);
     const isOutOfStock = (item as any).stockState === 'out_of_stock';
     el.innerHTML = `
       <div class="sc-item__head">
-        <span class="sc-item__name">${titleH}</span>
+        ${nameH}
       </div>
       <button class="sc-item__remove" type="button" data-id="${item.variantId}" data-action="remove" aria-label="Remover da bag">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -303,7 +306,7 @@ function renderCart() {
   subtotalEl.textContent = fmt(subtotal);
   discountEl.textContent = `-${fmt(discount)}`;
   taxesEl.textContent = fmt(taxes);
-  shippingEl.textContent = fmt(shipping);
+  shippingEl.textContent = 'No carrinho';
   totalEl.textContent = fmt(total);
   saveTagEl.hidden = savePct <= 0;
   saveTagEl.textContent = `${savePct}% OFF`;

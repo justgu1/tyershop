@@ -4,6 +4,8 @@ import ProductCarousel from '../../components/ProductCarousel.astro';
 import { getLangFromUrl, t, getPathForLang } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
 import { getMedusaStoreUrl, getPublishableKey } from '../../lib/medusa-env';
+import { readSessionToken } from '../../lib/session';
+import { isHiddenCollection } from '../../lib/collections';
 import { getProductListQueryString, getVariantPriceInfo, resolveDefaultRegionId } from '../../lib/medusa-pricing';
 import { getVariantSlideUrls } from '../../lib/product-variant-gallery';
 import { formatVariationValuesOnly, getProductVariantData } from '../../lib/product-variants';
@@ -24,7 +26,11 @@ const lang: Lang = getLangFromUrl(Astro.url);
 
 const { handle } = Astro.params;
 const pk = getPublishableKey();
-const medusaHeaders = { 'x-publishable-api-key': pk };
+const sessionToken = readSessionToken(Astro.request.headers.get('cookie'));
+const medusaHeaders: Record<string, string> = {
+  'x-publishable-api-key': pk,
+  ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}),
+};
 let product: any = null;
 let related: any[] = [];
 let newest: any[] = [];
@@ -50,14 +56,14 @@ try {
         related = (rp ?? []).filter((p: any) => p.handle !== handle).slice(0, 8);
       }
     }
-    const newestRes = await fetch(`${url}/store/products?${q}&limit=16`, {
+    const newestRes = await fetch(`${url}/store/products?${q}&order=-created_at&limit=24`, {
       headers: medusaHeaders,
       signal: AbortSignal.timeout(5000),
     });
     if (newestRes.ok) {
       const { products: np } = await newestRes.json();
       newest = [...(np ?? [])]
-        .filter((p: any) => p?.handle && p.handle !== handle)
+        .filter((p: any) => p?.handle && p.handle !== handle && !isHiddenCollection(p.collection ?? {}))
         .sort(
           (a: any, b: any) =>
             new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime()
@@ -336,25 +342,11 @@ const jsonLd = productFound
           <ol class="pdp-breadcrumb__list">
             <li><a href={getPathForLang('/', lang)}>Tyer</a></li>
             <li aria-hidden="true">/</li>
-            {product.collection?.handle ? (
-              <>
-                <li>
-                  <a href={getPathForLang(`/collections/${product.collection.handle}`, lang)}>
-                    {product.collection.title ?? product.collection.handle}
-                  </a>
-                </li>
-                <li aria-hidden="true">/</li>
-                <li aria-current="page">{product.title}</li>
-              </>
-            ) : (
-              <>
-                <li>
-                  <a href={getPathForLang('/shop', lang)}>{t(lang, 'nav', 'shop')}</a>
-                </li>
-                <li aria-hidden="true">/</li>
-                <li aria-current="page">{product.title}</li>
-              </>
-            )}
+            <li>
+              <a href={getPathForLang('/drop', lang)}>Drop</a>
+            </li>
+            <li aria-hidden="true">/</li>
+            <li aria-current="page">{product.title}</li>
           </ol>
         </nav>
 
@@ -522,6 +514,7 @@ const jsonLd = productFound
             id="pdp-atc"
             data-variant-id={defaultVariant?.id}
             data-title={product.title}
+            data-handle={product.handle}
             data-price={defaultPriceInfo?.amountCents ?? ''}
             data-thumbnail={initialSlides[0] ?? product.thumbnail ?? ''}
             data-variant-title={defaultVariantTitle}
@@ -552,6 +545,7 @@ const jsonLd = productFound
             </button>
           </div>
           <p id="pdp-cep-hint" class="pdp-cep-hint" role="status"></p>
+          <div class="ship-opts" id="pdp-ship-options" aria-live="polite"></div>
           <p class="pdp-cep-static">{t(lang, 'pdp', 'shipping_estimate_placeholder')}</p>
         </div>
       </div>
@@ -651,9 +645,14 @@ const jsonLd = productFound
               autocomplete="postal-code"
               maxlength="9"
               placeholder="00000-000"
-              aria-describedby="pdp-cep-hint"
+              aria-describedby="pdp-cep-hint-sticky"
             />
+            <button type="button" class="btn btn-outline pdp-cep-btn pdp-cep-btn--sticky" id="pdp-cep-calc-sticky">
+              {t(lang, 'pdp', 'calculate_shipping_cta')}
+            </button>
           </div>
+          <p id="pdp-cep-hint-sticky" class="pdp-cep-hint" role="status"></p>
+          <div class="ship-opts" id="pdp-ship-options-sticky" aria-live="polite"></div>
         </div>
       </div>
     </div>
@@ -816,7 +815,7 @@ const jsonLd = productFound
       <p class="nf__sub">{t(lang, 'pdp', 'product_not_found_sub')}</p>
       <div class="nf__actions">
         <a href={getPathForLang('/', lang)} class="btn btn-primary">{t(lang, 'pdp', 'product_not_found_home')}</a>
-        <a href={getPathForLang('/shop', lang)} class="btn btn-outline">{t(lang, 'pdp', 'product_not_found_shop')}</a>
+        <a href={getPathForLang('/drop', lang)} class="btn btn-outline">{t(lang, 'pdp', 'product_not_found_shop')}</a>
       </div>
     </section>
   )}
@@ -1352,10 +1351,15 @@ const jsonLd = productFound
     max-width: 100%;
   }
   @media (max-width: 420px) {
-    .pdp-buy-card .pdp-variant-btn {
+    .pdp-buy-card .pdp-variant-btn:not(.pdp-variant-btn--swatch) {
       padding: 0 9px;
       font-size: 10px;
       min-height: 30px;
+    }
+    /* A bolinha de cor precisa continuar redonda: sem padding e sem encolher. */
+    .pdp-buy-card .pdp-variant-btn--swatch {
+      padding: 0;
+      flex: 0 0 auto;
     }
     .pdp-buy-card .pdp-variant-values {
       gap: 4px;
@@ -1590,9 +1594,12 @@ const jsonLd = productFound
     opacity: 0.45;
     cursor: not-allowed;
   }
+  .btn-primary.pdp-buy-now,
+  .btn-primary.pdp-sticky-bar__buy {
+    color: #fff;
+  }
   .pdp-atc-icon img {
     display: block;
-    filter: brightness(0);
   }
   .pdp-atc-icon--labeled {
     width: auto;
@@ -2260,9 +2267,15 @@ const jsonLd = productFound
     height: 18px;
   }
   .pdp-sticky-bar__ship {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 4px 8px;
+  }
+  .pdp-sticky-bar__cep-label,
+  .pdp-sticky-bar__drawer .pdp-cep-hint,
+  .pdp-sticky-bar__drawer .ship-opts {
+    grid-column: 1 / -1;
   }
   .pdp-sticky-bar__cep-label {
     font-size: 10px;
