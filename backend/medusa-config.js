@@ -3,7 +3,9 @@ const { loadEnv, defineConfig } = require('@medusajs/framework/utils')
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 
 // Segredos padrão em produção deixariam qualquer um forjar sessões de cliente e de admin.
-if (process.env.NODE_ENV === 'production') {
+// O `medusa build` da imagem roda sem segredos: o guarda vale só para quem inicia o servidor.
+const isBuild = process.argv.includes('build')
+if (process.env.NODE_ENV === 'production' && !isBuild) {
   for (const name of ['JWT_SECRET', 'COOKIE_SECRET']) {
     if (!process.env[name] || process.env[name] === 'supersecret') {
       throw new Error(`${name} precisa estar definido em produção`)
