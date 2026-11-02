@@ -84,6 +84,13 @@ export async function calculate(accessToken: string, input: { fromZip: string; t
 }
 
 
+/** Token sem permissão: costuma ser a autorização antiga, que só calcula frete. */
+export class UnauthorizedError extends Error {
+  constructor() {
+    super("Melhor Envio recusou o acesso")
+  }
+}
+
 async function meRequest<T>(accessToken: string, path: string, body: unknown): Promise<T> {
   const res = await fetch(`${baseUrl()}/api/v2/me${path}`, {
     method: "POST",
@@ -97,6 +104,7 @@ async function meRequest<T>(accessToken: string, path: string, body: unknown): P
     signal: AbortSignal.timeout(20_000),
   })
   const data = (await res.json().catch(() => ({}))) as any
+  if (res.status === 401 || res.status === 403) throw new UnauthorizedError()
   if (!res.ok) {
     const detail = data?.message || (data?.errors ? JSON.stringify(data.errors).slice(0, 300) : "")
     throw new Error(`Melhor Envio respondeu ${res.status}${detail ? `: ${detail}` : ""}`)
@@ -109,9 +117,12 @@ export async function addToCart(accessToken: string, payload: Record<string, unk
   return meRequest(accessToken, "/cart", payload)
 }
 
-/** Compra a etiqueta (usa o saldo da conta) e a gera. */
-export async function purchaseAndGenerate(accessToken: string, id: string): Promise<void> {
+/** Compra a etiqueta com o saldo da conta. */
+export async function checkoutLabel(accessToken: string, id: string): Promise<void> {
   await meRequest(accessToken, "/shipment/checkout", { orders: [id] })
+}
+
+export async function generateLabel(accessToken: string, id: string): Promise<void> {
   await meRequest(accessToken, "/shipment/generate", { orders: [id] })
 }
 

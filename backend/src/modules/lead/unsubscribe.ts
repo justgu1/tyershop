@@ -1,6 +1,12 @@
 import { createHmac, timingSafeEqual } from "crypto"
 
-const secret = () => process.env.JWT_SECRET || "supersecret"
+const secret = () => {
+  const value = process.env.JWT_SECRET
+  if (value) return value
+  // Sem segredo em produção qualquer um calcularia o token: recusa em vez de usar o valor padrão conhecido.
+  if (process.env.NODE_ENV === "production") throw new Error("JWT_SECRET não está definido")
+  return "supersecret"
+}
 const siteUrl = () => (process.env.SITE_URL || "http://localhost:4321").replace(/\/$/, "")
 
 /** Assinatura do e-mail: só quem recebeu a mensagem tem o link, e ele não serve para sair com o e-mail de outra pessoa. */
