@@ -206,6 +206,7 @@ const c = (key: string) => t(lang, 'checkout', key);
           <ul class="checkout-success__items" id="checkout-success-items" role="list"></ul>
           <p class="checkout-success__total" id="checkout-success-total" hidden></p>
           <p class="checkout-success__mail" id="checkout-success-mail" hidden></p>
+          <p class="checkout-success__spam">Não achou o e-mail? Olhe a caixa de <strong>spam</strong> ou a aba <strong>Promoções</strong> e marque como "não é spam" para receber o rastreio e os próximos avisos.</p>
           <div class="checkout-success__actions">
             <a href={getPathForLang('/account/orders', lang)} class="btn btn-primary">Ver meus pedidos</a>
             <a href={getPathForLang('/', lang)} class="btn btn-outline">Voltar ao início</a>
@@ -892,6 +893,7 @@ const c = (key: string) => t(lang, 'checkout', key);
   .checkout-success__items :global(small) { display: block; color: #9a9a9a; }
   .checkout-success .checkout-success__total { color: #fff; font-weight: 800; font-size: 18px; margin: 4px 0 16px; }
   .checkout-success .checkout-success__mail { font-size: 14px; }
+  .checkout-success .checkout-success__spam { font-size: 13px; max-width: 440px; color: #b8b8b8; margin: 0 0 20px; }
   .checkout-success__actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin: 8px 0 24px; }
   .checkout-success__social { list-style: none; margin: 0; padding: 0; display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
   .checkout-success__social a { color: #fff; font-weight: 700; font-size: 14px; text-decoration: none; }

@@ -60,17 +60,23 @@ class SmtpNotificationProviderService extends AbstractNotificationProviderServic
     }
     const rendered = renderTemplate(notification.template, (notification.data ?? {}) as Record<string, any>)
     // Redefinição de senha é a única que sempre vai ao destinatário real: quem pediu precisa receber.
-    const { to, subject } =
+    const { to, subject, redirectedFrom } =
       notification.template === "password_reset"
-        ? { to: notification.to, subject: rendered.subject }
-        : resolveRecipient(notification.to, rendered.subject, readTestMode(process.env))
+        ? { to: notification.to, subject: rendered.subject, redirectedFrom: undefined as string | undefined }
+        : { ...resolveRecipient(notification.to, rendered.subject, readTestMode(process.env)) }
+    // Em modo de teste o aviso do destinatário original vai no corpo, não no assunto.
+    const note = redirectedFrom ? `Modo de teste: este e-mail seria enviado para ${redirectedFrom}.` : ""
+    const html = note
+      ? rendered.html.replace(/<body[^>]*>/, (m) => `${m}<div style="background:#fff7ed;color:#9a3412;font:12px Helvetica,Arial,sans-serif;padding:8px 12px;text-align:center">${note.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)}</div>`)
+      : rendered.html
+    const text = note ? `${note}\n\n${rendered.text}` : rendered.text
 
     const info = await this.transporter_.sendMail({
       from: this.options_.from,
       to,
       subject,
-      html: rendered.html,
-      text: rendered.text,
+      html,
+      text,
       headers: listHeaders(notification.template, (notification.data ?? {}) as Record<string, any>),
       attachments: [
         {

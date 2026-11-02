@@ -5,7 +5,7 @@ interface Props {
   placeholder?: string;
   successMessage?: string;
 }
-const { source, cta, placeholder = 'Seu e-mail', successMessage = 'Pronto! Você está na lista.' } = Astro.props;
+const { source, cta, placeholder = 'Seu e-mail', successMessage = 'Pronto! Você está na lista. Confira também a caixa de spam ou Promoções.' } = Astro.props;
 ---
 
 <form class="lead" data-lead-form data-source={source} data-success={successMessage} novalidate>

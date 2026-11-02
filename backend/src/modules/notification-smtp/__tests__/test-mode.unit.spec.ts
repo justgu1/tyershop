@@ -21,10 +21,11 @@ describe("readTestMode", () => {
 })
 
 describe("resolveRecipient", () => {
-  it("redirects to the test address and keeps the original in the subject", () => {
+  it("redirects to the test address, keeps the subject clean and reports the original", () => {
     const r = resolveRecipient("cliente@x.com", "Seu ingresso", { enabled: true, to: "eu@teste.com" })
     expect(r.to).toBe("eu@teste.com")
-    expect(r.subject).toBe("[TESTE · cliente@x.com] Seu ingresso")
+    expect(r.subject).toBe("Seu ingresso")
+    expect(r.redirectedFrom).toBe("cliente@x.com")
   })
 
   it("refuses to send when test mode is on without a test address", () => {

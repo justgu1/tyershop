@@ -144,9 +144,13 @@ async function meGet<T>(accessToken: string, path: string): Promise<T> {
   return data as T
 }
 
-/** Situação da etiqueta no Melhor Envio (pending = no carrinho, ainda não paga). Lança erro se não conseguir consultar. */
+/**
+ * Situação da etiqueta no Melhor Envio (pending = no carrinho, ainda não paga), pela consulta de rastreio: a consulta direta
+ * do pedido exige um escopo a mais. Lança erro se não conseguir consultar.
+ */
 export async function getLabel(accessToken: string, id: string): Promise<{ status?: string }> {
-  return meGet(accessToken, `/orders/${encodeURIComponent(id)}`)
+  const result = await tracking(accessToken, [id])
+  return result[id] ?? {}
 }
 
 type CartPage = { data?: { id: string; status?: string; tags?: { tag?: string }[] }[]; last_page?: number }

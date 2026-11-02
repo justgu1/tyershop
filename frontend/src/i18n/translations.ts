@@ -298,7 +298,7 @@ export const translations = {
       copyright_full:  'Copyright TYER — 50.949.915/0001-16 — {year}. Todos os direitos reservados.',
       strip_privacy:   'Privacidade e cookies',
       strip_access:    'Acessibilidade',
-      newsletter_ok:   'Obrigado! Você está inscrito.',
+      newsletter_ok:   'Obrigado! Você está inscrito. Se o e-mail não chegar, olhe o spam ou a aba Promoções.',
       a11y_open:       'Abrir configurações de acessibilidade',
       a11y_title:      'Acessibilidade',
       a11y_font:       'Tamanho do texto',

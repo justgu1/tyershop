@@ -1131,7 +1131,7 @@ a.past__card:hover img { border-color: var(--c-accent, #e77e23); }
             body: JSON.stringify({ email }),
           });
           if (!res.ok) throw new Error('fail');
-          if (feedback) { feedback.hidden = false; feedback.textContent = 'Pre-save feito! Avisamos você.'; feedback.className = 'hero__presave-feedback is-ok'; }
+          if (feedback) { feedback.hidden = false; feedback.textContent = 'Pre-save feito! Avisamos você por e-mail (olhe também o spam ou Promoções).'; feedback.className = 'hero__presave-feedback is-ok'; }
           form.hidden = true;
         } catch {
           if (feedback) { feedback.hidden = false; feedback.textContent = 'Não deu certo agora. Tente de novo.'; feedback.className = 'hero__presave-feedback is-err'; }

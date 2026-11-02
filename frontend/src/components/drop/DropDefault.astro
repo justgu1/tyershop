@@ -53,7 +53,7 @@ const showProducts = access === 'granted' && products.length > 0;
       <>
         <Countdown targetIso={drop.preorder_starts_at} label="Pré-venda abre em" />
         <p class="drop__text">A pré-venda é só para convidados. Entre na lista para ser avisado quando abrir.</p>
-        <LeadForm source="presave" cta="Quero ser avisado" successMessage="Anotado! Avisamos por e-mail." />
+        <LeadForm source="presave" cta="Quero ser avisado" successMessage="Anotado! Avisamos por e-mail. Se não chegar, olhe o spam ou a aba Promoções." />
       </>
     )}
 
@@ -73,7 +73,7 @@ const showProducts = access === 'granted' && products.length > 0;
         {access === 'locked' && (
           <>
             <p class="drop__text drop__text--muted">Esta conta ainda não tem convite para este drop. Peça acesso e avisamos se liberarmos.</p>
-            <LeadForm source="pedir_acesso" cta="Pedir acesso" successMessage="Pedido enviado! Avisamos por e-mail." />
+            <LeadForm source="pedir_acesso" cta="Pedir acesso" successMessage="Pedido enviado! Avisamos por e-mail (olhe também o spam ou Promoções)." />
           </>
         )}
       </>
@@ -92,7 +92,7 @@ const showProducts = access === 'granted' && products.length > 0;
     {phase === 'ended' && (
       <>
         <p class="drop__text">Este drop encerrou. Entre na lista e seja o primeiro a saber do próximo.</p>
-        <LeadForm source="signup" cta="Entrar na lista" successMessage="Você está na lista do próximo drop!" />
+        <LeadForm source="signup" cta="Entrar na lista" successMessage="Você está na lista do próximo drop! Os avisos podem cair em spam ou Promoções." />
         <div class="drop__links">
           {drop.instagram_url && <a href={drop.instagram_url} target="_blank" rel="noopener">Instagram</a>}
           {drop.whatsapp_url && <a href={drop.whatsapp_url} target="_blank" rel="noopener">Grupo do WhatsApp</a>}
