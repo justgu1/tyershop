@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tyershop-api
+  namespace: apps
+spec:
+  template:
+    spec:
+      containers:
+        - name: api
+          env:
+            - name: MEDUSA_INTERNAL_URL
+              value: "http://tyershop-backend.tyershop-prod.svc.cluster.local:9000"
+            - name: MEDUSA_URL
+              value: "http://tyershop-backend.tyershop-prod.svc.cluster.local:9000"
+            - name: CHECKOUT_PUBLIC_BASE_URL
+              value: "https://tyershop.com"
+            - name: CORS_ORIGIN
+              value: "https://tyershop.com"
