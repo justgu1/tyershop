@@ -172,7 +172,7 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string, orig
     }
 
     // Se nada foi comprado nem gerado agora, a consulta de cima ainda vale (traz o código de rastreio).
-    const info = consulted && !changed ? consulted : (await tracking(token, [meId]).catch(() => ({} as Record<string, any>)))[meId]
+    const info = consulted?.tracking && !changed ? consulted : (await tracking(token, [meId]).catch(() => ({} as Record<string, any>)))[meId]
     let fulfillmentId = current?.fulfillment_id
     if (!fulfillmentId) {
       const created = await createOrderFulfillmentWorkflow(scope).run({
