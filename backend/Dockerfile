@@ -37,7 +37,6 @@ RUN --mount=type=cache,target=/root/.npm \
 COPY backend/ ./
 
 ENV NODE_ENV=production
-ENV MEDUSA_BACKEND_URL=https://medusa.homolog.tyershop.com
 
 RUN npm run build
 
