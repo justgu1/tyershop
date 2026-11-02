@@ -14,10 +14,15 @@ type Options = {
   from: string
 }
 
-// Só os e-mails de lista levam o cabeçalho: o cliente de e-mail mostra o botão "cancelar inscrição", que abre uma resposta a esta caixa.
-const LIST_UNSUBSCRIBE: Record<string, string> = {
-  lead_welcome: "<mailto:suporte@tyershop.com?subject=Sair%20da%20lista>",
-  ticket: "<mailto:suporte@tyershop.com?subject=Sair%20da%20lista>",
+// Só os e-mails de lista levam o cabeçalho: o cliente de e-mail mostra o botão "cancelar inscrição". Com o link do site o
+// cancelamento é de um clique (o próprio Gmail/Outlook chama a página); o mailto fica de reserva.
+const LIST_TEMPLATES = ["lead_welcome", "ticket"]
+const MAILTO = "<mailto:suporte@tyershop.com?subject=Sair%20da%20lista>"
+
+function listHeaders(template: string, data: Record<string, any>): Record<string, string> | undefined {
+  if (!LIST_TEMPLATES.includes(template)) return undefined
+  if (!data.unsubscribe_url) return { "List-Unsubscribe": MAILTO }
+  return { "List-Unsubscribe": `<${data.unsubscribe_url}>, ${MAILTO}`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" }
 }
 
 class SmtpNotificationProviderService extends AbstractNotificationProviderService {
@@ -62,7 +67,7 @@ class SmtpNotificationProviderService extends AbstractNotificationProviderServic
       subject,
       html: rendered.html,
       text: rendered.text,
-      headers: LIST_UNSUBSCRIBE[notification.template] ? { "List-Unsubscribe": LIST_UNSUBSCRIBE[notification.template] } : undefined,
+      headers: listHeaders(notification.template, (notification.data ?? {}) as Record<string, any>),
       attachments: [
         {
           filename: "tyer.png",

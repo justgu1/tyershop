@@ -1,6 +1,6 @@
 import { model } from "@medusajs/framework/utils"
 
-export const LEAD_STATUSES = ["pendente", "liberado", "inativo", "negado"] as const
+export const LEAD_STATUSES = ["pendente", "liberado", "inativo", "negado", "descadastrado"] as const
 export type LeadStatus = (typeof LEAD_STATUSES)[number]
 
 const Lead = model.define("lead", {

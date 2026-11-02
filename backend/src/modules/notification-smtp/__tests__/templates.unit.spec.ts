@@ -98,3 +98,15 @@ describe("e-mails de pedido", () => {
     expect(renderTemplate("order_delivered", base).html).not.toContain("responder esta mensagem")
   })
 })
+
+describe("cancelar inscrição nos e-mails de lista", () => {
+  const url = "https://tyer.test/sair-da-lista?e=ana%40tyer.test&t=abc"
+  it("boas-vindas e ingresso trazem o link e o texto sem HTML", () => {
+    for (const template of ["lead_welcome", "ticket"]) {
+      const mail = renderTemplate(template, { ...data, unsubscribe_url: url, whatsapp_url: "https://wa.test", login_url: "https://tyer.test/x", drop_title: "Red Rose" })
+      expect(mail.html).toContain(`href="${url.replace(/&/g, "&amp;")}"`)
+      expect(mail.text).toContain(url)
+      expect(mail.text).not.toContain("<a ")
+    }
+  })
+})

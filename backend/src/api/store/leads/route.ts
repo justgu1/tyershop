@@ -6,6 +6,7 @@ import { DROP_MODULE } from "../../../modules/drop"
 import { ensureAccount } from "../../../modules/lead/account"
 import { resolveDropPhase } from "../../../modules/drop/phase"
 import { statusOnCapture } from "../../../modules/lead/status"
+import { unsubscribeUrl } from "../../../modules/lead/unsubscribe"
 import { StoreCreateLeadBody } from "./validators"
 
 const WHATSAPP_GROUP_URL = "https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN"
@@ -23,11 +24,12 @@ export async function POST(req: MedusaRequest<StoreCreateLeadBody>, res: MedusaR
   const phase = current ? resolveDropPhase(current) : null
 
   const [existing] = await leads.listLeads({ email }, { take: 1 })
-  const isNew = !existing
+  const isNew = !existing || existing.status === "descadastrado"
   if (isNew) {
     await leads.createLeads({ email, name: name ?? null, status: statusOnCapture(null, phase), source })
-  } else if (existing.status === "pendente" && statusOnCapture("pendente", phase) === "liberado") {
-    await leads.updateLeads({ id: existing.id, status: "liberado" })
+  } else if (existing.status === "descadastrado" || existing.status === "pendente") {
+    const next = statusOnCapture(existing.status, phase)
+    if (next !== existing.status) await leads.updateLeads({ id: existing.id, status: next })
   }
   if (existing?.status !== "negado") {
     try {
@@ -48,6 +50,7 @@ export async function POST(req: MedusaRequest<StoreCreateLeadBody>, res: MedusaR
         data: {
           email,
           drop_title: current?.title ?? null,
+          unsubscribe_url: unsubscribeUrl(email),
           whatsapp_url: current?.whatsapp_url || WHATSAPP_GROUP_URL,
         },
       })

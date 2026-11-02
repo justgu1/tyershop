@@ -121,6 +121,69 @@ spec:
                   optional: true
             - name: MELHOR_ENVIO_REDIRECT_URI
               value: "https://homolog.tyershop.com/melhor-envio/callback"
+            # Etiqueta automática no Melhor Envio: só liga com os dados do remetente preenchidos e o saldo da conta carregado.
+            - name: MELHOR_ENVIO_AUTO_LABEL
+              value: "false"
+            - name: MELHOR_ENVIO_SENDER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MELHOR_ENVIO_SENDER_NAME
+                  optional: true
+            - name: MELHOR_ENVIO_SENDER_PHONE
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MELHOR_ENVIO_SENDER_PHONE
+                  optional: true
+            - name: MELHOR_ENVIO_SENDER_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MELHOR_ENVIO_SENDER_EMAIL
+                  optional: true
+            - name: MELHOR_ENVIO_SENDER_DOCUMENT
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MELHOR_ENVIO_SENDER_DOCUMENT
+                  optional: true
+            - name: MELHOR_ENVIO_SENDER_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MELHOR_ENVIO_SENDER_ADDRESS
+                  optional: true
+            - name: MELHOR_ENVIO_SENDER_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MELHOR_ENVIO_SENDER_NUMBER
+                  optional: true
+            - name: MELHOR_ENVIO_SENDER_DISTRICT
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MELHOR_ENVIO_SENDER_DISTRICT
+                  optional: true
+            - name: MELHOR_ENVIO_SENDER_CITY
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MELHOR_ENVIO_SENDER_CITY
+                  optional: true
+            - name: MELHOR_ENVIO_SENDER_STATE
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MELHOR_ENVIO_SENDER_STATE
+                  optional: true
+            - name: MELHOR_ENVIO_SENDER_COMPLEMENT
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: MELHOR_ENVIO_SENDER_COMPLEMENT
+                  optional: true
             - name: MELHOR_ENVIO_FROM_ZIP
               value: "06365210"
             # Conexões por réplica. Réplicas x este valor precisa ficar abaixo do max_connections do PostgreSQL menos o que os

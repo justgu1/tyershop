@@ -25,6 +25,10 @@ const fmtDate = (iso?: string) =>
 const brl = (v: unknown, currency = "BRL") =>
   Number(v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: String(currency || "BRL").toUpperCase() })
 
+/** Convite para sair da lista: link próprio (um clique) quando há, ou resposta ao e-mail. */
+const leave = (d: TemplateData) =>
+  d.unsubscribe_url ? `<a href="${esc(d.unsubscribe_url)}" style="color:#ffffff">Cancelar inscrição</a>.` : "É só responder esta mensagem."
+
 const FONT = "Helvetica,Arial,sans-serif"
 
 type Shell = {
@@ -112,7 +116,7 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
   /** Confirmação de quem entrou na lista de um drop (ainda sem ingresso). */
   lead_welcome: (d) => {
     const subject = d.drop_title ? `Você está na lista do drop ${d.drop_title}` : "Você está na lista da Tyer"
-    const reason = `Você recebeu este e-mail porque se cadastrou na lista da Tyer (${esc(d.email)}). Não quer mais receber avisos? É só responder esta mensagem.`
+    const reason = `Você recebeu este e-mail porque se cadastrou na lista da Tyer (${esc(d.email)}). Não quer mais receber avisos? ${leave(d)}`
     const what = d.drop_title ? `do drop <strong>${esc(d.drop_title)}</strong>` : "dos próximos drops"
     const paragraphs = [
       `Anotado! Seu e-mail está na lista ${what}. Assim que a pré-venda abrir, você é avisado por aqui.`,
@@ -130,7 +134,7 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
       "",
       "Assim que a pré-venda abrir, você é avisado por e-mail.",
       `Grupo do WhatsApp: ${d.whatsapp_url}`,
-      footerText(reason),
+      footerText(`Você recebeu este e-mail porque se cadastrou na lista da Tyer (${d.email}). Para parar de receber avisos: ${d.unsubscribe_url ?? "responda esta mensagem."}`),
     ].join("\n")
     return { subject, html, text }
   },
@@ -140,7 +144,7 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
     const subject = `Seu ingresso para o drop ${d.drop_title}`
     const ends = fmtDate(d.presale_ends_at)
     const days = d.production_days ?? 21
-    const reason = `Você recebeu este e-mail porque está na lista de convidados da Tyer (${esc(d.email)}). Não quer mais receber convites? É só responder esta mensagem.`
+    const reason = `Você recebeu este e-mail porque está na lista de convidados da Tyer (${esc(d.email)}). Não quer mais receber convites? ${leave(d)}`
 
     const html = shell({
       preheader: `Pré-venda exclusiva do drop ${d.drop_title}: seu acesso já está liberado.`,
@@ -165,7 +169,7 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
       "",
       "Entrar na pré-venda (link pessoal, não encaminhe):",
       d.login_url,
-      footerText(`Você recebeu este e-mail porque está na lista de convidados da Tyer (${d.email}). Para parar de receber convites, responda esta mensagem.`),
+      footerText(`Você recebeu este e-mail porque está na lista de convidados da Tyer (${d.email}). Para parar de receber convites: ${d.unsubscribe_url ?? "responda esta mensagem."}`),
     ]
       .filter((l) => l !== undefined)
       .join("\n")

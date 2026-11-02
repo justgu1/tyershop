@@ -1,0 +1,64 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getMedusaStoreUrl, getPublishableKey } from '../lib/medusa-env';
+
+export const prerender = false;
+
+const email = Astro.url.searchParams.get('e') ?? '';
+const token = Astro.url.searchParams.get('t') ?? '';
+const oneClick = Astro.request.method === 'POST';
+
+// POST vem do botão desta página ou do clique único do próprio cliente de e-mail (Gmail/Outlook).
+let done = false;
+let failed = false;
+if (oneClick) {
+  try {
+    const res = await fetch(`${getMedusaStoreUrl()}/store/leads/unsubscribe`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-publishable-api-key': getPublishableKey() },
+      body: JSON.stringify({ email, token }),
+      signal: AbortSignal.timeout(8000),
+    });
+    done = res.ok;
+    failed = !res.ok;
+  } catch {
+    failed = true;
+  }
+}
+Astro.response.headers.set('cache-control', 'private, no-store');
+---
+
+<Layout title="Cancelar inscrição" description="Sair da lista de avisos da Tyer." lang="pt" noindex bodyClass="page-drop">
+  <section class="leave">
+    {done ? (
+      <>
+        <h1>Pronto, você saiu da lista</h1>
+        <p>Não vamos mais enviar avisos nem convites de drops para este e-mail. Se mudar de ideia, é só se cadastrar de novo.</p>
+        <a class="leave__link" href="/">Voltar para o início</a>
+      </>
+    ) : failed || !email || !token ? (
+      <>
+        <h1>Link inválido</h1>
+        <p>Não consegui validar este link. Responda ao e-mail que recebeu, ou escreva para suporte@tyershop.com, e tiramos você da lista.</p>
+        <a class="leave__link" href="/">Voltar para o início</a>
+      </>
+    ) : (
+      <>
+        <h1>Cancelar inscrição?</h1>
+        <p>Você deixa de receber avisos e convites de drops da Tyer neste e-mail. Pedidos e mensagens da sua conta continuam chegando.</p>
+        <form method="post" action={`/sair-da-lista?e=${encodeURIComponent(email)}&t=${encodeURIComponent(token)}`}>
+          <button type="submit" class="leave__btn">Sim, quero sair da lista</button>
+        </form>
+        <a class="leave__link" href="/">Não, voltar para o início</a>
+      </>
+    )}
+  </section>
+</Layout>
+
+<style>
+  .leave { min-height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 120px 20px 80px; text-align: center; background: #0b0b0b; color: #fff; }
+  .leave h1 { margin: 0; font-family: var(--font-title); font-size: clamp(32px, 7vw, 56px); text-transform: uppercase; line-height: 1; }
+  .leave p { margin: 0; max-width: 480px; line-height: 1.6; color: rgba(255, 255, 255, 0.8); }
+  .leave__btn { padding: 16px 28px; border: 0; border-radius: 8px; background: var(--c-accent, #e77e23); color: #fff; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; font-size: 13px; cursor: pointer; }
+  .leave__link { color: rgba(255, 255, 255, 0.6); font-size: 13px; }
+</style>

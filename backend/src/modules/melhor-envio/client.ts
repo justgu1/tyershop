@@ -25,13 +25,16 @@ export const oauthConfig = () => ({
   redirectUri: process.env.MELHOR_ENVIO_REDIRECT_URI ?? "",
 })
 
+/** Cotação mais o que a compra da etiqueta usa (carrinho, pagamento com o saldo, geração e rastreio). */
+export const SCOPES = "shipping-calculate cart-read cart-write shipping-checkout shipping-generate shipping-print shipping-tracking shipping-cancel"
+
 export function authorizeUrl(state: string) {
   const { clientId, redirectUri } = oauthConfig()
   const q = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "shipping-calculate",
+    scope: SCOPES,
     state,
   })
   return `${baseUrl()}/oauth/authorize?${q.toString()}`
@@ -78,4 +81,42 @@ export async function calculate(accessToken: string, input: { fromZip: string; t
   if (!res.ok) throw new Error(`Melhor Envio respondeu ${res.status}`)
   const data = await res.json()
   return (Array.isArray(data) ? data : []) as ServiceQuote[]
+}
+
+
+async function meRequest<T>(accessToken: string, path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${baseUrl()}/api/v2/me${path}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
+      accept: "application/json",
+      "user-agent": userAgent(),
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20_000),
+  })
+  const data = (await res.json().catch(() => ({}))) as any
+  if (!res.ok) {
+    const detail = data?.message || (data?.errors ? JSON.stringify(data.errors).slice(0, 300) : "")
+    throw new Error(`Melhor Envio respondeu ${res.status}${detail ? `: ${detail}` : ""}`)
+  }
+  return data as T
+}
+
+/** Põe o envio no carrinho do Melhor Envio; devolve o id da etiqueta. */
+export async function addToCart(accessToken: string, payload: Record<string, unknown>): Promise<{ id: string }> {
+  return meRequest(accessToken, "/cart", payload)
+}
+
+/** Compra a etiqueta (usa o saldo da conta) e a gera. */
+export async function purchaseAndGenerate(accessToken: string, id: string): Promise<void> {
+  await meRequest(accessToken, "/shipment/checkout", { orders: [id] })
+  await meRequest(accessToken, "/shipment/generate", { orders: [id] })
+}
+
+export type TrackingInfo = { status?: string; tracking?: string | null; melhorenvio_tracking?: string | null }
+
+export async function tracking(accessToken: string, ids: string[]): Promise<Record<string, TrackingInfo>> {
+  return meRequest(accessToken, "/shipment/tracking", { orders: ids })
 }

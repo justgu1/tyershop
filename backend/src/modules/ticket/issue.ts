@@ -1,3 +1,4 @@
+import { unsubscribeUrl } from "../lead/unsubscribe"
 import { randomBytes } from "crypto"
 import { MedusaContainer } from "@medusajs/framework/types"
 import { MedusaError, Modules } from "@medusajs/framework/utils"
@@ -87,7 +88,7 @@ export async function issueTickets(scope: MedusaContainer, dropId: string) {
     if (testMode && sentInTest.has(ticket.id)) continue
     // O status pode ter mudado desde o carregamento (ex.: admin negou o lead): relê antes de enviar.
     const lead = leadById.get(ticket.lead_id) && (await leadsService.retrieveLead(ticket.lead_id).catch(() => null))
-    if (!lead || lead.status === "negado") continue
+    if (!lead || lead.status === "negado" || lead.status === "descadastrado") continue
     try {
       await ensureAccount(scope, lead.email, lead.name)
       await notifications.createNotifications({
@@ -98,6 +99,7 @@ export async function issueTickets(scope: MedusaContainer, dropId: string) {
           email: lead.email,
           name: lead.name,
           drop_title: drop.title,
+          unsubscribe_url: unsubscribeUrl(lead.email),
           login_url: `${siteUrl}/drop/entrar?c=${encodeURIComponent(ticket.code)}`,
           presale_ends_at: drop.general_starts_at ?? drop.preorder_ends_at,
           production_days: drop.production_days,

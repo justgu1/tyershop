@@ -2,6 +2,7 @@ import { defineWidgetConfig } from "@medusajs/admin-sdk"
 import { useRef, useState } from "react"
 import { adminFetch, ui } from "../lib/api"
 
+type Label = { status: string; tracking_code?: string | null; error?: string }
 type Invoice = { file_id: string; number: string | null; filename: string; issued_at: string }
 
 const InvoiceWidget = ({ data }: { data: { id: string; display_id?: number; metadata?: Record<string, any> | null } }) => {
@@ -52,7 +53,46 @@ const InvoiceWidget = ({ data }: { data: { id: string; display_id?: number; meta
     }
   }
 
+  const [label, setLabel] = useState<Label | null>((data.metadata?.melhor_envio as Label) ?? null)
+  const [labelBusy, setLabelBusy] = useState(false)
+
+  async function buyLabel() {
+    setLabelBusy(true)
+    try {
+      const r = await adminFetch<{ melhor_envio: Label }>(`/admin/orders/${data.id}/melhor-envio`, { method: "POST" })
+      setLabel(r.melhor_envio)
+    } catch (e: any) {
+      setLabel({ status: "erro", error: e.message })
+    } finally {
+      setLabelBusy(false)
+    }
+  }
+
+  const labelText: Record<string, string> = {
+    carrinho: "No carrinho do Melhor Envio",
+    gerada: "Etiqueta comprada, aguardando a postagem",
+    postada: "Postada, a caminho",
+    entregue: "Entregue",
+    erro: "Erro ao comprar a etiqueta",
+  }
+
   return (
+    <>
+    <div style={{ padding: 16, border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", marginBottom: 12 }}>
+      <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 12px" }}>Etiqueta de envio</h2>
+      {label && (
+        <p style={{ fontSize: 14, margin: "0 0 12px" }}>
+          {labelText[label.status] ?? label.status}
+          {label.tracking_code ? ` — rastreio ${label.tracking_code}` : ""}
+          {label.error ? <span style={{ display: "block", color: "#b91c1c", marginTop: 4 }}>{label.error}</span> : null}
+        </p>
+      )}
+      {(!label || label.status === "erro") && (
+        <button type="button" onClick={buyLabel} disabled={labelBusy} style={{ padding: "8px 14px", borderRadius: 6, border: 0, background: "#e77e23", color: "#fff", cursor: "pointer" }}>
+          {labelBusy ? "Comprando..." : "Comprar etiqueta no Melhor Envio"}
+        </button>
+      )}
+    </div>
     <div style={{ padding: 16, border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff" }}>
       <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 12px" }}>Nota fiscal</h2>
       {invoice && (
@@ -76,6 +116,7 @@ const InvoiceWidget = ({ data }: { data: { id: string; display_id?: number; meta
       </button>
       {message && <p style={{ fontSize: 13, marginTop: 10 }}>{message}</p>}
     </div>
+    </>
   )
 }
 
