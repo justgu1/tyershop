@@ -43,6 +43,11 @@ services:
       PUBLIC_MERCADOPAGO_PUBLIC_KEY: ${PUBLIC_MERCADOPAGO_PUBLIC_KEY:-}
       MERCADOPAGO_NOTIFICATION_URL: ${MERCADOPAGO_NOTIFICATION_URL:-}
       HMR_PORT: ${HMR_PORT:-24678}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      EMAIL_TEST_MODE: ${EMAIL_TEST_MODE:-}
+      EMAIL_TEST_TO: ${EMAIL_TEST_TO:-}
       HMR_BIND_HOST: 0.0.0.0
       # E-mail de reset de senha (subscribers/password-reset.ts) delega pro
       # gateway leve `api` (mesmo SMTP/nodemailer de newsletter/stock-notify)

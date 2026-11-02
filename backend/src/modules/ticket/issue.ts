@@ -6,6 +6,7 @@ import DropModuleService from "../drop/service"
 import { resolveDropPhase } from "../drop/phase"
 import { LEAD_MODULE } from "../lead"
 import LeadModuleService from "../lead/service"
+import { ensureAccount } from "../lead/account"
 import { TICKET_MODULE } from "./index"
 import TicketModuleService from "./service"
 import { leadsToIssue, ticketsToSend } from "./eligibility"
@@ -79,6 +80,7 @@ export async function issueTickets(scope: MedusaContainer, dropId: string) {
     const lead = leadById.get(ticket.lead_id)
     if (!lead) continue
     try {
+      await ensureAccount(scope, lead.email, lead.name)
       await notifications.createNotifications({
         to: lead.email,
         channel: "email",

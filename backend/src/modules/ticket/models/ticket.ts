@@ -10,6 +10,7 @@ const Ticket = model
     source: model.enum(["liberado", "link", "manual"]).default("liberado"),
     access_link_id: model.text().nullable(),
     sent_at: model.dateTime().nullable(),
+    redeemed_at: model.dateTime().nullable(),
   })
   .indexes([{ on: ["drop_id", "lead_id"], unique: true }])
 

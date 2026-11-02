@@ -1,12 +1,11 @@
-import { randomBytes } from "crypto"
 import { MedusaContainer } from "@medusajs/framework/types"
-import { MedusaError, Modules, generateJwtToken } from "@medusajs/framework/utils"
-import { createCustomersWorkflow } from "@medusajs/medusa/core-flows"
+import { MedusaError, generateJwtToken } from "@medusajs/framework/utils"
 import { DROP_MODULE } from "../drop"
 import DropModuleService from "../drop/service"
 import { resolveDropPhase } from "../drop/phase"
 import { LEAD_MODULE } from "../lead"
 import LeadModuleService from "../lead/service"
+import { ensureAccount } from "../lead/account"
 import { TICKET_MODULE } from "./index"
 import TicketModuleService from "./service"
 
@@ -29,45 +28,11 @@ export async function redeemTicket(scope: MedusaContainer, code: string) {
   const lead = await leads.retrieveLead(ticket.lead_id)
   if (lead.status === "negado") throw invalid()
 
-  const customerModule = scope.resolve(Modules.CUSTOMER) as any
-  const authModule = scope.resolve(Modules.AUTH) as any
-
-  let [customer] = await customerModule.listCustomers({ email: lead.email }, { take: 1 })
-  if (!customer) {
-    const { result } = await createCustomersWorkflow(scope).run({
-      input: {
-        customersData: [{ email: lead.email, first_name: lead.name?.split(" ")[0] ?? undefined, has_account: true }],
-      },
-    })
-    customer = result[0]
-  } else if (!customer.has_account) {
-    customer = await customerModule.updateCustomers(customer.id, { has_account: true })
-  }
-
-  const [existing] = await authModule.listAuthIdentities(
-    { provider_identities: { entity_id: lead.email, provider: "emailpass" } },
-    { relations: ["provider_identities"], take: 1 }
-  )
-
-  let authIdentity = existing
-  if (!authIdentity) {
-    // Conta criada pelo convite: senha aleatória; a pessoa define a sua pelo "esqueci minha senha".
-    const registered = await authModule.register("emailpass", {
-      body: { email: lead.email, password: randomBytes(24).toString("hex") },
-      url: "",
-      headers: {},
-      query: {},
-      protocol: "",
-    })
-    if (!registered.success) throw invalid()
-    authIdentity = registered.authIdentity
-  }
-
-  if (authIdentity.app_metadata?.customer_id !== customer.id) {
-    authIdentity = await authModule.updateAuthIdentities({
-      id: authIdentity.id,
-      app_metadata: { customer_id: customer.id },
-    })
+  let customer, authIdentity
+  try {
+    ;({ customer, authIdentity } = await ensureAccount(scope, lead.email, lead.name))
+  } catch {
+    throw invalid()
   }
 
   const http = (scope.resolve("configModule") as any).projectConfig.http
@@ -82,7 +47,7 @@ export async function redeemTicket(scope: MedusaContainer, code: string) {
     { secret: http.jwtSecret, expiresIn: http.jwtExpiresIn ?? "1d", jwtOptions: http.jwtOptions }
   )
 
-  if (ticket.customer_id !== customer.id) await tickets.updateTickets({ id: ticket.id, customer_id: customer.id })
+  await tickets.updateTickets({ id: ticket.id, customer_id: customer.id, redeemed_at: ticket.redeemed_at ?? new Date() })
   if (lead.customer_id !== customer.id) await leads.updateLeads({ id: lead.id, customer_id: customer.id })
 
   return { token, drop_handle: drop.handle }

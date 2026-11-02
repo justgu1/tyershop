@@ -39,3 +39,18 @@ describe("ticket email", () => {
     expect(() => renderTemplate("nope", {})).toThrow(/desconhecido/)
   })
 })
+
+describe("lead_welcome and password_reset templates", () => {
+  it("lead_welcome links to the community and names the drop", () => {
+    const mail = renderTemplate("lead_welcome", { email: "a@b.co", drop_title: "Red Rose", whatsapp_url: "https://chat.whatsapp.com/x" })
+    expect(mail.subject).toBe("Você está na lista do drop Red Rose")
+    expect(mail.html).toContain('href="https://chat.whatsapp.com/x"')
+  })
+
+  it("password_reset has a clickable link and escapes the url", () => {
+    const mail = renderTemplate("password_reset", { email: "a@b.co", reset_url: 'https://x.co/r?t=1&u="2"' })
+    expect(mail.html).toContain('href="https://x.co/r?t=1&amp;u=&quot;2&quot;"')
+    expect(mail.text).toContain("https://x.co/r?t=1")
+    expect(mail.subject).toBe("Redefinição de senha — Tyer")
+  })
+})

@@ -44,7 +44,11 @@ class SmtpNotificationProviderService extends AbstractNotificationProviderServic
 
   async send(notification: ProviderSendNotificationDTO): Promise<ProviderSendNotificationResultsDTO> {
     const rendered = renderTemplate(notification.template, (notification.data ?? {}) as Record<string, any>)
-    const { to, subject } = resolveRecipient(notification.to, rendered.subject, readTestMode(process.env))
+    // Redefinição de senha é a única que sempre vai ao destinatário real: quem pediu precisa receber.
+    const { to, subject } =
+      notification.template === "password_reset"
+        ? { to: notification.to, subject: rendered.subject }
+        : resolveRecipient(notification.to, rendered.subject, readTestMode(process.env))
 
     const info = await this.transporter_.sendMail({
       from: this.options_.from,

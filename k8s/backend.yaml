@@ -58,6 +58,39 @@ spec:
                   key: PUBLIC_MERCADOPAGO_PUBLIC_KEY
             - name: MERCADOPAGO_NOTIFICATION_URL
               value: "https://medusa.homolog.tyershop.com/hooks/payment/mercadopago"
+            - name: SMTP_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: SMTP_HOST
+            - name: SMTP_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: SMTP_PORT
+            - name: SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: SMTP_USER
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: SMTP_PASSWORD
+            - name: SMTP_FROM
+              value: "Tyer <contato@tyershop.com>"
+            # Ligado por padrão: homolog e prod são o mesmo deploy, nada sai para cliente real sem desligar aqui.
+            - name: EMAIL_TEST_MODE
+              value: "true"
+            - name: EMAIL_TEST_TO
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: EMAIL_TEST_TO
+                  optional: true
+            - name: SITE_URL
+              value: "https://homolog.tyershop.com"
             - name: STORE_CORS
               value: "https://homolog.tyershop.com"
             - name: ADMIN_CORS

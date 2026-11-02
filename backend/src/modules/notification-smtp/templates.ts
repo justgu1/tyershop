@@ -80,6 +80,57 @@ const footerText = (reason: string) =>
   ].join("\n")
 
 const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
+  /** Redefinição de senha da conta do cliente. */
+  password_reset: (d) => {
+    const subject = "Redefinição de senha — Tyer"
+    const reason = `Você recebeu este e-mail porque alguém pediu a redefinição de senha da conta ${esc(d.email)}. Se não foi você, é só ignorar: nada muda na sua conta.`
+    const html = shell({
+      preheader: "Crie uma nova senha para a sua conta Tyer.",
+      title: "Redefinir senha",
+      paragraphs: [
+        "Recebemos um pedido para redefinir a senha da sua conta Tyer.",
+        "Clique no botão abaixo para escolher uma nova senha. O link vale por <strong>15 minutos</strong> e só pode ser usado uma vez.",
+      ],
+      cta: { label: "Criar nova senha", url: d.reset_url },
+      note: `Se o botão não funcionar, copie e cole no navegador:<br><a href="${esc(d.reset_url)}" style="word-break:break-all;color:#6b6b6b">${esc(d.reset_url)}</a>`,
+      reason,
+    })
+    const text = [
+      "Recebemos um pedido para redefinir a senha da sua conta Tyer.",
+      "",
+      "Escolha uma nova senha pelo link abaixo (válido por 15 minutos, uso único):",
+      d.reset_url,
+      footerText(reason),
+    ].join("\n")
+    return { subject, html, text }
+  },
+
+  /** Confirmação de quem entrou na lista de um drop (ainda sem ingresso). */
+  lead_welcome: (d) => {
+    const subject = d.drop_title ? `Você está na lista do drop ${d.drop_title}` : "Você está na lista da Tyer"
+    const reason = `Você recebeu este e-mail porque se cadastrou na lista da Tyer (${esc(d.email)}). Não quer mais receber avisos? É só responder esta mensagem.`
+    const what = d.drop_title ? `do drop <strong>${esc(d.drop_title)}</strong>` : "dos próximos drops"
+    const paragraphs = [
+      `Anotado! Seu e-mail está na lista ${what}. Assim que a pré-venda abrir, você é avisado por aqui.`,
+      `Enquanto isso, entre no grupo da comunidade no WhatsApp e acompanhe a Tyer nas redes: é lá que os avisos saem primeiro.`,
+    ]
+    const html = shell({
+      preheader: "Você está na lista. Avisamos por e-mail quando abrir.",
+      title: "Você está na lista",
+      paragraphs,
+      cta: { label: "Entrar no grupo do WhatsApp", url: d.whatsapp_url },
+      reason,
+    })
+    const text = [
+      "Anotado! Seu e-mail está na lista.",
+      "",
+      "Assim que a pré-venda abrir, você é avisado por e-mail.",
+      `Grupo do WhatsApp: ${d.whatsapp_url}`,
+      footerText(reason),
+    ].join("\n")
+    return { subject, html, text }
+  },
+
   /** Ingresso individual da pré-venda de um drop. O botão entra direto na conta. */
   ticket: (d) => {
     const subject = `Seu ingresso para o drop ${d.drop_title}`
@@ -97,7 +148,7 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
         `As peças são feitas sob encomenda, com produção em até <strong>${esc(days)} dias</strong>, mais o prazo da transportadora.`,
       ].filter(Boolean),
       cta: { label: "Entrar na pré-venda", url: d.login_url },
-      note: `Este link é pessoal e entra na sua conta: não encaminhe este e-mail. Se o botão não funcionar, copie e cole no navegador:<br><span style="word-break:break-all;color:#6b6b6b">${esc(d.login_url)}</span>`,
+      note: `Este link é pessoal e entra na sua conta: não encaminhe este e-mail. Se o botão não funcionar, copie e cole no navegador:<br><a href="${esc(d.login_url)}" style="word-break:break-all;color:#6b6b6b">${esc(d.login_url)}</a>`,
       reason,
     })
 
