@@ -199,7 +199,7 @@ spec:
                   key: MELHOR_ENVIO_SENDER_COMPLEMENT
                   optional: true
             - name: MELHOR_ENVIO_FROM_ZIP
-              value: "06365210"
+              value: "06365570"
             # Conexões por réplica. Réplicas x este valor precisa ficar abaixo do max_connections do PostgreSQL menos o que os
             # outros apps usam (hoje ~20); o ajuste do banco no repo de infra sobe o limite para 150.
             - name: DB_POOL_MAX
