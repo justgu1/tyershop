@@ -19,7 +19,8 @@ spec:
           args: ["-c", "shared_buffers=256MB", "-c", "max_connections=200", "-c", "fsync=off", "-c", "synchronous_commit=off"]
           env:
             - { name: POSTGRES_USER, value: tyershop }
-            - { name: POSTGRES_PASSWORD, value: carga }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: loadtest-postgres, key: password } }
             - { name: POSTGRES_DB, value: tyershop }
           ports: [{ containerPort: 5432 }]
           resources:
@@ -59,12 +60,20 @@ spec:
             - -c
             - |
               set -eu
+              set -o pipefail
+              DESTINO="postgres://tyershop:${SENHA}@loadtest-postgres:5432/tyershop"
               until pg_isready -h loadtest-postgres -U tyershop >/dev/null 2>&1; do sleep 2; done
-              pg_dump --no-owner --no-acl "$ORIGEM" | psql -q -v ON_ERROR_STOP=0 "postgres://tyershop:carga@loadtest-postgres:5432/tyershop" >/dev/null
-              psql -tA "postgres://tyershop:carga@loadtest-postgres:5432/tyershop" -c 'select count(*) from product'
+              pg_dump --no-owner --no-acl "$ORIGEM" | psql -q -v ON_ERROR_STOP=0 "$DESTINO" >/dev/null
+              # Falha se a cópia veio vazia ou incompleta (o pipe acima passa mesmo com erros isolados de carga).
+              for t in product product_variant cart "order" customer drop shipping_option; do
+                psql -tA "$DESTINO" -c "select to_regclass('public.\"$t\"') is not null" | grep -q t || { echo "tabela ausente: $t"; exit 1; }
+              done
+              test "$(psql -tA "$DESTINO" -c 'select count(*) from product')" -gt 0
           env:
             - name: ORIGEM
               valueFrom: { secretKeyRef: { name: tyershop-secrets, key: BACKEND_DATABASE_URL } }
+            - name: SENHA
+              valueFrom: { secretKeyRef: { name: loadtest-postgres, key: password } }
           resources:
             requests: { cpu: 50m, memory: 64Mi }
             limits: { cpu: "500m", memory: 512Mi }

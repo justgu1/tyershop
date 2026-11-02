@@ -4,20 +4,19 @@
 #   loadtest/run-in-cluster.sh run     roda o k6 e salva o resultado em $OUT
 #   loadtest/run-in-cluster.sh down    remove tudo o que o `up` criou
 #
-# Modo padrão (ISOLATED=1): o teste usa um PostgreSQL próprio e backends próprios; o banco compartilhado só é LIDO uma vez (cópia)
-# e nada do ArgoCD é alterado. Com ISOLATED=0 o teste usa o backend e o banco reais da homologação (arriscado: derrubou o banco
-# compartilhado uma vez; só com o banco dimensionado).
+# O teste usa um PostgreSQL próprio (senha aleatória a cada `up`) e backends próprios; o banco compartilhado só é LIDO uma vez, para
+# a cópia, e nada do ArgoCD é alterado. Os backends de teste não recebem Redis, SMTP nem o token real do Mercado Pago da homologação.
 # Variáveis: EXTRA_BACKENDS (réplicas do backend de teste, padrão 1), PROFILE (capacity|sessions), PEOPLE ("100,200,300"),
 #            HOLD_SECONDS, THINK_SCALE, USERS, STEP_SECONDS, LEVELS.
 # IMPORTANTE: não edite este arquivo enquanto ele roda (o bash lê o script aos poucos).
 set -euo pipefail
 NS=apps
-ISOLATED="${ISOLATED:-1}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="${OUT:-$HERE/saida}"
 mkdir -p "$OUT"
-if [ "$ISOLATED" = "1" ]; then BACKEND_DEPLOY=tyershop-backend-extra; API_SVC=loadtest-backend; else BACKEND_DEPLOY=tyershop-backend; API_SVC=tyershop-backend; fi
-TEST_DB="postgres://tyershop:carga@loadtest-postgres.$NS.svc.cluster.local:5432/tyershop"
+BACKEND_DEPLOY=tyershop-backend-extra
+API_SVC=loadtest-backend
+test_db() { echo "postgres://tyershop:$(kubectl -n "$NS" get secret loadtest-postgres -o jsonpath='{.data.password}' | base64 -d)@loadtest-postgres.$NS.svc.cluster.local:5432/tyershop"; }
 MOCK="http://loadtest-mock.$NS.svc.cluster.local:8099"
 
 backend() { kubectl -n "$NS" exec deploy/"$BACKEND_DEPLOY" -- "$@"; }
@@ -37,13 +36,15 @@ up)
   kubectl apply -f "$HERE/k8s/mock.yaml"
   kubectl -n "$NS" rollout status deploy/loadtest-mock --timeout=120s
 
-  if [ "$ISOLATED" = "1" ]; then
-    kubectl -n "$NS" delete job loadtest-copia-banco --ignore-not-found >/dev/null
-    kubectl apply -f "$HERE/k8s/postgres.yaml"
-    kubectl -n "$NS" rollout status deploy/loadtest-postgres --timeout=180s
-    kubectl -n "$NS" wait --for=condition=complete job/loadtest-copia-banco --timeout=300s
-    # Backends de teste: cópia do backend real (mesma imagem e configuração), com o banco de teste e os simuladores.
-    kubectl -n "$NS" get deploy tyershop-backend -o json | EXTRA="${EXTRA_BACKENDS:-1}" TEST_DB="$TEST_DB" MOCK="$MOCK" python3 -c "
+  kubectl -n "$NS" delete job loadtest-copia-banco --ignore-not-found >/dev/null
+  # Senha aleatória do banco de teste: o Service é alcançável por qualquer pod do namespace e a cópia tem os dados da homologação.
+  kubectl -n "$NS" create secret generic loadtest-postgres --from-literal=password="$(openssl rand -hex 16)" --dry-run=client -o yaml | kubectl apply -f -
+  kubectl apply -f "$HERE/k8s/postgres.yaml"
+  kubectl -n "$NS" rollout status deploy/loadtest-postgres --timeout=180s
+  kubectl -n "$NS" wait --for=condition=complete job/loadtest-copia-banco --timeout=300s
+  # Backends de teste: cópia do backend real (mesma imagem e configuração), com o banco de teste e os simuladores. Sem Redis, SMTP
+  # nem o token real do Mercado Pago: nada do teste se mistura com o que a homologação usa de verdade.
+  kubectl -n "$NS" get deploy tyershop-backend -o json | EXTRA="${EXTRA_BACKENDS:-1}" TEST_DB="$(test_db)" MOCK="$MOCK" python3 -c "
 import sys,json,os
 d=json.load(sys.stdin)
 d['metadata']={'name':'tyershop-backend-extra','namespace':'$NS','labels':{'loadtest':'extra'}}
@@ -54,13 +55,14 @@ d['spec']['selector']={'matchLabels':sel}
 d['spec']['template']['metadata']['labels']=sel
 c=d['spec']['template']['spec']['containers'][0]
 env={e['name']:e for e in c['env']}
-for k,v in {'DATABASE_URL':os.environ['TEST_DB'],'LOAD_TEST_MODE':'true','MERCADOPAGO_API_BASE':os.environ['MOCK'],'MELHOR_ENVIO_BASE_URL':os.environ['MOCK'],'MELHOR_ENVIO_FROM_ZIP':'06365210'}.items():
+for k in ['REDIS_URL','SMTP_HOST','SMTP_PORT','SMTP_USER','SMTP_PASSWORD','SMTP_FROM','EMAIL_TEST_TO','NODE_OPTIONS','MERCADOPAGO_WEBHOOK_SECRET']:
+    env.pop(k,None)
+for k,v in {'DATABASE_URL':os.environ['TEST_DB'],'LOAD_TEST_MODE':'true','MERCADOPAGO_ACCESS_TOKEN':'token-de-teste','MERCADOPAGO_API_BASE':os.environ['MOCK'],'MELHOR_ENVIO_BASE_URL':os.environ['MOCK'],'MELHOR_ENVIO_FROM_ZIP':'06365210'}.items():
     env[k]={'name':k,'value':v}
-env.pop('NODE_OPTIONS',None)
 c['env']=list(env.values())
 c.setdefault('resources',{}).setdefault('requests',{})['cpu']='100m'
 print(json.dumps(d))" | kubectl apply -f -
-    kubectl -n "$NS" apply -f - <<SVC
+  kubectl -n "$NS" apply -f - <<SVC
 apiVersion: v1
 kind: Service
 metadata: { name: loadtest-backend, namespace: $NS }
@@ -68,11 +70,6 @@ spec:
   selector: { app: loadtest-backend }
   ports: [{ port: 9000, targetPort: 9000 }]
 SVC
-  else
-    kubectl -n argocd get app tyershop -o json | python3 -c "import sys,json;print(json.dumps(json.load(sys.stdin)['spec'].get('syncPolicy',{})))" > "$OUT/syncpolicy.json"
-    kubectl -n argocd patch app tyershop --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
-    kubectl -n "$NS" set env deploy/tyershop-backend LOAD_TEST_MODE=true MERCADOPAGO_API_BASE="$MOCK" MELHOR_ENVIO_BASE_URL="$MOCK" MELHOR_ENVIO_FROM_ZIP=06365210
-  fi
   wait_backend
   backend npx medusa exec ./src/scripts/setup-melhor-envio-shipping.js 2>&1 | grep -iE "Melhor Envio|Frete fixo|Opções|rror" || true
   node_pg > "$OUT/estado-original.json" <<'JS'
@@ -117,11 +114,7 @@ down)
   kubectl -n "$NS" delete deploy tyershop-backend-extra loadtest-postgres loadtest-mock --ignore-not-found
   kubectl -n "$NS" delete svc loadtest-backend loadtest-postgres loadtest-mock --ignore-not-found
   kubectl -n "$NS" delete configmap loadtest-mock loadtest-k6 --ignore-not-found
-  if [ "$ISOLATED" != "1" ]; then
-    kubectl -n "$NS" set env deploy/tyershop-backend LOAD_TEST_MODE- MERCADOPAGO_API_BASE- MELHOR_ENVIO_BASE_URL-
-    POLICY=$(cat "$OUT/syncpolicy.json")
-    kubectl -n argocd patch app tyershop --type merge -p "{\"spec\":{\"syncPolicy\":$POLICY}}"
-  fi
+  kubectl -n "$NS" delete secret loadtest-postgres --ignore-not-found
   echo "desmontado"
   ;;
 *) echo "uso: $0 up|run|down"; exit 1 ;;

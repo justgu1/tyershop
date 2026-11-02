@@ -143,6 +143,7 @@ if (PROFILE === "sessions") {
 }
 
 export const options = {
+  setupTimeout: "300s",
   scenarios,
   thresholds,
   discardResponseBodies: false,
