@@ -142,6 +142,11 @@ const pk = getPublishableKey();
       a.textContent = 'Rastrear entrega';
       actions.append(a);
     }
+    const proof = document.createElement('a');
+    proof.className = 'btn btn-outline';
+    proof.href = `/account/comprovante?o=${encodeURIComponent(order.id)}`;
+    proof.textContent = 'Comprovante';
+    actions.append(proof);
     if (withInvoice.has(order.id) && order.status !== 'canceled') {
       const b = document.createElement('button');
       b.type = 'button';

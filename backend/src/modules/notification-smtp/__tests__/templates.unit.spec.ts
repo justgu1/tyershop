@@ -110,3 +110,37 @@ describe("cancelar inscrição nos e-mails de lista", () => {
     }
   })
 })
+
+describe("confirmação do pedido detalhada", () => {
+  const base = {
+    email: "ana@tyer.test", name: "Ana", display_id: 9, orders_url: "https://tyer.test/account/orders", currency_code: "brl",
+    placed_at: "2026-11-02T19:12:00Z", subtotal: 100, shipping_total: 12.61, total: 112.61, shipping_name: ".Com",
+    items: [{ title: "Camiseta Teste", variant: "M", quantity: 2, unit_price: 50, image: "https://tyer.test/p/1.webp" }],
+    address_info: { name: "Ana Souza", line1: "Rua B, 20", district: "Sé", city: "São Paulo", uf: "SP", zip: "01000-000", phone: "11988887777" },
+    payment: { method: "Cartão de crédito", status: "aprovado", id: "123456" },
+  }
+
+  it("mostra foto, quantidade, endereço completo e pagamento", () => {
+    const mail = renderTemplate("order_confirmation", base)
+    expect(mail.html).toContain('src="https://tyer.test/p/1.webp"')
+    expect(mail.html).toContain("2 × ")
+    expect(mail.html).toContain("Rua B, 20 — Sé")
+    expect(mail.html).toContain("CEP 01000-000")
+    expect(mail.html).toContain("Cartão de crédito")
+    expect(mail.html).toContain("Mercado Pago nº 123456")
+    expect(mail.html).toContain("Frete (.Com)")
+    expect(mail.text).toContain("Pagamento: Cartão de crédito (aprovado) — Mercado Pago nº 123456")
+  })
+
+  it("as redes sociais saem como ícones com texto alternativo", () => {
+    const mail = renderTemplate("order_confirmation", base)
+    for (const rede of ["instagram", "tiktok", "youtube"]) expect(mail.html).toContain(`/email/${rede}.png`)
+    expect(mail.html).toContain('alt="Instagram"')
+  })
+
+  it("sem foto nem endereço ainda monta o e-mail", () => {
+    const mail = renderTemplate("order_confirmation", { ...base, items: [{ title: "Peça", quantity: 1, unit_price: 10 }], address_info: null, payment: null })
+    expect(mail.html).toContain("Peça")
+    expect(mail.subject).toBe("Pedido #9 confirmado")
+  })
+})

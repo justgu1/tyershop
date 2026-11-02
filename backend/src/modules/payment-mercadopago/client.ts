@@ -6,6 +6,21 @@
  * Docs: https://www.mercadopago.com.br/developers/pt/reference/payments/_payments/post
  */
 
+import { MedusaError } from "@medusajs/framework/utils";
+
+/**
+ * Mensagem em português para o cliente a partir do erro cru do Mercado Pago (que fica só no log). Recusa de cartão não passa
+ * por aqui: ela volta como pagamento `rejected`, com motivo próprio.
+ */
+export function friendlyMercadoPagoError(raw: string, status: number): { message: string; type: string } {
+  const text = raw.toLowerCase();
+  if (status >= 500) return { message: "O Mercado Pago está indisponível agora. Tente de novo em instantes.", type: MedusaError.Types.UNEXPECTED_STATE };
+  if (text.includes("email")) return { message: "O Mercado Pago não aceitou o e-mail informado para o pagamento. Use outro e-mail.", type: MedusaError.Types.INVALID_DATA };
+  if (text.includes("token")) return { message: "Os dados do cartão expiraram. Digite o cartão de novo.", type: MedusaError.Types.INVALID_DATA };
+  if (text.includes("identification") || text.includes("cpf")) return { message: "O CPF informado não foi aceito. Confira e tente de novo.", type: MedusaError.Types.INVALID_DATA };
+  return { message: "O Mercado Pago não aceitou o pagamento. Confira os dados e tente de novo.", type: MedusaError.Types.INVALID_DATA };
+}
+
 /** `MERCADOPAGO_API_BASE` só existe para apontar o simulador no teste de carga. */
 const MP_API_BASE = process.env.MERCADOPAGO_API_BASE?.replace(/\/$/, "") || "https://api.mercadopago.com";
 
@@ -92,7 +107,9 @@ export class MercadoPagoClient {
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       const message = (body as any)?.message || (body as any)?.error || `Mercado Pago respondeu ${res.status}`;
-      throw new Error(`[mercadopago] ${message}`);
+      console.error(`[mercadopago] ${res.status} ${path}: ${message}`);
+      const friendly = friendlyMercadoPagoError(String(message), res.status);
+      throw new MedusaError(friendly.type as any, friendly.message);
     }
     return body as T;
   }

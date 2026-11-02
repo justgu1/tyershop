@@ -77,12 +77,15 @@ export function buildCartPayload(input: {
   serviceId: number
   sender: Sender
   pkg: { height: number; width: number; length: number; weight: number }
+  /** Ponto de postagem da Jadlog onde o remetente deixa os pacotes (exigido pelos serviços .Com e .Package). */
+  agency?: number | null
 }) {
   const { order, sender, pkg } = input
   const a = order.shipping_address
   const insurance = Math.round(order.items.reduce((sum, i) => sum + i.unit_price * i.quantity, 0) * 100) / 100
   return {
     service: input.serviceId,
+    ...(input.agency ? { agency: input.agency } : {}),
     from: {
       name: sender.name,
       phone: sender.phone,
@@ -112,7 +115,7 @@ export function buildCartPayload(input: {
       postal_code: digits(a.postal_code),
       state_abbr: String(a.province ?? "").toUpperCase(),
     },
-    products: order.items.map((i) => ({ name: i.product_title || i.title || "Peça Tyer", quantity: i.quantity, unit_value: i.unit_price })),
+    products: order.items.map((i) => ({ name: i.product_title || i.title || "Peça Tyer", quantity: i.quantity, unitary_value: i.unit_price })),
     volumes: [{ height: pkg.height, width: pkg.width, length: pkg.length, weight: pkg.weight }],
     options: {
       insurance_value: insurance,
@@ -130,3 +133,8 @@ export function buildCartPayload(input: {
 /** Status do Melhor Envio que já contam como "despachado" e "entregue". */
 export const POSTED = ["posted", "delivered"]
 export const DELIVERED = ["delivered"]
+
+/** Serviços da Jadlog: só aceitam o envio com o ponto de postagem informado. */
+export const NEEDS_AGENCY = [3, 4]
+
+export const agencyFromEnv = (env: Record<string, string | undefined>) => Number(env.MELHOR_ENVIO_AGENCY_ID) || null
