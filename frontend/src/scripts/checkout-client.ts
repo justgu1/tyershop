@@ -1501,6 +1501,25 @@ function init() {
     else document.getElementById('mp-sdk')?.addEventListener('load', mount);
   }
 
+  /** Texto para o cliente a partir do `status_detail` do Mercado Pago. */
+  function cardRejectionMessage(detail?: string) {
+    switch (detail) {
+      case 'cc_rejected_insufficient_amount':
+        return 'Saldo insuficiente no cartão. Tente outro cartão ou pague com Pix.';
+      case 'cc_rejected_bad_filled_card_number':
+      case 'cc_rejected_bad_filled_date':
+      case 'cc_rejected_bad_filled_security_code':
+      case 'cc_rejected_bad_filled_other':
+        return 'Confira os dados do cartão e tente novamente.';
+      case 'cc_rejected_high_risk':
+        return 'O pagamento não passou pela análise de segurança do Mercado Pago. Tente outro cartão ou pague com Pix.';
+      case 'cc_rejected_call_for_authorize':
+        return 'Seu banco pediu autorização para este pagamento. Fale com o banco ou use outro cartão.';
+      default:
+        return 'O cartão foi recusado. Cartões emitidos fora do Brasil nem sempre são aceitos: tente outro cartão ou pague com Pix.';
+    }
+  }
+
   async function submitCard() {
     const holderName = (qs<HTMLInputElement>('ck-card-holder')?.value || '').trim();
     if (!mp || !cardFields || !holderName) {
@@ -1525,7 +1544,7 @@ function init() {
         identificationNumber: payer.cpf,
       });
       const installments = Number(qs<HTMLSelectElement>('ck-installments')?.value || 1);
-      await medusaFetch('/store/checkout/mercadopago/card', {
+      const charge = await medusaFetch('/store/checkout/mercadopago/card', {
         method: 'POST',
         body: JSON.stringify({
           payment_session_id: paymentSessionId,
@@ -1537,6 +1556,9 @@ function init() {
           payer: { email: payer.email, cpf: payer.cpf },
         }),
       });
+      if (charge?.status === 'rejected' || charge?.status === 'cancelled') {
+        throw new Error(cardRejectionMessage(charge.status_detail));
+      }
       await completeCart();
     } catch (err) {
       setText('checkout-card-error', err instanceof Error ? err.message : t('errorGeneric'));
