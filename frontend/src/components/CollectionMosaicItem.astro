@@ -1,10 +1,9 @@
 ---
 import { t, getPathForLang, type Lang } from '../i18n/utils';
-import { getProductVariantData, getVariantMaxQty } from '../lib/product-variants';
+import { getProductVariantData } from '../lib/product-variants';
 import { getVariantPriceInfo } from '../lib/medusa-pricing';
-import { optionRowKind, swatchFillForValue } from '../lib/variant-option-ui';
+import { optionRowKind } from '../lib/variant-option-ui';
 import { getVariantSlideUrls } from '../lib/product-variant-gallery';
-import VariantOptionRows from './VariantOptionRows.astro';
 
 interface Props {
   product: any;
@@ -66,12 +65,12 @@ const colorVariants = colorRow
   : [];
 
 const priceInfo = getVariantPriceInfo(defaultVariant);
-const galleryUrls = colorRow
-  ? colorVariants.find((c) => c.value === activeColor)?.slides ?? ['/no-data.webp']
-  : (() => {
-      const s = [...new Set(getVariantSlideUrls(defaultVariant, product))].slice(0, 5);
-      return s.length ? s : ['/no-data.webp'];
-    })();
+const activeSlides = colorRow
+  ? colorVariants.find((c) => c.value === activeColor)?.slides ?? []
+  : [...new Set(getVariantSlideUrls(defaultVariant, product))];
+// A foto principal de cada cor abre o mosaico; depois vêm as demais da cor ativa.
+const galleryUrls = [...new Set([...colorVariants.map((c) => c.slides[0]), ...activeSlides])].filter(Boolean).slice(0, 5);
+if (!galleryUrls.length) galleryUrls.push('/no-data.webp');
 
 /* DOM precisa de slots suficientes p/ cobrir a cor com mais fotos — trocar de cor
    só liga/desliga slots e troca src, nunca recria nó (CSS scoped não pega em injectHTML). */
@@ -143,40 +142,6 @@ const selectedByOption = Object.fromEntries(
       <h3 class="mosaic-item__title">{title}</h3>
     </a>
 
-    {colorRow && colorRow.values.length > 0 && (
-      <div class="mosaic-item__colors" role="list" aria-label={colorRow.title} data-color-switch data-color-option-id={colorRow.id}>
-        {colorVariants.map(({ value: val, variant: v, slides }) => {
-          const { fill, isGradient } = swatchFillForValue(val);
-          const style: { background?: string; backgroundColor?: string } = {};
-          if (isGradient && fill) style.background = fill;
-          else if (fill) style.backgroundColor = fill;
-          const vPrice = getVariantPriceInfo(v);
-          return (
-            <button
-              type="button"
-              class:list={['mosaic-item__swatch', { 'is-active': val === activeColor }]}
-              title={val}
-              role="listitem"
-              aria-pressed={val === activeColor}
-              aria-label={val}
-              data-color={val}
-              data-variant-id={v?.id}
-              data-price={vPrice?.amountCents ?? ''}
-              data-price-display={vPrice?.display ?? ''}
-              data-price-original-display={vPrice?.originalDisplay ?? ''}
-              data-variant-title={v?.title ?? ''}
-              data-max-qty={getVariantMaxQty(v) ?? ''}
-              data-slides={JSON.stringify(slides)}
-            >
-              <span class:list={['mosaic-item__swatch-inner', { 'mosaic-item__swatch-inner--neutral': !fill }]} style={style} />
-            </button>
-          );
-        })}
-      </div>
-    )}
-
-    <VariantOptionRows optionRows={[...sizeRows, ...otherOptRows]} selectedByOption={selectedByOption} idPrefix={handle} />
-
     {descriptionParagraphs.length > 0 && (
       <div class="mosaic-item__desc">{descriptionParagraphs.map((text) => <p>{text}</p>)}</div>
     )}
@@ -190,20 +155,6 @@ const selectedByOption = Object.fromEntries(
         <a href={getPathForLang(`/product/${handle}`, lang)} class="btn btn-outline mosaic-item__view">
           {t(lang, 'shop', 'view_product') || 'Ver produto'}
         </a>
-        <button
-          type="button"
-          class="pc__quick-add mosaic-item__add"
-          data-variant-id={defaultVariant?.id}
-          data-title={title}
-          data-price={priceInfo?.amountCents ?? ''}
-          data-thumbnail={galleryUrls[0]}
-          data-variant-title={defaultVariant?.title ?? ''}
-          data-max-qty={getVariantMaxQty(defaultVariant) ?? ''}
-          aria-label={`${t(lang, 'product', 'add_to_cart')} — ${title}`}
-        >
-          <img src="/icons/bag.svg" alt="" width="18" height="18" />
-          <span class="pc__quick-add__label">{t(lang, 'product', 'add_to_cart')}</span>
-        </button>
       </div>
     </div>
   </div>

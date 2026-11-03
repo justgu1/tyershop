@@ -53,7 +53,7 @@ const href = getPathForLang(`/product/${product.handle ?? ''}`, lang);
       </button>
     )}
     <span class="prow__tags">
-      {soldOut && <span class="prow__tag prow__tag--soldout">Esgotado</span>}
+      {soldOut && <span class="prow__tag prow__tag--soldout"><img src="/icons/cross.svg" alt="" width="12" height="12" />Esgotado</span>}
       {!soldOut && discount > 0 && <span class="prow__tag prow__tag--discount">{discount}% off</span>}
       {!soldOut && exclusive && <span class="prow__tag">Exclusivo</span>}
     </span>
@@ -80,9 +80,9 @@ const href = getPathForLang(`/product/${product.handle ?? ''}`, lang);
   .prow__nav--prev { left: 8px; }
   .prow__nav--next { right: 8px; }
   .prow__tags { position: absolute; top: 8px; left: 8px; display: flex; gap: 4px; pointer-events: none; }
-  .prow__tag { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; text-transform: uppercase; background: rgba(10, 10, 10, 0.82); color: #fff; }
-  .prow__tag--soldout { background: #7f1d1d; }
-  .prow__tag--discount { background: var(--c-accent, #e77e23); }
+  .prow__tag { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: var(--r); font-size: 10px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; background: #0a0a0a; color: #fff; }
+  .prow__tag--soldout { background: #000; }
+  .prow__tag--discount { background: #16a34a; }
   .prow__dots { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
   .prow__dots :global(span) { width: 8px; height: 8px; border-radius: 50%; background: rgba(128, 128, 128, 0.4); transition: background 0.15s ease, transform 0.15s ease; }
   .prow__dots :global(span.is-active) { background: var(--c-accent, #e77e23); transform: scale(1.3); }

@@ -1,6 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import ProductGrid from '../components/ProductGrid.astro';
+import CollectionMosaicItem from '../components/CollectionMosaicItem.astro';
 import { fetchStarterProducts } from '../lib/drop';
 
 export const prerender = false;
@@ -12,7 +12,7 @@ const products = await fetchStarterProducts();
   <section class="starter-page">
     <h1>TYER STARTER</h1>
     <p>Linha fixa com estoque pronto: sem prazo de produção.</p>
-    <div class="starter-page__grid"><ProductGrid products={products} lang="pt" label="Linha Starter" /></div>
+    <div class="starter-page__grid"><div role="list" aria-label="Linha Starter">{products.map((p, i) => <CollectionMosaicItem product={p} lang="pt" reverse={i % 2 === 1} />)}</div></div>
   </section>
 </Layout>
 

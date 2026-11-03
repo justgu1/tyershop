@@ -35,7 +35,7 @@ const href = getPathForLang(`/product/${product.handle ?? ''}`, lang);
     <span class="ptile__img">
       <img src={thumb} alt={product.title ?? ''} width="480" height="600" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/no-data.webp'" />
       <span class="ptile__tags">
-        {soldOut && <span class="ptile__tag ptile__tag--soldout">Esgotado</span>}
+        {soldOut && <span class="ptile__tag ptile__tag--soldout"><img src="/icons/cross.svg" alt="" width="12" height="12" />Esgotado</span>}
         {!soldOut && discount > 0 && <span class="ptile__tag ptile__tag--discount">{discount}% off</span>}
         {!soldOut && badges?.isNew && <span class="ptile__tag">Novo</span>}
         {!soldOut && badges?.isPopular && <span class="ptile__tag">Em alta</span>}
@@ -58,8 +58,9 @@ const href = getPathForLang(`/product/${product.handle ?? ''}`, lang);
   .ptile__link:hover .ptile__img img, .ptile__link:focus-visible .ptile__img img { transform: scale(1.04); }
   .ptile__tags { position: absolute; top: 6px; left: 6px; right: 6px; display: flex; flex-wrap: wrap; gap: 4px; pointer-events: none; }
   .ptile__tag { padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; background: rgba(10, 10, 10, 0.82); color: #fff; }
-  .ptile__tag--soldout { background: #7f1d1d; }
-  .ptile__tag--discount { background: var(--c-accent, #e77e23); }
+  .ptile__tag--soldout { background: #000; display: inline-flex; align-items: center; gap: 5px; }
+  .ptile__tag--soldout img { width: 12px; height: 12px; }
+  .ptile__tag--discount { background: #16a34a; }
   .ptile__title { font-size: 13px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .ptile__price { display: flex; align-items: baseline; gap: 6px; font-size: 13px; }
   .ptile__price strong { font-weight: 800; }

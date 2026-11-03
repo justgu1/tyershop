@@ -1,6 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import ProductGrid from '../../components/ProductGrid.astro';
+import CollectionMosaicItem from '../../components/CollectionMosaicItem.astro';
 import { getLangFromUrl, t, getPathForLang } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
 import { isHiddenCollection } from '../../lib/collections';
@@ -117,7 +117,11 @@ const metaDesc =
 
         <div class="container">
           {products.length > 0 ? (
-            <ProductGrid products={products} lang={lang} label={colTitle} />
+            <div class="collection-mosaic" role="list" aria-label={colTitle}>
+              {products.map((p, i) => (
+                <CollectionMosaicItem product={p} lang={lang} reverse={i % 2 === 1} />
+              ))}
+            </div>
           ) : (
             <p class="collection-empty">{t(lang, 'collections', 'empty')}</p>
           )}

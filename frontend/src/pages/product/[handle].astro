@@ -34,6 +34,7 @@ const medusaHeaders: Record<string, string> = {
 let product: any = null;
 let related: any[] = [];
 let newest: any[] = [];
+let crumb: { label: string; href: string } = { label: 'Loja', href: '/shop' };
 
 try {
   const url = getMedusaStoreUrl();
@@ -70,6 +71,13 @@ try {
         )
         .slice(0, 8);
     }
+  }
+  const dropRes = await fetch(`${url}/store/drop`, { headers: medusaHeaders, signal: AbortSignal.timeout(3000) });
+  const dropData = dropRes.ok ? await dropRes.json() : null;
+  if (product?.id && dropData?.drop?.title && (dropData.product_ids ?? []).includes(product.id)) {
+    crumb = { label: dropData.drop.title, href: '/drop' };
+  } else if (product?.collection?.handle && !isHiddenCollection(product.collection)) {
+    crumb = { label: product.collection.title, href: `/collections/${product.collection.handle}` };
   }
 } catch {}
 
@@ -343,7 +351,7 @@ const jsonLd = productFound
             <li><a href={getPathForLang('/', lang)}>Tyer</a></li>
             <li aria-hidden="true">/</li>
             <li>
-              <a href={getPathForLang('/drop', lang)}>Drop</a>
+              <a href={getPathForLang(crumb.href, lang)}>{crumb.label}</a>
             </li>
             <li aria-hidden="true">/</li>
             <li aria-current="page">{product.title}</li>
@@ -739,14 +747,6 @@ const jsonLd = productFound
 
   {CustomDropComponent && (
     <CustomDropComponent product={product!} lang={lang} related={related} newest={newest} />
-  )}
-
-  {newest.length > 0 && (
-    <section class="pdp-related" aria-labelledby="newest-title">
-      <div class="container">
-        <ProductCarousel products={newest} lang={lang} title={t(lang, 'shop', 'section_novos')} headingId="newest-title" />
-      </div>
-    </section>
   )}
 
   {sizeGuideUrl && (
