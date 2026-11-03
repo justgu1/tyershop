@@ -247,6 +247,14 @@ export function getDefaultVariantTitle(
   return nv?.title || defaultVariant?.title || '';
 }
 
+/** Esgotado quando todas as variações estão sem estoque (estoque controlado e zerado conta como esgotado). */
+export function isProductSoldOut(product: any): boolean {
+  const variants = product?.variants ?? [];
+  const reliable = stockSignalsAreReliableForProduct(product);
+  if (!variants.length) return isVariantSoldOut(pickDefaultVariant(product, reliable), reliable);
+  return variants.every((v: any) => isVariantSoldOut(v, reliable || v.manage_inventory === true));
+}
+
 /** Dados partilhados entre ProductCard e PDP. */
 export function getProductVariantData(product: any) {
   const stockReliable = stockSignalsAreReliableForProduct(product);

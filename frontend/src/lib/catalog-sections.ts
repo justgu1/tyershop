@@ -1,13 +1,14 @@
 import { getMedusaStoreUrl, getPublishableKey } from './medusa-env';
 import { getProductListQueryString, resolveDefaultRegionId } from './medusa-pricing';
 import { isHiddenCollection } from './collections';
+import { isProductSoldOut } from './product-variants';
 
 export type CatalogSection = { key: string; title: string; href: string | null; products: any[] };
 
 const createdAt = (p: any) => new Date(p?.created_at ?? 0).getTime() || 0;
 
 /** Tudo o que está à venda fora das pré-vendas: uma seção por coleção visível e as pulseiras, da peça mais nova para a mais antiga. */
-export async function fetchCatalogSections(): Promise<CatalogSection[]> {
+export async function fetchCatalogSections(opts: { onlyInStock?: boolean } = {}): Promise<CatalogSection[]> {
   const base = getMedusaStoreUrl();
   const headers = { 'x-publishable-api-key': getPublishableKey() };
   const sections: CatalogSection[] = [];
@@ -38,6 +39,7 @@ export async function fetchCatalogSections(): Promise<CatalogSection[]> {
     /* Medusa fora do ar: sem seções */
   }
   return sections
-    .map((s) => ({ ...s, products: [...s.products].sort((a, b) => createdAt(b) - createdAt(a)) }))
+    .map((s) => ({ ...s, products: [...s.products].filter((p) => !opts.onlyInStock || !isProductSoldOut(p)).sort((a, b) => createdAt(b) - createdAt(a)) }))
+    .filter((s) => s.products.length > 0)
     .sort((a, b) => createdAt(b.products[0]) - createdAt(a.products[0]));
 }

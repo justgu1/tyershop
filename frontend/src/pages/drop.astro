@@ -16,7 +16,7 @@ const customPages = import.meta.glob('../components/drop-pages/*.astro', { eager
 const token = readSessionToken(Astro.request.headers.get('cookie'));
 const { drop, access, product_ids, sections } = await fetchDrops(token);
 const products = await fetchProductsByIds(product_ids, token);
-const others = access === 'granted' ? await fetchCatalogSections() : [];
+const others = access === 'granted' ? await fetchCatalogSections({ onlyInStock: true }) : [];
 
 const Custom = drop?.component_key
   ? customPages[`../components/drop-pages/${drop.component_key}.astro`]?.default
