@@ -64,18 +64,6 @@ const searchGroupPopular = t(lang, "search", "group_popular");
     <nav class="hdr__nav" aria-label="Main navigation">
       {dropLabel && <div class="hdr__drop-wrap">
         <a href={dropHref} class="hdr__nav-link">{dropLabel}</a>
-        {countdown?.target && (
-          <div class="hdr__drop-tag">
-            <a href={getPathForLang("/drop", lang)} class="hdr__drop-tag__link" aria-label={`${countdown.title}: ${countdown.label}`}>
-              <span class="hdr__drop-tag__edge">
-                <span class="hdr__drop-tag__in">
-                  <Countdown targetIso={countdown.target} label={countdown.label} compact />
-                </span>
-              </span>
-            </a>
-            <button type="button" class="hdr__drop-tag__toggle" data-tag-toggle aria-label="Minimizar plaquinha" aria-expanded="true">−</button>
-          </div>
-        )}
       </div>}
       {drops.length > 0 && (
         <div class="hdr__nav-item hdr__nav-item--mega" id="nav-collections-wrap">
@@ -377,19 +365,6 @@ const searchGroupPopular = t(lang, "search", "group_popular");
       </button>
     </div>
   </div>
-  {countdown?.target && (
-    <div class="hdr__drop-tag hdr__drop-tag--mobile">
-      <a href={getPathForLang("/drop", lang)} class="hdr__drop-tag__link" aria-label={`${countdown.title}: ${countdown.label}`}>
-        <span class="hdr__drop-tag__edge">
-          <span class="hdr__drop-tag__in">
-            <span class="hdr__drop-tag__name">{countdown.title}</span>
-            <Countdown targetIso={countdown.target} label={countdown.label} compact />
-          </span>
-        </span>
-      </a>
-      <button type="button" class="hdr__drop-tag__toggle" data-tag-toggle aria-label="Minimizar plaquinha" aria-expanded="true">−</button>
-    </div>
-  )}
 </header>
 
 <!-- Search overlay -->
@@ -616,90 +591,6 @@ const searchGroupPopular = t(lang, "search", "group_popular");
     align-items: center;
   }
   /* Plaquinha de etiqueta: cordão reto saindo da barra, centralizada no link do drop. */
-  .hdr__drop-tag {
-    --tag-clip: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%, 0 14px);
-    position: absolute;
-    top: calc(100% + 14px);
-    left: 50%;
-    z-index: 5;
-    transform: translateX(-50%);
-    filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.5));
-    text-decoration: none;
-  }
-  .hdr__drop-tag__edge {
-    display: block;
-    padding: 2px;
-    background: var(--c-accent, #e77e23);
-    clip-path: var(--tag-clip);
-  }
-  .hdr__drop-tag__in {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 3px;
-    padding: 18px 16px 9px;
-    background: #101010;
-    clip-path: var(--tag-clip);
-    white-space: nowrap;
-  }
-  .hdr__drop-tag__in::before {
-    content: "";
-    position: absolute;
-    top: 6px;
-    left: 50%;
-    width: 7px;
-    height: 7px;
-    margin-left: -3.5px;
-    border-radius: 50%;
-    border: 1.5px solid var(--c-accent, #e77e23);
-    background: #000;
-  }
-  .hdr__drop-tag::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: -14px;
-    width: 2px;
-    height: 20px;
-    margin-left: -1px;
-    background: var(--c-accent, #e77e23);
-  }
-  /* A navegação some no celular: a plaquinha sai de dentro dela e pende direto da barra, com o nome do drop. */
-  .hdr__drop-tag__link { display: block; color: inherit; text-decoration: none; }
-  .hdr__drop-tag__toggle {
-    position: absolute;
-    top: 3px;
-    right: -9px;
-    z-index: 2;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: var(--c-accent, #e77e23);
-    color: #fff;
-    font-size: 14px;
-    line-height: 20px;
-    font-weight: 800;
-    cursor: pointer;
-  }
-  /* Minimizada: só o cronômetro, com o botão para abrir de novo. */
-  :global(html[data-tag-min="1"]) .hdr__drop-tag__name,
-  :global(html[data-tag-min="1"] .hdr__drop-tag .cd__label) { display: none; }
-  :global(html[data-tag-min="1"]) .hdr__drop-tag__in { padding: 16px 12px 6px; }
-  .hdr__drop-tag--mobile { display: none; }
-  .hdr__drop-tag__name { font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; }
-  @media (max-width: 900px) {
-    .hdr__drop-tag--mobile { display: block; max-width: calc(100vw - 24px); }
-    .hdr__drop-tag--mobile .hdr__drop-tag__in { padding: 18px 12px 8px; }
-  }
-  .hdr__drop-tag :global(.cd--compact) { flex-direction: column; gap: 3px; align-items: center; }
-  .hdr__drop-tag :global(.cd--compact .cd__label) { font-size: 9px; letter-spacing: 0.14em; color: var(--c-accent, #e77e23); }
-  .hdr__drop-tag :global(.cd--compact .cd__clock) { gap: 8px; font-variant-numeric: tabular-nums; }
-  .hdr__drop-tag :global(.cd--compact .cd__num) { font-size: 15px; }
-  .hdr__drop-tag :global(.cd--compact .cd__unit) { gap: 2px; }
-  .hdr__drop-tag :global(.cd--compact .cd__u) { color: rgba(255, 255, 255, 0.6); }
   .hdr__nav-link {
     display: inline-flex;
     align-items: center;
@@ -2155,40 +2046,4 @@ const searchGroupPopular = t(lang, "search", "group_popular");
       });
     });
   }
-</script>
-
-<script>
-  // Plaquinha do drop: minimiza para só o cronômetro e lembra a escolha entre páginas.
-  const KEY = 'tyer_tag_min';
-  const root = document.documentElement;
-
-  function paint(min: boolean) {
-    if (min) root.dataset.tagMin = '1';
-    else delete root.dataset.tagMin;
-    document.querySelectorAll<HTMLButtonElement>('[data-tag-toggle]').forEach((btn) => {
-      btn.textContent = min ? '+' : '−';
-      btn.setAttribute('aria-expanded', String(!min));
-      btn.setAttribute('aria-label', min ? 'Maximizar plaquinha' : 'Minimizar plaquinha');
-    });
-  }
-
-  let minimized = false;
-  try {
-    minimized = localStorage.getItem(KEY) === '1';
-  } catch {
-    /* storage indisponível: começa aberta */
-  }
-  paint(minimized);
-
-  document.querySelectorAll('[data-tag-toggle]').forEach((btn) =>
-    btn.addEventListener('click', () => {
-      minimized = !minimized;
-      paint(minimized);
-      try {
-        localStorage.setItem(KEY, minimized ? '1' : '0');
-      } catch {
-        /* storage indisponível: vale só nesta página */
-      }
-    })
-  );
 </script>
