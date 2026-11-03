@@ -43,6 +43,10 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   Origem: achado no teste real da homologação (pedido de teste).
   Guard: `friendly-error.unit.spec.ts` ("nunca devolve o texto cru ao cliente") e `friendly-error.unit.spec.ts` ("trata falha do
   Mercado Pago como indisponibilidade").
+- **A cobrança no cartão leva itens, telefone e endereço de entrega ao antifraude do Mercado Pago.** Sem esses dados a nota de
+  risco sobe e compras legítimas voltam como `cc_rejected_high_risk`.
+  Origem: pagamento recusado por análise de segurança em produção, `createCardPayment`.
+  Guard: `additional-info.unit.spec.ts` ("leva itens, telefone separado em DDD e número e o endereço de entrega").
 
 ## Leads, convites e e-mails
 
@@ -127,6 +131,8 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
 - **A tela Minha Conta não envia `email` ao atualizar o perfil.** O Medusa recusa o campo em `POST /store/customers/me` e o
   e-mail da conta é o que dá acesso à pré-venda. Falta teste de frontend (não há runner configurado).
   Origem: erro "Unrecognized fields: 'email'" ao salvar dados em produção.
+- **O frontend envia o Device ID (`MP_DEVICE_SESSION_ID`) na cobrança.** Falta teste de frontend (não há runner configurado).
+  Origem: mesma recusa, `submitCard`.
 - **Pagamento com cartão recusado não segue para fechar o pedido.** O frontend ignorava o `status` da cobrança e o cliente via
   o erro cru "was not authorized with the provider". Falta teste de frontend (não há runner configurado).
   Origem: cartão emitido fora do Brasil recusado em produção, `submitCard`.
