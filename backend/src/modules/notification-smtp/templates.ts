@@ -45,10 +45,12 @@ type Shell = {
   cta?: { label: string; url: string }
   note?: string
   reason: string
+  /** Sem a faixa de redes sociais: e-mail pessoal, que o Gmail não tem motivo para tratar como promoção. */
+  plain?: boolean
 }
 
 /** Casca visual compartilhada por todos os e-mails: cabeçalho com logo, cartão, botão e rodapé. */
-function shell({ preheader, title, paragraphs, blocks, cta, note, reason }: Shell): string {
+function shell({ preheader, title, paragraphs, blocks, cta, note, reason, plain }: Shell): string {
   const body = paragraphs.map((p) => `<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#2b2b2b">${p}</p>`).join("")
   const button = cta
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0 8px"><tr><td bgcolor="${ACCENT}" style="border-radius:8px">
@@ -76,7 +78,7 @@ function shell({ preheader, title, paragraphs, blocks, cta, note, reason }: Shel
     ${body}${blocks ?? ""}${button}${noteHtml}
   </td></tr>
   <tr><td align="center" bgcolor="#0b0b0b" style="padding:28px 24px;border-radius:0 0 12px 12px;font-family:${FONT}">
-    <p style="margin:0 0 14px;font-size:0;line-height:0">${social}</p>
+    ${plain ? "" : `<p style="margin:0 0 14px;font-size:0;line-height:0">${social}</p>`}
     <p style="margin:0 0 10px;font-size:12px;line-height:1.6;color:#9a9a9a">${reason}</p>
     <p style="margin:0;font-size:12px;line-height:1.6;color:#9a9a9a">Dúvidas? Fale com a gente em <a href="mailto:${SUPPORT_EMAIL}" style="color:#ffffff">${SUPPORT_EMAIL}</a><br>© ${new Date().getFullYear()} Tyer. Todos os direitos reservados.</p>
   </td></tr>
@@ -85,13 +87,13 @@ function shell({ preheader, title, paragraphs, blocks, cta, note, reason }: Shel
 </body></html>`
 }
 
-const footerText = (reason: string) =>
+const footerText = (reason: string, plain = false) =>
   [
     "",
     "—",
     reason,
     `Dúvidas? ${SUPPORT_EMAIL}`,
-    SOCIAL.map((s) => `${s.label}: ${s.url}`).join(" | "),
+    ...(plain ? [] : [SOCIAL.map((s) => `${s.label}: ${s.url}`).join(" | ")]),
   ].join("\n")
 
 const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
@@ -165,6 +167,7 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
       cta: { label: "Entrar na pré-venda", url: d.login_url },
       note: `Este link é pessoal e entra na sua conta: não encaminhe este e-mail. Se o botão não funcionar, copie e cole no navegador:<br><a href="${esc(d.login_url)}" style="word-break:break-all;color:#6b6b6b">${esc(d.login_url)}</a>`,
       reason,
+      plain: true,
     })
 
     const text = [
@@ -176,7 +179,7 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
       "",
       "Entrar na pré-venda (link pessoal, não encaminhe):",
       d.login_url,
-      footerText(`Você recebeu este e-mail porque está na lista de convidados da Tyer (${d.email}). Para parar de receber convites: ${d.unsubscribe_url ?? "responda esta mensagem."}`),
+      footerText(`Você recebeu este e-mail porque está na lista de convidados da Tyer (${d.email}). Para parar de receber convites: ${d.unsubscribe_url ?? "responda esta mensagem."}`, true),
     ]
       .filter((l) => l !== undefined)
       .join("\n")

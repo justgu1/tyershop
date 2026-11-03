@@ -68,6 +68,10 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   Origem: PR 39, pedido do cliente.
   Guard: `templates.unit.spec.ts` ("mostra foto, quantidade, endereço completo e pagamento") e `templates.unit.spec.ts`
   ("as redes sociais saem como ícones com texto alternativo").
+- **O e-mail do ingresso não leva a faixa de redes sociais.** Com ela o Gmail tende a mandá-lo para Promoções, e é uma
+  mensagem pessoal com link de acesso.
+  Origem: ingresso do Drop 6 caindo na aba Promoções.
+  Guard: `templates.unit.spec.ts` ("não leva a faixa de redes sociais, para não parecer e-mail promocional").
 
 ## Testes e CI
 
