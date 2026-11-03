@@ -6,13 +6,11 @@ import MelhorEnvioModuleService from "./service"
 import { dropRows } from "../drop/access"
 import { presentDrop } from "../drop/present"
 
-/** Serviços oferecidos na loja (ids do Melhor Envio). */
+/** Serviços oferecidos na loja (ids do Melhor Envio): só Correios. */
 export const SERVICES: Record<string, string> = {
   "1": "PAC",
   "2": "SEDEX",
   "17": "Mini Envios",
-  "3": ".Package",
-  "4": ".Com",
 }
 
 export type Shipment = { variant_id: string; quantity: number; weight?: number | null; length?: number | null; width?: number | null; height?: number | null }
