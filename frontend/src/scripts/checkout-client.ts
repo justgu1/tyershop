@@ -228,6 +228,20 @@ function init() {
   let shipFor = '';
   let shipTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** Mostra o frete escolhido nos totais assim que ele é escolhido; o valor oficial vem do carrinho ao confirmar. */
+  function previewShippingTotals() {
+    if (!shipChoice) {
+      show('checkout-summary-shipping-row', false);
+      setText('checkout-summary-total', fmtBrl(subtotalCents / 100));
+      setText('checkout-summary-toggle-total', fmtBrl(subtotalCents / 100));
+      return;
+    }
+    setText('checkout-summary-shipping', fmtBrl(shipChoice.price));
+    show('checkout-summary-shipping-row', true);
+    setText('checkout-summary-total', fmtBrl(subtotalCents / 100 + shipChoice.price));
+    setText('checkout-summary-toggle-total', fmtBrl(subtotalCents / 100 + shipChoice.price));
+  }
+
   async function refreshShipping() {
     const zip = (qs<HTMLInputElement>('ck-zip')?.value || '').trim();
     const box = qs('ck-shipping');
@@ -238,6 +252,7 @@ function init() {
       shipChoice = null;
       shipFor = '';
       box.hidden = true;
+      previewShippingTotals();
       return;
     }
     const lines = items.map((i) => ({ variant_id: i.variantId, quantity: i.quantity }));
@@ -253,17 +268,20 @@ function init() {
       shipChoice = quote.options.find((o) => o.id === (shipChoice?.id ?? savedId)) ?? quote.options[0] ?? null;
       shipFor = key;
       hint.textContent = shipChoice ? '' : 'Nenhum serviço de entrega atende este CEP.';
+      previewShippingTotals();
       renderShippingOptions(list, quote, {
         name: 'ck-ship',
         selectedId: shipChoice?.id,
         onSelect: (o) => {
           shipChoice = o;
           saveShipping({ cep: zip, id: o.id, name: o.name, price: o.price, signature: linesSignature(lines) });
+          previewShippingTotals();
         },
       });
     } catch (err) {
       shipChoice = null;
       shipFor = '';
+      previewShippingTotals();
       hint.textContent = err instanceof Error ? err.message : 'Não foi possível calcular o frete agora.';
     }
   }
@@ -334,18 +352,19 @@ function init() {
   function isMobileWizard(): boolean {
     return window.matchMedia('(max-width: 860px)').matches;
   }
-  const MOBILE_STEP_ORDER: (typeof mobileStep)[] = ['contact', 'address', 'review', 'payment'];
   const MOBILE_STEP_LABELS: Record<typeof mobileStep, string> = {
-    contact: 'Passo 1 de 4 — Seus dados',
-    address: 'Passo 2 de 4 — Endereço de entrega',
-    review: 'Passo 3 de 4 — Revisão do pedido',
-    payment: 'Passo 4 de 4 — Pagamento',
+    contact: 'Passo 1 de 3 — Seus dados',
+    address: 'Passo 2 de 3 — Endereço e entrega',
+    review: 'Passo 3 de 3 — Revisão e pagamento',
+    payment: 'Passo 3 de 3 — Revisão e pagamento',
   };
   function setMobileStep(next: typeof mobileStep) {
     mobileStep = next;
     root.dataset.mobileStep = next;
     setText('checkout-mobile-step-label', MOBILE_STEP_LABELS[next]);
-    const pct = Math.round(((MOBILE_STEP_ORDER.indexOf(next) + 1) / MOBILE_STEP_ORDER.length) * 100);
+    // Revisão e pagamento são o mesmo passo para quem preenche: 3 passos (dados, endereço e entrega, pagamento).
+    const stepNumber = next === 'contact' ? 1 : next === 'address' ? 2 : 3;
+    const pct = Math.round((stepNumber / 3) * 100);
     const fill = qs('checkout-mobile-stepper-fill');
     if (fill) fill.style.width = `${pct}%`;
     setText('checkout-mobile-stepper-pct', `${pct}%`);
