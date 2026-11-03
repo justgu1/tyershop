@@ -17,6 +17,8 @@ module.exports = defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
     redisUrl: process.env.REDIS_URL,
+    // Sessão do admin: 7 dias renováveis a cada uso (o padrão de 10 horas desloga no meio do trabalho).
+    sessionOptions: { ttl: 7 * 24 * 3600 * 1000, rolling: true },
     databaseDriverOptions: {
       ssl: false,
       // Conexões por servidor: o padrão (10) forma fila quando muita gente compra ao mesmo tempo. Com N servidores o banco
@@ -27,6 +29,7 @@ module.exports = defineConfig({
       storeCors: process.env.STORE_CORS || "http://localhost:4321,http://localhost:3000,http://172.24.0.8:4321,http://127.0.0.1:4321",
       adminCors: process.env.ADMIN_CORS,
       authCors: process.env.AUTH_CORS || process.env.STORE_CORS || "http://localhost:4321,http://localhost:3000,http://172.24.0.8:4321,http://127.0.0.1:4321",
+      jwtExpiresIn: "7d",
       jwtSecret: process.env.JWT_SECRET || "supersecret",
       cookieSecret: process.env.COOKIE_SECRET || "supersecret",
     },
