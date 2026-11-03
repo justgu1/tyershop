@@ -4,6 +4,7 @@ import LeadForm from './LeadForm.astro';
 import AccessForm from './AccessForm.astro';
 import CollectionMosaicItem from '../CollectionMosaicItem.astro';
 import SectionBand from './SectionBand.astro';
+import type { CatalogSection } from '../../lib/catalog-sections';
 import { PHASE_LABEL, type DropAccess, type DropSection, type PublicDrop } from '../../lib/drop';
 
 interface Props {
@@ -11,8 +12,10 @@ interface Props {
   access?: DropAccess;
   products?: any[];
   sections?: DropSection[];
+  /** O que está à venda fora do drop, em faixas separadas abaixo das peças do drop. */
+  others?: CatalogSection[];
 }
-const { drop, access = 'none', products = [], sections = [] } = Astro.props;
+const { drop, access = 'none', products = [], sections = [], others = [] } = Astro.props;
 const { phase } = drop;
 const heroBanner = drop.hero_kind === 'banner' ? drop.hero_url : null;
 const heroVideo = drop.hero_kind !== 'banner' ? drop.hero_url : null;
@@ -49,6 +52,18 @@ const groups = (sections.length ? sections : [{ key: 'all', title: drop.title, l
         <div class="container">
           <div class="dc-mosaic" role="list" aria-label={s.title || drop.title}>
             {s.items.map((p, i) => <CollectionMosaicItem product={p} lang="pt" reverse={i % 2 === 1} />)}
+          </div>
+        </div>
+      </section>
+    ))}
+    {others.map((s, n) => (
+      <section class="dc-section" aria-label={s.title}>
+        <div class="container">
+          <SectionBand index={groups.length + n + 1} title={s.title} label="Sempre disponível" />
+        </div>
+        <div class="container">
+          <div class="dc-mosaic" role="list" aria-label={s.title}>
+            {s.products.map((p, i) => <CollectionMosaicItem product={p} lang="pt" reverse={i % 2 === 1} />)}
           </div>
         </div>
       </section>
