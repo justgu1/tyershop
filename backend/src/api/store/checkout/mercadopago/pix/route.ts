@@ -64,5 +64,6 @@ export async function POST(req: MedusaRequest<Body>, res: MedusaResponse) {
     status: payment.status,
     qr_code: payment.point_of_interaction?.transaction_data?.qr_code ?? null,
     qr_code_base64: payment.point_of_interaction?.transaction_data?.qr_code_base64 ?? null,
+    expires_at: payment.date_of_expiration ?? null,
   });
 }

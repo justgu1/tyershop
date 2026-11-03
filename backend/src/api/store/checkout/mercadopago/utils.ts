@@ -88,7 +88,11 @@ export async function guardedPayment(
       if (prev.mp_payment_id) {
         const client = getMercadoPagoClient();
         const existing = await client.getPayment(prev.mp_payment_id);
-        if (OPEN_STATUSES.includes(existing.status)) {
+        // Pix vencido ainda pode constar como aberto por alguns instantes: não é reaproveitado, vira um código novo.
+        const expired = !!existing.date_of_expiration && Date.parse(existing.date_of_expiration) <= Date.now();
+        if (OPEN_STATUSES.includes(existing.status) && expired) {
+          await client.cancelPayment(prev.mp_payment_id).catch(() => null);
+        } else if (OPEN_STATUSES.includes(existing.status)) {
           // O carrinho mudou depois de gerado o pagamento: o antigo não serve mais e é cancelado para dar lugar a um novo.
           if (Math.abs(Number(existing.transaction_amount) - amount) <= 0.009) return { payment: existing, reused: true };
           const cancelled = await client.cancelPayment(prev.mp_payment_id).catch(() => null);
