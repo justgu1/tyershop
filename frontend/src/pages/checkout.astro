@@ -130,12 +130,8 @@ const c = (key: string) => t(lang, 'checkout', key);
 
                 <div id="checkout-address-fields">
                   <div class="checkout-grid">
+                    <div class="checkout-address-row">
                     <label class="checkout-field">
-                      <span>{c('zip_code')} <em class="checkout-field__required">*</em></span>
-                      <input id="ck-zip" name="postal-code" type="text" inputmode="numeric" placeholder="00000-000" required autocomplete="postal-code" />
-                      <span class="checkout-field__error" data-error-for="ck-zip" hidden></span>
-                    </label>
-                    <label class="checkout-field checkout-field--full">
                       <span>{c('street_name')} <em class="checkout-field__required">*</em></span>
                       <input id="ck-street" name="address-line1" type="text" required autocomplete="address-line1" />
                       <span class="checkout-field__error" data-error-for="ck-street" hidden></span>
@@ -144,6 +140,12 @@ const c = (key: string) => t(lang, 'checkout', key);
                       <span>{c('street_number')} <em class="checkout-field__required">*</em></span>
                       <input id="ck-number" name="address-line2" type="text" required autocomplete="address-line2" />
                       <span class="checkout-field__error" data-error-for="ck-number" hidden></span>
+                    </label>
+                    </div>
+                    <label class="checkout-field">
+                      <span>{c('zip_code')} <em class="checkout-field__required">*</em></span>
+                      <input id="ck-zip" name="postal-code" type="text" inputmode="numeric" placeholder="00000-000" required autocomplete="postal-code" />
+                      <span class="checkout-field__error" data-error-for="ck-zip" hidden></span>
                     </label>
                     <label class="checkout-field">
                       <span>Complemento</span>
@@ -927,6 +929,13 @@ const c = (key: string) => t(lang, 'checkout', key);
   }
   :global(.pac-item-query) {
     color: #fff;
+  }
+  /* Endereço (largo) e Número lado a lado, ocupando a linha toda do grid. */
+  .checkout-address-row {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 110px;
+    gap: 12px;
   }
   #ck-email[readonly] {
     opacity: 0.7;

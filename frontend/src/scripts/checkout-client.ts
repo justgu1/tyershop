@@ -368,7 +368,7 @@ function init() {
       if (!g?.maps?.places) return;
       const auto = new g.maps.places.Autocomplete(streetInput, {
         componentRestrictions: { country: 'br' },
-        fields: ['address_components'],
+        fields: ['address_components', 'place_id'],
         types: ['address'],
       });
       auto.addListener('place_changed', () => {
@@ -383,15 +383,25 @@ function init() {
         };
         put('ck-street', get('route'));
         put('ck-number', get('street_number'));
-        put('ck-neighborhood', get('sublocality_level_1') || get('sublocality') || get('neighborhood'));
+        put('ck-neighborhood', get('sublocality_level_1') || get('sublocality') || get('neighborhood') || get('political'));
         put('ck-city', get('administrative_area_level_2') || get('locality'));
         put('ck-province', get('administrative_area_level_1', true));
-        const zip = get('postal_code');
-        if (zip) {
+        const applyZip = (zip: string) => {
+          if (!zip) return;
           put('ck-zip', zip);
+          qs<HTMLInputElement>('ck-zip')?.dispatchEvent(new Event('input', { bubbles: true }));
           scheduleShipping();
+        };
+        applyZip(get('postal_code'));
+        // Sem CEP no resultado (rua sem número, por exemplo): o Geocoder devolve o CEP do mesmo lugar.
+        const placeId = auto.getPlace()?.place_id;
+        if (!get('postal_code') && placeId && g.maps.Geocoder) {
+          new g.maps.Geocoder().geocode({ placeId }, (res: any[] | null, status: string) => {
+            const zip = status === 'OK' ? res?.[0]?.address_components?.find((c: any) => c.types.includes('postal_code'))?.long_name : '';
+            applyZip(zip || '');
+          });
         }
-        qs<HTMLInputElement>(get('street_number') ? 'ck-city' : 'ck-number')?.focus();
+        qs<HTMLInputElement>(get('street_number') ? 'ck-complement' : 'ck-number')?.focus();
       });
     };
     const script = document.createElement('script');
@@ -705,7 +715,7 @@ function init() {
     });
     show('checkout-address-summary', false);
     show('checkout-address-fields', true);
-    qs<HTMLInputElement>('ck-zip')?.focus();
+    qs<HTMLInputElement>('ck-street')?.focus();
   });
 
   /** Passo 1 (dados) — cliente logado com nome/e-mail já conhecidos: card
