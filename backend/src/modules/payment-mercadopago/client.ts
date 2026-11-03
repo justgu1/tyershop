@@ -7,6 +7,7 @@
  */
 
 import { MedusaError } from "@medusajs/framework/utils";
+import { pixExpiration } from "./pix-expiration";
 
 /**
  * Mensagem em português para o cliente a partir do erro cru do Mercado Pago (que fica só no log). Recusa de cartão não passa
@@ -72,6 +73,7 @@ export type MercadoPagoPayment = {
   status_detail: string;
   transaction_amount: number;
   external_reference?: string;
+  date_of_expiration?: string | null;
   point_of_interaction?: {
     transaction_data?: {
       qr_code?: string;
@@ -142,6 +144,7 @@ export class MercadoPagoClient {
         transaction_amount: input.transactionAmount,
         description: input.description,
         payment_method_id: "pix",
+        date_of_expiration: pixExpiration(),
         payer: {
           email: input.payer.email,
           first_name: input.payer.firstName,

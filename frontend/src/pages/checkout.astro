@@ -123,6 +123,9 @@ const c = (key: string) => t(lang, 'checkout', key);
                   <button type="button" id="checkout-address-summary-edit" class="checkout-link-btn">
                     Editar este endereço
                   </button>
+                  <button type="button" id="checkout-address-summary-delete" class="checkout-link-btn checkout-link-btn--danger">
+                    Excluir este endereço
+                  </button>
                   <button type="button" id="checkout-address-summary-new" class="checkout-link-btn">
                     Usar outro endereço
                   </button>
@@ -363,10 +366,17 @@ const c = (key: string) => t(lang, 'checkout', key);
               <p id="checkout-pix-error" class="checkout-error" hidden></p>
             </div>
             <div id="checkout-pix-result" hidden>
-              <img id="checkout-pix-qr" alt="QR code Pix" class="checkout-pix-qr" />
-              <textarea id="checkout-pix-code" class="checkout-pix-code" readonly rows="3"></textarea>
-              <button id="checkout-pix-copy" type="button" class="btn btn-outline">{c('pix_copy')}</button>
-              <p class="checkout-waiting">{c('pix_waiting')}</p>
+              <div id="checkout-pix-live">
+                <p class="checkout-pix-timer">Este código expira em <strong id="checkout-pix-countdown">--:--</strong></p>
+                <img id="checkout-pix-qr" alt="QR code Pix" class="checkout-pix-qr" />
+                <textarea id="checkout-pix-code" class="checkout-pix-code" readonly rows="3"></textarea>
+                <button id="checkout-pix-copy" type="button" class="btn btn-outline">{c('pix_copy')}</button>
+                <p class="checkout-waiting">{c('pix_waiting')}</p>
+              </div>
+              <div id="checkout-pix-expired" class="checkout-pix-expired" hidden>
+                <p>O código Pix expirou. Gere um novo para pagar.</p>
+                <button id="checkout-pix-renew" type="button" class="btn btn-primary">Gerar novo código</button>
+              </div>
             </div>
           </div>
 
@@ -935,6 +945,32 @@ const c = (key: string) => t(lang, 'checkout', key);
   }
   :global(.pac-item-query) {
     color: #fff;
+  }
+  .checkout-pix-timer {
+    margin: 0 0 10px;
+    font-size: 13px;
+    color: #bbb;
+  }
+  .checkout-pix-timer strong {
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+  }
+  .checkout-pix-timer.is-low strong {
+    color: #f87171;
+  }
+  .checkout-pix-expired {
+    text-align: center;
+    padding: 16px 0;
+  }
+  .checkout-pix-expired p {
+    margin: 0 0 12px;
+    color: #f0f0f0;
+  }
+  .checkout-pix-expired[hidden] {
+    display: none;
+  }
+  .checkout-link-btn--danger {
+    color: #f87171;
   }
   .checkout-address-actions {
     display: flex;

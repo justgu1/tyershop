@@ -637,11 +637,13 @@ function init() {
   };
   let customerAddresses: SavedAddress[] = [];
 
-  /** Mesmo endereço digitado de formas diferentes (CEP com ou sem hífen, caixa, espaços) conta como um só. */
-  function addressKey(zip?: string | null, street?: string | null, number?: string | null) {
-    const norm = (v?: string | null) => String(v || '').toLowerCase().replace(/\s+/g, ' ').trim();
-    return `${String(zip || '').replace(/\D/g, '')}|${norm(street)}|${norm(number)}`;
+  /** Mesmo endereço (rua, número, cidade e complemento) conta como um só, qualquer que seja o CEP, a caixa ou os espaços. */
+  function addressKey(street?: string | null, number?: string | null, city?: string | null, complement?: string | null) {
+    const norm = (v?: string | null) =>
+      String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+    return [street, number, city, complement].map(norm).join('|');
   }
+  const savedKey = (x: SavedAddress) => addressKey(x.address_1, x.address_2, x.city, x.metadata?.complement);
 
   function fillAddressFields(addr: SavedAddress) {
     const map: Record<string, string> = {
@@ -681,7 +683,7 @@ function init() {
     const sorted = [...addresses]
       .sort((a, b) => (b.is_default_shipping ? 1 : 0) - (a.is_default_shipping ? 1 : 0))
       .filter((a) => {
-        const key = addressKey(a.postal_code, a.address_1, a.address_2);
+        const key = savedKey(a);
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
@@ -736,6 +738,32 @@ function init() {
     qs<HTMLInputElement>('ck-street')?.focus();
   });
 
+  // Exclui o endereço escolhido da conta (pede confirmação); sem nenhum salvo sobra o formulário.
+  qs('checkout-address-summary-delete')?.addEventListener('click', async () => {
+    const target = customerAddresses.find((x) => x.id === selectedAddressId);
+    if (!target || !window.confirm(`Excluir o endereço ${target.address_1}, ${target.address_2}?`)) return;
+    try {
+      // Apaga também as cópias do mesmo endereço (salvas antes da trava de repetição), senão a de baixo apareceria no lugar.
+      const copies = customerAddresses.filter((x) => savedKey(x) === savedKey(target));
+      for (const copy of copies) await medusaFetch(`/store/customers/me/addresses/${copy.id}`, { method: 'DELETE' });
+      const me = await medusaFetch('/store/customers/me');
+      customerAddresses = Array.isArray(me?.customer?.addresses) ? me.customer.addresses : [];
+      selectedAddressId = null;
+      if (customerAddresses.length) renderAddressCards(customerAddresses);
+      else {
+        ['ck-zip', 'ck-street', 'ck-number', 'ck-complement', 'ck-neighborhood', 'ck-city', 'ck-province'].forEach((id) => {
+          const el = qs<HTMLInputElement>(id);
+          if (el) el.value = '';
+        });
+        show('checkout-address-summary', false);
+        show('checkout-address-fields', true);
+        setEditMode(false);
+      }
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Não foi possível excluir o endereço.');
+    }
+  });
+
   // Cancelar volta aos endereços salvos, com o escolhido como estava (descarta o que foi digitado).
   qs('checkout-address-cancel')?.addEventListener('click', () => {
     const back = customerAddresses.find((x) => x.id === selectedAddressId) ?? customerAddresses[0];
@@ -760,6 +788,17 @@ function init() {
       country_code: 'br',
       metadata: { neighborhood: addr.neighborhood || undefined, complement: addr.complement || undefined },
     };
+    const wanted = addressKey(addr.street_name, addr.street_number, addr.city, addr.complement);
+    const twin = customerAddresses.find((x) => savedKey(x) === wanted && x.id !== editingAddressId);
+    if (twin) {
+      // Já existe igual: não grava de novo. Num endereço novo, só escolhe o que já está salvo.
+      if (!editingAddressId) renderAddressCards(customerAddresses, twin.id);
+      else {
+        setText('checkout-address-edit-error', 'Você já tem um endereço salvo igual a este.');
+        show('checkout-address-edit-error', true);
+      }
+      return;
+    }
     if (btn) btn.disabled = true;
     show('checkout-address-edit-error', false);
     try {
@@ -780,8 +819,8 @@ function init() {
       });
       const me = await medusaFetch('/store/customers/me');
       customerAddresses = Array.isArray(me?.customer?.addresses) ? me.customer.addresses : customerAddresses;
-      const key = addressKey(addr.zip_code, addr.street_name, addr.street_number);
-      const saved = creating ? customerAddresses.find((x) => addressKey(x.postal_code, x.address_1, x.address_2) === key) : null;
+      const key = addressKey(addr.street_name, addr.street_number, addr.city, addr.complement);
+      const saved = creating ? customerAddresses.find((x) => savedKey(x) === key) : null;
       renderAddressCards(customerAddresses, saved?.id ?? editingAddressId);
     } catch (err) {
       setText('checkout-address-edit-error', err instanceof Error ? err.message : 'Não foi possível salvar o endereço.');
@@ -857,7 +896,7 @@ function init() {
   async function persistAddressToAccount(addr: ReturnType<typeof addressFromForm>, payer: ReturnType<typeof payerFromForm>) {
     if (!currentAuthToken) return;
     const alreadySaved = customerAddresses.some(
-      (a) => addressKey(a.postal_code, a.address_1, a.address_2) === addressKey(addr.zip_code, addr.street_name, addr.street_number)
+      (a) => savedKey(a) === addressKey(addr.street_name, addr.street_number, addr.city, addr.complement)
     );
     if (alreadySaved) return;
     try {
@@ -1489,6 +1528,37 @@ function init() {
   });
 
   // ---- Pix ----
+  /** Contagem regressiva do código Pix; ao zerar, esconde o QR e oferece um código novo. */
+  let pixTimer: ReturnType<typeof setInterval> | null = null;
+  function stopPixCountdown() {
+    if (pixTimer) clearInterval(pixTimer);
+    pixTimer = null;
+  }
+  function startPixCountdown(expiresAt?: string | null) {
+    stopPixCountdown();
+    const parsed = expiresAt ? Date.parse(expiresAt) : NaN;
+    const end = Number.isFinite(parsed) ? parsed : Date.now() + 30 * 60_000;
+    show('checkout-pix-live', true);
+    show('checkout-pix-expired', false);
+    const tick = () => {
+      const left = end - Date.now();
+      if (left <= 0) {
+        stopPixCountdown();
+        stopPolling();
+        show('checkout-pix-live', false);
+        show('checkout-pix-expired', true);
+        return;
+      }
+      const m = Math.floor(left / 60_000);
+      const s = Math.floor((left % 60_000) / 1000);
+      setText('checkout-pix-countdown', `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+      document.querySelector('.checkout-pix-timer')?.classList.toggle('is-low', left < 5 * 60_000);
+    };
+    tick();
+    pixTimer = setInterval(tick, 1000);
+  }
+  qs('checkout-pix-renew')?.addEventListener('click', () => void generatePix());
+
   async function generatePix() {
     show('checkout-pix-error', false);
     const cta = qs<HTMLButtonElement>('checkout-summary-cta');
@@ -1508,6 +1578,7 @@ function init() {
       if (codeEl) codeEl.value = data.qr_code || '';
       show('checkout-pix-form', false);
       show('checkout-pix-result', true);
+      startPixCountdown(data.expires_at);
       paymentDone = true;
       syncCta();
       startPolling(() => void completeCart());
