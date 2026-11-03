@@ -168,6 +168,12 @@ const c = (key: string) => t(lang, 'checkout', key);
                   </div>
                 </div>
 
+                <div id="checkout-address-edit-actions" class="checkout-address-actions" hidden>
+                  <button type="button" id="checkout-address-save" class="btn btn-primary">Salvar endereço</button>
+                  <button type="button" id="checkout-address-cancel" class="btn btn-outline">Cancelar</button>
+                  <p id="checkout-address-edit-error" class="checkout-error" hidden></p>
+                </div>
+
                 <div id="ck-shipping" class="checkout-shipping" hidden>
                   <h2 class="checkout-step__title">Entrega</h2>
                   <p id="ck-ship-hint" class="checkout-hint" role="status"></p>
@@ -929,6 +935,19 @@ const c = (key: string) => t(lang, 'checkout', key);
   }
   :global(.pac-item-query) {
     color: #fff;
+  }
+  .checkout-address-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 4px 0 16px;
+  }
+  .checkout-address-actions[hidden] {
+    display: none;
+  }
+  .checkout-address-actions .checkout-error {
+    flex-basis: 100%;
+    margin: 0;
   }
   /* Endereço (largo) e Número lado a lado, ocupando a linha toda do grid. */
   .checkout-address-row {
