@@ -51,9 +51,8 @@ try {
     );
     if (pRes.ok) {
       const d = await pRes.json();
-      // Regatas depois das camisas; o resto mantém a ordem da API (a ordenação é estável).
       products = (d.products ?? []).sort(
-        (a: any, b: any) => Number(/^regata/i.test(a.title ?? '')) - Number(/^regata/i.test(b.title ?? ''))
+        (a: any, b: any) => (new Date(b?.created_at ?? 0).getTime() || 0) - (new Date(a?.created_at ?? 0).getTime() || 0)
       );
     }
   }

@@ -55,6 +55,15 @@ try {
   }
 } catch { /* medusa off */ }
 
+// Mais recente primeiro: produtos dentro de cada seção e as seções pela peça mais nova de cada uma.
+const createdAt = (p: any) => new Date(p?.created_at ?? 0).getTime() || 0;
+const sections = [
+  ...collections.map((c) => ({ key: `col-${c.id}`, title: c.title, href: `/collections/${c.handle}`, products: c.products })),
+  ...(pulseiras ? [{ key: 'pulseiras', title: 'Pulseiras', href: null as string | null, products: pulseiras.products }] : []),
+]
+  .map((sec) => ({ ...sec, products: [...sec.products].sort((a, b) => createdAt(b) - createdAt(a)) }))
+  .sort((a, b) => createdAt(b.products[0]) - createdAt(a.products[0]));
+
 ---
 
 <Layout
@@ -102,22 +111,11 @@ try {
         <nav class="shop-toc" aria-label="Seções da loja">
           <p class="shop-toc__label" id="toc-nav-label">Navegação</p>
           <ul class="shop-toc__list" role="list" aria-labelledby="toc-nav-label">
-            {collections.map((c) => (
+            {sections.map((sec) => (
               <li>
-                <button
-                  type="button"
-                  class="shop-toc__btn"
-                  data-scroll-target={`shop-col-${c.id}`}
-                >
-                  {c.title}
-                </button>
+                <button type="button" class="shop-toc__btn" data-scroll-target={`shop-${sec.key}`}>{sec.title}</button>
               </li>
             ))}
-            {pulseiras && (
-              <li>
-                <button type="button" class="shop-toc__btn" data-scroll-target="shop-pulseiras">Pulseiras</button>
-              </li>
-            )}
           </ul>
         </nav>
       </div>
@@ -131,33 +129,26 @@ try {
         </button>
       </div>
 
-      {collections.map((c) => (
-        <section class="shop-block" id={`shop-col-${c.id}`} aria-labelledby={`shop-col-title-${c.id}`}>
+      {sections.map((sec) => (
+        <section class="shop-block" id={`shop-${sec.key}`} aria-labelledby={`shop-${sec.key}-title`}>
           <div class="shop-block__head">
-            <h2 class="shop-block__title" id={`shop-col-title-${c.id}`}>{c.title}</h2>
-            <a href={getPathForLang(`/collections/${c.handle}`, lang)} class="shop-col__drop-link btn btn-outline btn-sm">Ver tudo</a>
+            <h2 class="shop-block__title" id={`shop-${sec.key}-title`}>{sec.title}</h2>
+            {sec.href && <a href={getPathForLang(sec.href, lang)} class="shop-col__drop-link btn btn-outline btn-sm">Ver tudo</a>}
           </div>
           <div class="shop-rows">
-            {c.products.map((p) => <ProductGalleryRow product={p} lang={lang} />)}
+            {sec.products.map((p) => <ProductGalleryRow product={p} lang={lang} />)}
           </div>
         </section>
       ))}
-
-      {pulseiras && (
-        <section class="shop-block" id="shop-pulseiras" aria-labelledby="shop-pulseiras-title">
-          <div class="shop-block__head"><h2 class="shop-block__title" id="shop-pulseiras-title">Pulseiras</h2></div>
-          <div class="shop-rows">
-            {pulseiras.products.map((p) => <ProductGalleryRow product={p} lang={lang} />)}
-          </div>
-        </section>
-      )}
     </main>
   </div>
 </Layout>
 
 <style is:global>
   .shop-block__head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
-  .shop-rows { display: flex; flex-direction: column; gap: 32px; }
+  /* Celular: um produto por linha; no desktop entram quantos couberem (3, 2...). */
+  .shop-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 32px 24px; align-items: start; }
+  .shop-rows > article.prow { max-width: none; }
   /** Tema claro só dentro da loja — não alterar :root (header, mega, footer mantêm o escuro). */
   body.page-shop {
     background: #f8f8f8;
