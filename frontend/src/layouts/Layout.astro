@@ -212,6 +212,12 @@ const schemas: object[] = [
     overflow-x: hidden;
     max-width: 100%;
   }
+  /* O Safari do iPhone amplia a página ao focar um campo com fonte menor que 16px e depois deixa rolar para os lados. */
+  @media (max-width: 860px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+  }
   body {
     font-family: var(--font);
     line-height: 1.6;

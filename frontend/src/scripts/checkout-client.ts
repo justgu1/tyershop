@@ -889,6 +889,16 @@ function init() {
   }
   void loadAccountData();
 
+  /** Guarda o CPF na conta (best-effort): as próximas compras já vêm com ele e a etiqueta o acha no cadastro. */
+  async function saveCpfOnAccount(cpf: string) {
+    if (!currentAuthToken || cpf.length !== 11) return;
+    try {
+      await medusaFetch('/store/customers/me', { method: 'POST', body: JSON.stringify({ metadata: { cpf } }) });
+    } catch {
+      /* o CPF já foi no pedido: a conta só deixa de lembrar dele */
+    }
+  }
+
   /** Persiste o endereço confirmado na conta do cliente (best-effort, nunca
    * bloqueia o checkout) — sem isso o endereço digitado só valia pro pedido
    * atual, nunca ficava disponível pra próxima compra. Não duplica se já
@@ -1337,12 +1347,14 @@ function init() {
         method: 'POST',
         body: JSON.stringify({
           email: payer.email,
+          // O CPF vai no pedido (a etiqueta do Melhor Envio exige o CPF do destinatário e não o encontrava em lugar nenhum).
+          metadata: { cpf: payer.cpf },
           shipping_address: {
             first_name: payer.first_name,
             last_name: payer.last_name,
             address_1: addr.street_name,
             address_2: addr.street_number,
-            metadata: { neighborhood: addr.neighborhood, complement: addr.complement },
+            metadata: { neighborhood: addr.neighborhood, complement: addr.complement, cpf: payer.cpf },
             city: addr.city,
             province: addr.federal_unit,
             postal_code: addr.zip_code,
@@ -1354,6 +1366,7 @@ function init() {
       // Best-effort, não trava o checkout se falhar — disponibiliza esse
       // endereço pra próxima compra (card no passo 2 do próximo checkout).
       void persistAddressToAccount(addr, payer);
+      void saveCpfOnAccount(payer.cpf);
 
       const shipRes = await medusaFetch(`/store/shipping-options?cart_id=${cartId}`);
       const option = (shipRes?.shipping_options ?? []).find((o: any) => o?.data?.id === `melhorenvio-${shipChoice!.id}` || o?.name === shipChoice!.name);
@@ -1442,15 +1455,15 @@ function init() {
       mp = new window.MercadoPago(pk, { locale: 'pt-BR' });
       const numberField = mp.fields.create('cardNumber', {
         placeholder: '0000 0000 0000 0000',
-        style: { color: '#f5f5f5', fontSize: '15px', placeholderColor: 'rgba(245,245,245,.4)' },
+        style: { color: '#f5f5f5', fontSize: '16px', placeholderColor: 'rgba(245,245,245,.4)' },
       });
       const expirationField = mp.fields.create('expirationDate', {
         placeholder: 'MM/AA',
-        style: { color: '#f5f5f5', fontSize: '15px', placeholderColor: 'rgba(245,245,245,.4)' },
+        style: { color: '#f5f5f5', fontSize: '16px', placeholderColor: 'rgba(245,245,245,.4)' },
       });
       const cvvField = mp.fields.create('securityCode', {
         placeholder: 'CVV',
-        style: { color: '#f5f5f5', fontSize: '15px', placeholderColor: 'rgba(245,245,245,.4)' },
+        style: { color: '#f5f5f5', fontSize: '16px', placeholderColor: 'rgba(245,245,245,.4)' },
       });
       numberField.mount('ck-card-number');
       expirationField.mount('ck-card-expiration');

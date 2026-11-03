@@ -31,7 +31,25 @@ export const prerender = false;
     back.hidden = false;
   }
 
+  const pk = () => (window as any).__MEDUSA_PK__ || '';
+
+  /** Já está logado com uma conta válida (recarregou a página do convite): não há o que resgatar, segue para o drop. */
+  async function alreadyLoggedIn() {
+    const token = localStorage.getItem('tyer_token');
+    if (!token) return false;
+    try {
+      const res = await fetch('/store/customers/me', { headers: { authorization: `Bearer ${token}`, 'x-publishable-api-key': pk() } });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
   (async () => {
+    if (await alreadyLoggedIn()) {
+      syncSessionCookie();
+      return location.replace('/drop');
+    }
     if (!code) return fail('Link de convite incompleto.');
     try {
       const res = await fetch('/store/tickets/redeem', {
@@ -44,7 +62,14 @@ export const prerender = false;
       });
       if (res.status === 404) return fail('Convite inválido ou expirado.');
       const data = await res.json();
-      if (res.status === 400 && data?.message) return fail(data.message);
+      if (res.status === 400 && data?.message) {
+        // Convite já usado: a pessoa entra pela senha na página do drop, em vez de ficar presa aqui.
+        if (/já foi usado/i.test(data.message)) {
+          msg.textContent = data.message;
+          return void setTimeout(() => location.replace('/drop'), 2500);
+        }
+        return fail(data.message);
+      }
       if (!res.ok || !data.token) throw new Error('fail');
 
       localStorage.setItem('tyer_token', data.token);
