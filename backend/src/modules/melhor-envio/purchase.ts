@@ -6,7 +6,7 @@ import {
   markOrderFulfillmentAsDeliveredWorkflow,
 } from "@medusajs/medusa/core-flows"
 import { addToCart, checkoutLabel, findInCart, generateLabel, getLabel, tracking, UnauthorizedError } from "./client"
-import { agencyFromEnv, buildCartPayload, cpfFromPayer, DELIVERED, NEEDS_AGENCY, POSTED, senderFromEnv, serviceIdOf } from "./label"
+import { agencyFromEnv, buildCartPayload, cpfFromPayer, DELIVERED, isGone, NEEDS_AGENCY, POSTED, senderFromEnv, serviceIdOf } from "./label"
 import { buildPackage, loadShipments } from "./quote"
 import { MELHOR_ENVIO_MODULE } from "./index"
 import { setMetadataKey } from "../../utils/order-metadata"
@@ -103,8 +103,13 @@ async function cpfFromMercadoPago(scope: MedusaContainer, orderId: string): Prom
  * o e-mail de despacho sai quando a transportadora registra a postagem (ver `syncShipments`). Cada etapa fica gravada no
  * pedido, então um erro no meio e uma nova tentativa retomam de onde pararam, sem pagar a etiqueta duas vezes.
  */
-export async function purchaseLabel(scope: MedusaContainer, orderId: string, origin: "auto" | "manual" = "manual"): Promise<LabelState> {
-  return withLock(scope, `melhor-envio-label:${orderId}`, () => purchaseLabelLocked(scope, orderId, origin))
+export async function purchaseLabel(
+  scope: MedusaContainer,
+  orderId: string,
+  origin: "auto" | "manual" = "manual",
+  opts: { redo?: boolean } = {}
+): Promise<LabelState> {
+  return withLock(scope, `melhor-envio-label:${orderId}`, () => purchaseLabelLocked(scope, orderId, origin, opts.redo))
 }
 
 export const PAYMENT_NOT_CONFIRMED =
@@ -112,12 +117,32 @@ export const PAYMENT_NOT_CONFIRMED =
 
 const DONE: LabelState["status"][] = ["gerada", "postada", "entregue"]
 
-async function purchaseLabelLocked(scope: MedusaContainer, orderId: string, origin: "auto" | "manual"): Promise<LabelState> {
+const resetLabel = (scope: MedusaContainer, order: { id: string; metadata?: Record<string, any> | null }) =>
+  saveState(scope, order, { status: "carrinho", me_order_id: undefined, paid: false, generated: false, tracking_code: null, posted_seen_at: undefined })
+
+/** Refazer só vale se o Melhor Envio declara a etiqueta cancelada ou expirada; viva ou sem resposta, não se cobra de novo. */
+async function forgetIfGone(scope: MedusaContainer, order: any, current: LabelState) {
+  const token = await scope.resolve<MelhorEnvioModuleService>(MELHOR_ENVIO_MODULE).accessToken()
+  if (!token) throw new Error("O Melhor Envio não está conectado. Conecte de novo no admin.")
+  const remote = await getLabel(token, current.me_order_id!).catch(() => {
+    throw new Error("Não consegui conferir a etiqueta no Melhor Envio. Tente de novo em instantes.")
+  })
+  if (!isGone(remote)) throw new Error(`A etiqueta ainda está ativa no Melhor Envio (${remote.status}): não é preciso refazer.`)
+  const logger = scope.resolve("logger") as any
+  logger.warn(`[melhor-envio] pedido #${order.display_id}: etiqueta perdida no Melhor Envio: ${JSON.stringify(remote)}`)
+  await resetLabel(scope, order)
+}
+
+async function purchaseLabelLocked(scope: MedusaContainer, orderId: string, origin: "auto" | "manual", redo = false): Promise<LabelState> {
   const logger = scope.resolve("logger") as any
   const order = await loadOrder(scope, orderId)
   if (!order) throw new Error("Pedido não encontrado.")
   const current = order.metadata?.melhor_envio as LabelState | undefined
-  if (current && DONE.includes(current.status)) return current
+  if (current && DONE.includes(current.status)) {
+    if (!redo || current.status === "entregue" || !current.me_order_id) return current
+    await forgetIfGone(scope, order, current)
+    return purchaseLabelLocked(scope, orderId, origin)
+  }
   if (current && current.origin !== origin) await saveState(scope, order, { status: current.status, origin })
 
   const fail = async (message: string) => {
@@ -170,9 +195,10 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string, orig
         throw new Error("Não consegui conferir a etiqueta no Melhor Envio. Tente de novo em instantes.")
       })
       const remote = consulted.status
-      if (remote === "canceled") {
-        // Etiqueta cancelada não volta: esquece esta e cria outra no carrinho.
-        await saveState(scope, order, { status: "carrinho", me_order_id: undefined, paid: false, generated: false, tracking_code: null, posted_seen_at: undefined })
+      if (isGone(consulted)) {
+        // Etiqueta cancelada ou expirada não volta: esquece esta e cria outra no carrinho.
+        logger.warn(`[melhor-envio] pedido #${order.display_id}: etiqueta perdida no Melhor Envio: ${JSON.stringify(consulted)}`)
+        await resetLabel(scope, order)
         return purchaseLabelLocked(scope, orderId, origin)
       }
       if (remote && ["undelivered", "paused", "suspended"].includes(remote)) {
@@ -276,10 +302,13 @@ async function syncShipmentsLocked(scope: MedusaContainer) {
       // Sem mudança no Melhor Envio não há o que fazer: evita carregar o pedido à toa.
       const remoteStatus = infos[summary.metadata.melhor_envio.me_order_id]?.status
       const saved = summary.metadata.melhor_envio as LabelState
-      if (remoteStatus === "canceled") {
-        // Cancelada no Melhor Envio: avisa no pedido; "Retomar a compra" no admin cria outra etiqueta.
+      if (isGone(infos[summary.metadata.melhor_envio.me_order_id])) {
+        // Cancelada ou expirada no Melhor Envio: avisa no pedido; "Retomar a compra" no admin cria outra etiqueta.
         const order = await loadOrder(scope, summary.id)
-        if (order) await saveState(scope, order, { status: "erro", error: "A etiqueta foi cancelada no Melhor Envio. Use \"Retomar a compra\" para criar outra." })
+        if (order) {
+          logger.warn(`[melhor-envio] pedido #${summary.display_id}: etiqueta perdida no Melhor Envio: ${JSON.stringify(infos[saved.me_order_id!])}`)
+          await saveState(scope, order, { status: "erro", error: "A etiqueta foi cancelada ou expirou no Melhor Envio. Use \"Retomar a compra\" para criar outra." })
+        }
         continue
       }
       const moves =

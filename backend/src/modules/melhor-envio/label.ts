@@ -136,6 +136,13 @@ export function buildCartPayload(input: {
 export const POSTED = ["posted", "delivered"]
 export const DELIVERED = ["delivered"]
 
+/** Etiqueta que o Melhor Envio declara perdida; a documentação grafa "cancelled" nos eventos, então as duas grafias valem. */
+const GONE = ["canceled", "cancelled", "expired"]
+export const isGone = (info?: { status?: string; expired_at?: string | null } | null) => {
+  const status = String(info?.status ?? "").toLowerCase()
+  return GONE.includes(status) || (!!info?.expired_at && !POSTED.includes(status))
+}
+
 /** Serviços da Jadlog: só aceitam o envio com o ponto de postagem informado. */
 export const NEEDS_AGENCY = [3, 4]
 

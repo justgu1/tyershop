@@ -1,4 +1,4 @@
-import { agencyFromEnv, buildCartPayload, cpfFromPayer, senderFromEnv, serviceIdOf } from "../label"
+import { agencyFromEnv, buildCartPayload, cpfFromPayer, isGone, senderFromEnv, serviceIdOf } from "../label"
 
 const env = {
   MELHOR_ENVIO_SENDER_NAME: "Tyer",
@@ -109,5 +109,22 @@ describe("CPF do pagador no Mercado Pago", () => {
     expect(cpfFromPayer({ payer: { identification: { type: "CPF", number: "123" } } })).toBe("")
     expect(cpfFromPayer({ payer: { identification: { type: "CPF", number: "52998224799" } } })).toBe("")
     expect(cpfFromPayer(null)).toBe("")
+  })
+})
+
+describe("etiqueta perdida no Melhor Envio", () => {
+  it("cancelada e expirada contam como perdidas, nas duas grafias", () => {
+    for (const status of ["canceled", "cancelled", "expired"]) expect(isGone({ status })).toBe(true)
+  })
+
+  it("expired_at preenchido vale, exceto em etiqueta já postada ou entregue", () => {
+    expect(isGone({ status: "generated", expired_at: "2026-11-10 00:00:00" })).toBe(true)
+    expect(isGone({ status: "posted", expired_at: "2026-11-10 00:00:00" })).toBe(false)
+  })
+
+  it("etiqueta viva ou sem resposta não é perdida: não se cobra de novo às cegas", () => {
+    for (const status of ["pending", "released", "generated", "posted", "delivered"]) expect(isGone({ status })).toBe(false)
+    expect(isGone({ expired_at: null })).toBe(false)
+    expect(isGone(undefined)).toBe(false)
   })
 })

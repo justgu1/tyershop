@@ -35,6 +35,11 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
 - **O envio do pedido é achado em qualquer página do carrinho.** Só a primeira página deixava um envio já criado de fora.
   Origem: PR 35, `findInCart`.
   Guard: `client.unit.spec.ts` ("acha o envio do pedido pela etiqueta, em qualquer página do carrinho").
+- **Etiqueta cancelada ou expirada no Melhor Envio não prende o pedido.** O acompanhamento marca o erro e o admin pode
+  refazer; etiqueta ativa ou sem resposta nunca é refeita, para não cobrar duas vezes.
+  Origem: etiqueta removida ou expirada no Melhor Envio seguia como confirmada no Medusa.
+  Guard: `label.unit.spec.ts` ("etiqueta viva ou sem resposta não é perdida: não se cobra de novo às cegas") e `label.unit.spec.ts`
+  ("cancelada e expirada contam como perdidas, nas duas grafias").
 
 ## Checkout e pagamento
 

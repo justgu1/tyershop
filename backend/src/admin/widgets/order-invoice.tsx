@@ -70,6 +70,19 @@ const InvoiceWidget = ({ data }: { data: { id: string; display_id?: number; meta
     }
   }
 
+  async function redoLabel() {
+    if (!window.confirm("Compra outra etiqueta (cobra do saldo do Melhor Envio). Só funciona se o Melhor Envio mostrar a etiqueta atual como cancelada ou expirada. Continuar?")) return
+    setLabelBusy(true)
+    try {
+      const r = await adminFetch<{ melhor_envio: Label }>(`/admin/orders/${data.id}/melhor-envio/refazer`, { method: "POST" })
+      setLabel(r.melhor_envio)
+    } catch (e: any) {
+      setLabel((prev) => ({ ...(prev as Label), error: e.message }))
+    } finally {
+      setLabelBusy(false)
+    }
+  }
+
   async function printLabel() {
     setLabelBusy(true)
     try {
@@ -104,6 +117,11 @@ const InvoiceWidget = ({ data }: { data: { id: string; display_id?: number; meta
       {label && (label.status === "gerada" || label.status === "postada") && (
         <button type="button" onClick={printLabel} disabled={labelBusy} style={{ padding: "8px 14px", borderRadius: 6, border: 0, background: "#e77e23", color: "#fff", cursor: "pointer" }}>
           {labelBusy ? "Abrindo..." : "Imprimir etiqueta"}
+        </button>
+      )}
+      {label && (label.status === "gerada" || label.status === "postada") && (
+        <button type="button" onClick={redoLabel} disabled={labelBusy} style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", color: "#111827", cursor: "pointer", marginLeft: 8 }}>
+          Refazer etiqueta
         </button>
       )}
       {(!label || label.status === "erro" || label.status === "carrinho") && (

@@ -134,7 +134,7 @@ export async function printLabelUrl(accessToken: string, id: string): Promise<st
   return data.url
 }
 
-export type TrackingInfo = { status?: string; tracking?: string | null; melhorenvio_tracking?: string | null }
+export type TrackingInfo = { status?: string; tracking?: string | null; melhorenvio_tracking?: string | null; expired_at?: string | null }
 
 export async function tracking(accessToken: string, ids: string[]): Promise<Record<string, TrackingInfo>> {
   return meRequest(accessToken, "/shipment/tracking", { orders: ids })
