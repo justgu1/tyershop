@@ -14,6 +14,7 @@
  * Toda troca de gateway futura muda isso aqui + o provider do Medusa, nunca
  * as páginas em volta.
  */
+import { isValidCpf } from '../lib/cpf';
 import { getCart, clearCart, type CartItem } from '../lib/cart';
 import { fetchShippingQuote, isCep, linesSignature, readSavedShipping, renderShippingOptions, saveShipping, type ShipOption } from '../lib/shipping';
 import { saveCheckoutDraft, loadCheckoutDraft, clearCheckoutDraft } from '../lib/checkout-draft';
@@ -901,7 +902,7 @@ function init() {
           first_name: payer.first_name || undefined,
           last_name: payer.last_name || undefined,
           phone: phone || undefined,
-          metadata: payer.cpf.length === 11 ? { cpf: payer.cpf } : undefined,
+          metadata: isValidCpf(payer.cpf) ? { cpf: payer.cpf } : undefined,
         }),
       });
       // O cache local do cabeçalho/conta ficou com o perfil antigo: força reler na próxima página.
@@ -952,7 +953,7 @@ function init() {
    * wizard mobile pra avançar pro passo 2 sem exigir endereço ainda. */
   function personalFormValid() {
     const payer = payerFromForm();
-    return Boolean(payer.email && payer.first_name && payer.last_name && payer.cpf.length === 11);
+    return Boolean(payer.email && payer.first_name && payer.last_name && isValidCpf(payer.cpf));
   }
 
   // Erro por campo (asterisco já marca quais são obrigatórios no HTML) —
@@ -981,7 +982,7 @@ function init() {
   }
   function fieldIsValid(id: string): boolean {
     const value = (qs<HTMLInputElement>(id)?.value || '').trim();
-    if (id === 'ck-cpf') return value.replace(/\D/g, '').length === 11;
+    if (id === 'ck-cpf') return isValidCpf(value);
     return value.length > 0;
   }
   /** Marca cada campo obrigatório vazio/inválido com erro próprio, foca o

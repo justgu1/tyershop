@@ -12,6 +12,7 @@ import { MELHOR_ENVIO_MODULE } from "./index"
 import { setMetadataKey } from "../../utils/order-metadata"
 import { loadOrder, trackingUrl } from "../../utils/order-email"
 import type MelhorEnvioModuleService from "./service"
+import { isValidCpf } from "../../utils/cpf"
 import { getMercadoPagoClient } from "../../api/store/checkout/mercadopago/utils"
 
 /** Estado da etiqueta guardado em `order.metadata.melhor_envio`. */
@@ -73,7 +74,7 @@ async function cpfOf(scope: MedusaContainer, order: any): Promise<string> {
     const { data } = await scope.resolve(ContainerRegistrationKeys.QUERY).graph({ entity: "customer", fields: ["metadata"], filters: { id: order.customer_id } })
     candidates.unshift((data[0] as any)?.metadata?.cpf)
   }
-  const saved = candidates.map((c) => String(c ?? "").replace(/\D/g, "")).find((c) => c.length === 11)
+  const saved = candidates.map((c) => String(c ?? "").replace(/\D/g, "")).find((c) => isValidCpf(c))
   if (saved) return saved
   return cpfFromMercadoPago(scope, order.id)
 }
@@ -135,7 +136,7 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string, orig
     }
 
     const cpf = await cpfOf(scope, order)
-    if (!cpf) return await fail("Não encontrei o CPF do cliente no cadastro nem no pedido.")
+    if (!cpf) return await fail("Não encontrei um CPF válido do cliente no cadastro, no pedido nem no pagamento. Corrija o CPF no cadastro do cliente e tente de novo.")
 
     const token = await scope.resolve<MelhorEnvioModuleService>(MELHOR_ENVIO_MODULE).accessToken()
     if (!token) return await fail("O Melhor Envio não está conectado. Conecte de novo no admin.")
