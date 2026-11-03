@@ -54,18 +54,6 @@ export type CreatePixPaymentInput = {
   externalReference: string;
 };
 
-export type CreateBoletoPaymentInput = CreatePixPaymentInput & {
-  payer: CreatePixPaymentInput["payer"] & {
-    address: {
-      zipCode: string;
-      streetName: string;
-      streetNumber: string;
-      neighborhood: string;
-      city: string;
-      federalUnit: string;
-    };
-  };
-};
 
 export type MercadoPagoPayment = {
   id: number;
@@ -150,34 +138,6 @@ export class MercadoPagoClient {
           first_name: input.payer.firstName,
           last_name: input.payer.lastName,
           identification: input.payer.identification,
-        },
-        external_reference: input.externalReference,
-        notification_url: this.notificationUrl,
-      }),
-    });
-  }
-
-  async createBoletoPayment(input: CreateBoletoPaymentInput): Promise<MercadoPagoPayment> {
-    return this.request<MercadoPagoPayment>("/v1/payments", {
-      method: "POST",
-      idempotencyKey: input.idempotencyKey,
-      body: JSON.stringify({
-        transaction_amount: input.transactionAmount,
-        description: input.description,
-        payment_method_id: "bolbradesco",
-        payer: {
-          email: input.payer.email,
-          first_name: input.payer.firstName,
-          last_name: input.payer.lastName,
-          identification: input.payer.identification,
-          address: {
-            zip_code: input.payer.address.zipCode,
-            street_name: input.payer.address.streetName,
-            street_number: input.payer.address.streetNumber,
-            neighborhood: input.payer.address.neighborhood,
-            city: input.payer.address.city,
-            federal_unit: input.payer.address.federalUnit,
-          },
         },
         external_reference: input.externalReference,
         notification_url: this.notificationUrl,
