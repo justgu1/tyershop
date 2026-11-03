@@ -24,7 +24,7 @@ describe("ticket email", () => {
   })
 
   it("states the presale rules and production time", () => {
-    expect(mail.html).toContain("2 peças de cada produto")
+    expect(mail.html).not.toContain("peças de cada produto")
     expect(mail.html).toContain("21 dias")
     expect(mail.subject).toBe("Seu ingresso para o drop Red Rose")
   })
