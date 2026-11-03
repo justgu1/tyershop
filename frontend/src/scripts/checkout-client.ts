@@ -566,13 +566,19 @@ function init() {
         /* localStorage indisponível — sessão em memória já basta pra esta page load */
       }
 
-      if (customer.email && customer.first_name && customer.last_name) {
-        setIfEmpty('ck-email', customer.email);
+      // O e-mail da conta é o que dá acesso à pré-venda: logado, ele vem preenchido e não pode ser trocado por outro.
+      if (customer.email) {
+        const emailInput = qs<HTMLInputElement>('ck-email');
+        if (emailInput) {
+          emailInput.value = customer.email;
+          emailInput.readOnly = true;
+          emailInput.setAttribute('aria-readonly', 'true');
+        }
         setIfEmpty('ck-first-name', customer.first_name);
         setIfEmpty('ck-last-name', customer.last_name);
         setIfEmpty('ck-phone', customer.phone);
         if (customer.metadata?.cpf) setIfEmpty('ck-cpf', String(customer.metadata.cpf));
-        renderContactSummary(customer);
+        if (customer.first_name && customer.last_name) renderContactSummary(customer);
       }
 
       customerAddresses = Array.isArray(customer.addresses) ? customer.addresses : [];

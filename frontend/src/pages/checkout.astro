@@ -878,6 +878,14 @@ const c = (key: string) => t(lang, 'checkout', key);
     word-break: break-all;
     color: #fff;
   }
+  #ck-email[readonly] {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+  /* `display:flex` do bloco ganha do `[hidden]` da UA: sem isto o "pedido confirmado" aparece junto do formulário. */
+  .checkout-success[hidden] {
+    display: none;
+  }
   .checkout-success {
     text-align: center;
     padding: 56px 24px;
