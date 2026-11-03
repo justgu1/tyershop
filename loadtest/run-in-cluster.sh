@@ -91,7 +91,7 @@ JS
   ;;
 run)
   PK=$(kubectl -n "$NS" exec deploy/tyershop-frontend -- printenv PUBLIC_MEDUSA_PUBLISHABLE_KEY)
-  kubectl -n "$NS" create configmap loadtest-k6 --from-file=load.js="$HERE/k6/load.js" --dry-run=client -o yaml | kubectl apply -f -
+  kubectl -n "$NS" create configmap loadtest-k6 --from-file=load.js="$HERE/k6/load.js" --from-file=guards.js="$HERE/k6/guards.js" --dry-run=client -o yaml | kubectl apply -f -
   kubectl -n "$NS" delete job loadtest-k6 --ignore-not-found
   export FRONT_URL="http://tyershop-frontend.$NS.svc.cluster.local" API_URL="http://$API_SVC.$NS.svc.cluster.local:9000" PUBLISHABLE_KEY="$PK"
   export PROFILE="${PROFILE:-capacity}" PEOPLE="${PEOPLE:-100,200,300}" HOLD_SECONDS="${HOLD_SECONDS:-300}" THINK_SCALE="${THINK_SCALE:-1}"

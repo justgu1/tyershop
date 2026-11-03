@@ -82,6 +82,26 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   Origem: PR 37, janela de teste.
   Guard: `rate-limit.unit.spec.ts` ("com escala 10, o mesmo limite comporta dez vezes mais").
 
+## Teste de carga e segredos
+
+- **A carga nunca roda contra a produção.** O bloqueio por `ALLOW_TYERSHOP_HOST` podia ser ligado no próprio Job e a carga criaria
+  milhares de clientes, pedidos e pagamentos no banco real; agora produção é recusada sempre e outro destino pede confirmação.
+  Origem: revisão da branch de carga na homologação, `loadtest/k8s/k6-homolog-job.yaml`.
+  Guard: `loadtest-guards.test.mjs` ("a carga nunca roda contra a produção, mesmo confirmada").
+- **`PAY_RATE` vazio não vira "ninguém paga".** `Number("")` dava 0 e a carga rodava sem nenhum pagamento.
+  Origem: mesma revisão, `loadtest/k6/load.js`.
+  Guard: `loadtest-guards.test.mjs` ("PAY_RATE vazio ou inválido vira 1 e não 0").
+- **A limpeza da carga só apaga o que a carga criou.** Clientes e pedidos são reconhecidos pelo e-mail da carga.
+  Origem: mesma revisão, `loadtest/limpar-carga.js`.
+  Guard: `loadtest-guards.test.mjs` ("a limpeza reconhece só os e-mails criados pela carga").
+- **A opção de frete se acha por `melhorenvio-<serviço>`.** Checkout, teste de carga e etiqueta casam a opção por esse `data.id`;
+  mudar o formato faria todo checkout falhar em silêncio.
+  Origem: mesma revisão, `loadtest/k6/load.js`.
+  Guard: `quote.unit.spec.ts` ("o id do dado da opção de envio é melhorenvio-<serviço>, o formato que checkout e teste de carga procuram").
+- **O `secrets.env` de produção é ignorado pelo git.** Guarda a URL do banco, do Redis e o `JWT_SECRET` em texto puro.
+  Origem: mesma revisão, `k8s/prod/secrets.env`.
+  Guard: `segredos-ignorados.test.mjs` ("o secrets.env de produção é ignorado pelo git").
+
 ## Pendentes de guard
 
 - **Reservas do e-mail de confirmação expiram, para um envio interrompido ser refeito.** Falta teste de integração com banco.
@@ -95,3 +115,5 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
 - **Toda troca de texto automática precisa falhar se não achar o trecho.** Um `replace` silencioso deixou um import de fora na
   home e o build passou. Falta uma checagem de uso de nomes não importados nas páginas Astro.
   Origem: PR 40, `index.astro`.
+- **A carga devolve os limites normais mesmo se falhar ou for interrompida, e as esperas têm teto.** `run-homolog.sh` agora usa
+  `trap` e prazos; falta um teste que simule a falha (hoje conferido só lendo o script e com `bash -n`).

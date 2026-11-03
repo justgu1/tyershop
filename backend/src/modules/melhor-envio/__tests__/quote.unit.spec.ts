@@ -1,4 +1,4 @@
-import { buildPackage } from "../quote"
+import { buildPackage, shippingOptionDataId, SERVICES } from "../quote"
 import { consumeState, signState, verifyState } from "../state"
 
 describe("buildPackage", () => {
@@ -29,7 +29,9 @@ describe("oauth state", () => {
     const now = 1_800_000_000_000
     const state = signState(now)
     expect(verifyState(state, now + 60_000)).toEqual(expect.any(String))
-    expect(verifyState(state.replace(/.$/, "0"), now)).toBeNull()
+    // Troca o último caractere por outro diferente: com "0" fixo o teste passava a ser inócuo quando o estado já terminava em 0.
+    const tampered = state.slice(0, -1) + (state.endsWith("0") ? "1" : "0")
+    expect(verifyState(tampered, now)).toBeNull()
     expect(verifyState(state, now + 16 * 60_000)).toBeNull()
     expect(verifyState(undefined)).toBeNull()
   })
@@ -45,5 +47,13 @@ describe("oauth state", () => {
     process.env.COOKIE_SECRET = "supersecret"
     expect(() => signState()).toThrow(/COOKIE_SECRET/)
     process.env.COOKIE_SECRET = prev
+  })
+})
+
+describe("shippingOptionDataId", () => {
+  it("o id do dado da opção de envio é melhorenvio-<serviço>, o formato que checkout e teste de carga procuram", () => {
+    expect(shippingOptionDataId(2)).toBe("melhorenvio-2")
+    expect(shippingOptionDataId("17")).toBe("melhorenvio-17")
+    for (const id of Object.keys(SERVICES)) expect(shippingOptionDataId(id)).toMatch(/^melhorenvio-\d+$/)
   })
 })

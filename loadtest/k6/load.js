@@ -3,6 +3,7 @@
 import http from "k6/http";
 import { check, fail, sleep } from "k6";
 import { Trend, Counter } from "k6/metrics";
+import { refusal, payRate } from "./guards.js";
 
 const FRONT = (__ENV.FRONT_URL || "http://localhost:4321").replace(/\/$/, "");
 const API = (__ENV.API_URL || FRONT).replace(/\/$/, "");
@@ -11,16 +12,29 @@ const PROFILE = __ENV.PROFILE || "smoke";
 const USERS = Number(__ENV.USERS || 100);
 const P99_MS = Number(__ENV.P99_MS || 1000);
 const ZIP = "01310-100";
+// REAL_GATEWAYS=yes: Mercado Pago e Melhor Envio de verdade (sandbox). O pagamento usa o cartão de teste aprovado e só parte das
+// pessoas paga (PAY_RATE), para não estourar os limites dos provedores. Contas e e-mails ficam em ".invalid": nunca saem e-mails.
+const REAL = __ENV.REAL_GATEWAYS === "yes";
+const MP_PK = __ENV.MP_PUBLIC_KEY || "";
+const PAY_RATE = payRate(__ENV.PAY_RATE);
+const PRODUCT_HANDLE = __ENV.LOAD_PRODUCT_HANDLE || "";
+const ZIPS = ["01310100", "20040020", "30140071", "90010150", "40020000"];
+const validCpf = () => {
+  const n = Array.from({ length: 9 }, () => Math.floor(Math.random() * 10));
+  for (let i = 0; i < 2; i++) {
+    const sum = n.reduce((a, v, k) => a + v * (n.length + 1 - k), 0);
+    const d = (sum * 10) % 11;
+    n.push(d === 10 ? 0 : d);
+  }
+  return n.join("");
+};
 const HOST = __ENV.HOST_HEADER || "";
 
-// Esta carga cria contas, carrinhos e pedidos de verdade: só roda em ambiente descartável.
-if (__ENV.I_UNDERSTAND_THIS_CREATES_ORDERS !== "yes") {
-  fail("Recusado: defina I_UNDERSTAND_THIS_CREATES_ORDERS=yes (ambiente descartável, nunca produção).");
-}
-if (/tyershop\.com/i.test(FRONT + API) && __ENV.ALLOW_TYERSHOP_HOST !== "yes") {
-  fail("Recusado: homologação e produção usam o mesmo banco. Aponte para um ambiente de teste de carga.");
-}
+// Esta carga cria contas, carrinhos e pedidos de verdade: nunca roda contra a produção (regra em guards.js).
+const recusa = refusal(FRONT, API, __ENV);
+if (recusa) fail(recusa);
 if (!PK) fail("Defina PUBLISHABLE_KEY (chave publicável da loja).");
+if (REAL && !MP_PK) fail("REAL_GATEWAYS=yes pede MP_PUBLIC_KEY (chave pública de teste do Mercado Pago).");
 
 const PROFILES = {
   // Valida o script e o ambiente com carga mínima.
@@ -151,6 +165,7 @@ export const options = {
 };
 
 const ordersCompleted = new Counter("orders_completed");
+const mpTokenFailures = new Counter("mp_token_failures"); // falhas do provedor ao tokenizar o cartão de teste
 const checkoutTotal = new Trend("checkout_total_ms", true);
 const step = (name) => new Trend(`step_${name}_ms`, true);
 const steps = {
@@ -173,7 +188,8 @@ function post(url, body, token, tags) {
 // Contas e catálogo preparados uma vez, antes da carga.
 export function setup() {
   const region = http.get(`${API}/store/regions`, { headers: jsonHeaders() }).json("regions.0.id");
-  const prods = http.get(`${API}/store/products?limit=50&fields=id,handle,*variants`, { headers: jsonHeaders() }).json("products") || [];
+  const query = PRODUCT_HANDLE ? `handle=${PRODUCT_HANDLE}&region_id=${region}&` : "";
+  const prods = http.get(`${API}/store/products?${query}limit=50&fields=id,handle,*variants`, { headers: jsonHeaders() }).json("products") || [];
   const variants = prods.flatMap((p) => (p.variants || []).map((v) => v.id)).slice(0, 20);
   if (!region || !variants.length) fail("Sem região ou sem produtos à venda: rode prepare-loadtest.ts e confira o drop em venda geral.");
 
@@ -182,7 +198,7 @@ export function setup() {
   for (let i = 0; i < USERS; i += 20) {
     const batch = [];
     for (let j = i; j < Math.min(i + 20, USERS); j++) {
-      const email = `carga+${stamp}-${j}@teste.local`;
+      const email = REAL ? `carga-${stamp}-${j}@carga-teste.invalid` : `carga+${stamp}-${j}@teste.local`;
       batch.push({ email, req: ["POST", `${API}/auth/customer/emailpass/register`, JSON.stringify({ email, password: "Carga#12345" }), { headers: jsonHeaders() }] });
     }
     const regs = http.batch(batch.map((b) => b.req));
@@ -259,9 +275,10 @@ function checkoutFlow(data, token, variant, thinking) {
   if (!check(line, { "item adicionado": (r) => r.status === 200 })) return;
   pause();
 
+  const zip = REAL ? pick(ZIPS, __VU + __ITER) : ZIP;
   const addr = post(`${API}/store/carts/${cartId}`, {
-    email: `carga@teste.local`,
-    shipping_address: { first_name: "Carga", last_name: "Teste", address_1: "Av Paulista, 1", city: "São Paulo", province: "SP", postal_code: ZIP, country_code: "br" },
+    email: REAL ? `carga-${__VU}-${__ITER}@carga-teste.invalid` : `carga@teste.local`,
+    shipping_address: { first_name: "Carga", last_name: "Teste", phone: "11999990000", address_1: "Av Paulista", address_2: "1", city: "São Paulo", province: "SP", postal_code: zip, country_code: "br", metadata: { neighborhood: "Centro" } },
   }, token, { ...tags, step: "address" });
   time(steps.address, addr, "address");
   if (!check(addr, { "endereço salvo": (r) => r.status === 200 })) return;
@@ -271,7 +288,15 @@ function checkoutFlow(data, token, variant, thinking) {
   time(steps.options, opts, "shipping_options");
   const melhor = (opts.json("shipping_options") || []).filter((o) => o.provider_id === "melhorenvio_melhorenvio");
   // O simulador cota só alguns serviços: pega o primeiro que o endereço aceita (.Com, depois os demais).
-  const option = melhor.find((o) => o.name === ".Com") || melhor[0];
+  let option = melhor.find((o) => o.name === ".Com") || melhor[0];
+  if (REAL) {
+    // Só os serviços que atendem o CEP: a cotação diz quais; a lista de opções traz todos.
+    const quote = post(`${API}/store/shipping/quote`, { postal_code: zip, items: [{ variant_id: variant, quantity: 1 }] }, null, { ...tags, step: "quote" });
+    const options = quote.json("options") || [];
+    const servedIds = options.map((q) => `melhorenvio-${q.id}`); // mesmo formato de shippingOptionDataId (backend)
+    const servedNames = options.map((q) => q.name);
+    option = melhor.find((o) => servedIds.includes(o.data && o.data.id) || servedNames.includes(o.name)) || null;
+  }
   if (!check(opts, { "há opção de frete": () => !!option })) return;
 
   const method = post(`${API}/store/carts/${cartId}/shipping-methods`, { option_id: option.id }, token, { ...tags, step: "shipping_method" });
@@ -290,8 +315,25 @@ function checkoutFlow(data, token, variant, thinking) {
   const sessionId = sessions.length ? sessions[sessions.length - 1].id : null;
   if (!check(sess, { "sessão criada": () => !!sessionId })) return;
 
+  let cardToken = "token-de-cartao";
+  let payer = { email: "carga@teste.local", cpf: "12345678909" };
+  if (REAL) {
+    if (Math.random() >= PAY_RATE) return; // parte das pessoas desiste antes de pagar
+    const doc = validCpf();
+    // Sem a tag `flow`: falha do provedor (429, 5xx) não conta contra a taxa de erro do checkout da loja.
+    const tk = http.post(`https://api.mercadopago.com/v1/card_tokens?public_key=${MP_PK}`, JSON.stringify({
+      card_number: "5031433215406351", security_code: "123", expiration_month: 11, expiration_year: 2030,
+      cardholder: { name: "APRO", identification: { type: "CPF", number: doc } },
+    }), { headers: { "content-type": "application/json" }, tags: { level: tags.level, step: "card_token", provider: "mercadopago" } });
+    cardToken = tk.json("id");
+    if (!cardToken) {
+      mpTokenFailures.add(1);
+      return;
+    }
+    payer = { email: `comprador-${__VU}-${__ITER}@example.com`, cpf: doc };
+  }
   const pay = post(`${API}/store/checkout/mercadopago/card`, {
-    payment_session_id: sessionId, token: "token-de-cartao", installments: 1, payer: { email: "carga@teste.local", cpf: "12345678909" },
+    payment_session_id: sessionId, token: cardToken, installments: 1, payer,
   }, token, { ...tags, step: "pay" });
   time(steps.pay, pay, "pay");
   if (!check(pay, { "pagamento aprovado": (r) => r.status === 200 && r.json("status") === "approved" })) return;
@@ -323,7 +365,7 @@ export function session(data) {
   think(10, 25);
   http.get(`${FRONT}/cart`, { headers: plain(), tags: { ...tags, page: "cart" } });
   think(5, 12);
-  post(`${API}/store/shipping/quote`, { postal_code: ZIP, items: [{ variant_id: variant, quantity: 1 }] }, null, { ...tags, page: "quote" });
+  post(`${API}/store/shipping/quote`, { postal_code: REAL ? pick(ZIPS, __VU + __ITER) : ZIP, items: [{ variant_id: variant, quantity: 1 }] }, null, { ...tags, page: "quote" });
   think(15, 40); // decide e começa a preencher os dados
   checkoutFlow(data, token, variant, true);
   sessionMs.add(Date.now() - started);

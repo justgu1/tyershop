@@ -1,0 +1,37 @@
+# Carga contra a homologação (https), com Mercado Pago e Melhor Envio de verdade (sandbox). Variáveis ${...}: envsubst.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: loadtest-homolog
+  namespace: apps
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: k6
+          image: grafana/k6:0.54.0
+          args: ["run", "/scripts/load.js"]
+          env:
+            - { name: FRONT_URL, value: "https://homolog.tyershop.com" }
+            - { name: API_URL, value: "https://homolog.tyershop.com" }
+            - { name: PUBLISHABLE_KEY, value: "${PUBLISHABLE_KEY}" }
+            - { name: MP_PUBLIC_KEY, value: "${MP_PUBLIC_KEY}" }
+            - { name: REAL_GATEWAYS, value: "yes" }
+            - { name: LOAD_PRODUCT_HANDLE, value: "camiseta-carga" }
+            - { name: PAY_RATE, value: "${PAY_RATE}" }
+            - { name: PROFILE, value: "sessions" }
+            - { name: PEOPLE, value: "${PEOPLE}" }
+            - { name: HOLD_SECONDS, value: "${HOLD_SECONDS}" }
+            - { name: THINK_SCALE, value: "${THINK_SCALE}" }
+            - { name: USERS, value: "${USERS}" }
+            - { name: I_UNDERSTAND_THIS_CREATES_ORDERS, value: "${CONFIRMO}" }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "2", memory: 3Gi }
+          volumeMounts: [{ name: script, mountPath: /scripts }]
+      volumes:
+        - name: script
+          configMap: { name: loadtest-homolog-k6 }

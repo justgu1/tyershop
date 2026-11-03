@@ -14,3 +14,9 @@ coverage/
 # entre ambientes (dev/homolog/prod) — fica versionado.
 backend/data/*.csv
 !backend/data/import-medusa.csv
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+# Segredos de produção em texto puro (a origem do sealed-secret.yaml): nunca vão para o git.
+k8s/**/secrets.env

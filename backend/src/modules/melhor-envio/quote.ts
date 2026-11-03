@@ -6,6 +6,9 @@ import MelhorEnvioModuleService from "./service"
 import { dropRows } from "../drop/access"
 import { presentDrop } from "../drop/present"
 
+/** Identificador da opção de envio de um serviço (`data.id`): o checkout, o teste de carga e a etiqueta casam a opção por ele. */
+export const shippingOptionDataId = (serviceId: string | number) => `melhorenvio-${serviceId}`
+
 /** Serviços oferecidos na loja (ids do Melhor Envio). */
 export const SERVICES: Record<string, string> = {
   "1": "PAC",

@@ -1,7 +1,7 @@
 import { ExecArgs } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { createShippingOptionsWorkflow, deleteShippingOptionsWorkflow } from "@medusajs/medusa/core-flows"
-import { SERVICES } from "../modules/melhor-envio/quote"
+import { SERVICES, shippingOptionDataId } from "../modules/melhor-envio/quote"
 
 /**
  * Cria uma opção de envio calculada pelo Melhor Envio para cada serviço e remove o frete fixo antigo.
@@ -33,15 +33,15 @@ export default async function setup({ container }: ExecArgs) {
   const have = new Set(existing.filter((o: any) => o.provider_id === "melhorenvio_melhorenvio").map((o: any) => String(o.data?.id)))
 
   const toCreate = Object.entries(SERVICES)
-    .filter(([id]) => !have.has(`melhorenvio-${id}`))
+    .filter(([id]) => !have.has(shippingOptionDataId(id)))
     .map(([id, name]) => ({
       name,
       price_type: "calculated" as const,
       provider_id: "melhorenvio_melhorenvio",
       service_zone_id: zone.id,
       shipping_profile_id: profile.id,
-      type: { label: name, description: `Entrega por ${name}`, code: `melhorenvio-${id}` },
-      data: { id: `melhorenvio-${id}` },
+      type: { label: name, description: `Entrega por ${name}`, code: shippingOptionDataId(id) },
+      data: { id: shippingOptionDataId(id) },
       rules: [
         { attribute: "enabled_in_store", value: "true", operator: "eq" as const },
         { attribute: "is_return", value: "false", operator: "eq" as const },
