@@ -25,14 +25,15 @@ export const isHiddenCollection = (c: { title?: string; handle?: string; metadat
 /** Coleção sem produto à venda não aparece: rascunho, esgotada de vez ou só com produto de pré-venda fechada. */
 async function loadVisibleCollections(): Promise<Collection[]> {
   const headers = { 'x-publishable-api-key': getPublishableKey() };
-  const res = await fetch(`${getMedusaStoreUrl()}/store/collections?limit=50`, { headers, signal: AbortSignal.timeout(3000) });
+  const res = await fetch(`${getMedusaStoreUrl()}/store/collections?limit=50&fields=id,title,handle,metadata`, { headers, signal: AbortSignal.timeout(3000) });
   if (!res.ok) throw new Error(`coleções: ${res.status}`);
   const collections: Collection[] = ((await res.json()).collections ?? []).filter((c: Collection) => !isHiddenCollection(c));
   const counts = await Promise.all(
     collections.map((c) =>
-      fetch(`${getMedusaStoreUrl()}/store/products?collection_id[]=${c.id}&limit=1&fields=id`, { headers, signal: AbortSignal.timeout(3000) })
+      // `count` da Store API inclui produtos que o servidor esconde (pré-venda fechada): conta o que de fato veio.
+      fetch(`${getMedusaStoreUrl()}/store/products?collection_id[]=${c.id}&limit=100&fields=id`, { headers, signal: AbortSignal.timeout(3000) })
         .then((r) => r.json())
-        .then((d) => d.count || 0)
+        .then((d) => (d.products ?? []).length)
         .catch(() => 0)
     )
   );
