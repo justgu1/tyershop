@@ -62,6 +62,7 @@ export type MercadoPagoPayment = {
   transaction_amount: number;
   external_reference?: string;
   date_of_expiration?: string | null;
+  payer?: { identification?: { type?: string; number?: string } };
   point_of_interaction?: {
     transaction_data?: {
       qr_code?: string;
