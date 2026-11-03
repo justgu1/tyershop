@@ -1,0 +1,116 @@
+---
+/**
+ * Um produto por linha: carrossel das fotos do produto (setas nas laterais, pontos embaixo), com nome, preço e etiquetas.
+ */
+import { getPathForLang, type Lang } from '../i18n/utils';
+import { buildFullProductGallery, buildVariantSpecificGallery } from '../lib/product-variant-gallery';
+import { getProductVariantData, isVariantSoldOut } from '../lib/product-variants';
+
+interface Props {
+  product: any;
+  lang?: Lang;
+}
+
+const { product, lang = 'pt' } = Astro.props;
+const { stockReliable, normalizedVariants, defaultVariant } = getProductVariantData(product);
+const variants = product.variants ?? [];
+const soldOut = variants.length
+  ? variants.every((v: any) => isVariantSoldOut(v, stockReliable || v.manage_inventory === true))
+  : isVariantSoldOut(defaultVariant, stockReliable);
+const info = normalizedVariants.find((n: any) => n.id === defaultVariant?.id) ?? normalizedVariants[0];
+const price = info?.priceDisplay ?? null;
+const original = info?.originalDisplay ?? null;
+const discount = info?.discountPercent ?? 0;
+const exclusive = ['true', '1', 'yes', 'sim'].includes(String(product.metadata?.exclusive ?? product.metadata?.is_exclusive ?? '').toLowerCase());
+// A foto principal de cada cor abre a galeria; tamanhos da mesma cor repetem a foto e são deduplicados.
+const gallery: string[] = [];
+for (const v of variants) {
+  const [main] = buildVariantSpecificGallery(v, product);
+  if (main && !gallery.includes(main)) gallery.push(main);
+}
+for (const u of buildFullProductGallery(product)) if (!gallery.includes(u)) gallery.push(u);
+const images = gallery.length ? gallery : ['/no-data.webp'];
+const href = getPathForLang(`/product/${product.handle ?? ''}`, lang);
+---
+
+<article class="prow" data-prow>
+  <div class="prow__stage">
+    {images.length > 1 && (
+      <button type="button" class="prow__nav prow__nav--prev" data-prow-prev aria-label="Foto anterior">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+    )}
+    <div class="prow__track" data-prow-track tabindex="0" aria-label={`Fotos de ${product.title}`}>
+      {images.map((src, i) => (
+        <a class="prow__slide" href={href} tabindex={i === 0 ? undefined : -1}>
+          <img src={src} alt={i === 0 ? (product.title ?? '') : ''} loading={i === 0 ? 'eager' : 'lazy'} decoding="async" onerror="this.onerror=null;this.src='/no-data.webp'" />
+        </a>
+      ))}
+    </div>
+    {images.length > 1 && (
+      <button type="button" class="prow__nav prow__nav--next" data-prow-next aria-label="Próxima foto">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    )}
+    <span class="prow__tags">
+      {soldOut && <span class="prow__tag prow__tag--soldout">Esgotado</span>}
+      {!soldOut && discount > 0 && <span class="prow__tag prow__tag--discount">{discount}% off</span>}
+      {!soldOut && exclusive && <span class="prow__tag">Exclusivo</span>}
+    </span>
+  </div>
+  {images.length > 1 && <div class="prow__dots" data-prow-dots aria-hidden="true">{images.map((_, i) => <span class={i === 0 ? 'is-active' : ''}></span>)}</div>}
+  <a class="prow__info" href={href}>
+    <span class="prow__title">{product.title}</span>
+    <span class="prow__price">
+      {price && <strong>{price}</strong>}
+      {original && <s>{original}</s>}
+    </span>
+  </a>
+</article>
+
+<style>
+  .prow { width: 100%; max-width: 560px; color: var(--tile-fg, inherit); }
+  .prow__stage { position: relative; }
+  .prow__track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 8px; background: #fff; }
+  .prow__track::-webkit-scrollbar { display: none; }
+  .prow__slide { flex: 0 0 100%; scroll-snap-align: center; scroll-snap-stop: always; display: block; aspect-ratio: 4 / 5; }
+  .prow__slide img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .prow__nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; width: 36px; height: 36px; border-radius: 50%; border: 1px solid #e0e0e0; background: #fff; color: #0a0a0a; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .prow__nav:disabled { opacity: 0.3; cursor: default; }
+  .prow__nav--prev { left: 8px; }
+  .prow__nav--next { right: 8px; }
+  .prow__tags { position: absolute; top: 8px; left: 8px; display: flex; gap: 4px; pointer-events: none; }
+  .prow__tag { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; text-transform: uppercase; background: rgba(10, 10, 10, 0.82); color: #fff; }
+  .prow__tag--soldout { background: #7f1d1d; }
+  .prow__tag--discount { background: var(--c-accent, #e77e23); }
+  .prow__dots { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
+  .prow__dots :global(span) { width: 8px; height: 8px; border-radius: 50%; background: rgba(128, 128, 128, 0.4); transition: background 0.15s ease, transform 0.15s ease; }
+  .prow__dots :global(span.is-active) { background: var(--c-accent, #e77e23); transform: scale(1.3); }
+  .prow__info { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; color: inherit; text-decoration: none; }
+  .prow__title { font-size: 15px; font-weight: 600; }
+  .prow__price { display: flex; align-items: baseline; gap: 8px; font-size: 15px; }
+  .prow__price strong { font-weight: 800; }
+  .prow__price s { opacity: 0.55; font-size: 13px; }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-prow]').forEach((row) => {
+    const track = row.querySelector<HTMLElement>('[data-prow-track]');
+    const prev = row.querySelector<HTMLButtonElement>('[data-prow-prev]');
+    const next = row.querySelector<HTMLButtonElement>('[data-prow-next]');
+    const dots = Array.from(row.querySelectorAll<HTMLElement>('[data-prow-dots] span'));
+    if (!track) return;
+    const index = () => Math.round(track.scrollLeft / track.clientWidth);
+    const sync = () => {
+      const i = index();
+      if (prev) prev.disabled = i <= 0;
+      if (next) next.disabled = i >= dots.length - 1;
+      dots.forEach((d, n) => d.classList.toggle('is-active', n === i));
+    };
+    const go = (n: number) => track.scrollTo({ left: n * track.clientWidth, behavior: 'smooth' });
+    prev?.addEventListener('click', () => go(index() - 1));
+    next?.addEventListener('click', () => go(index() + 1));
+    track.addEventListener('scroll', sync, { passive: true });
+    sync();
+  });
+</script>
