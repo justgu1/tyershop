@@ -195,6 +195,7 @@ const VARIANT_SNAPSHOT_FIELDS = [
   'id',
   'title',
   'allow_backorder',
+  'manage_inventory',
   'inventory_quantity',
   '*prices',
   '*calculated_price',
