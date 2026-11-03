@@ -160,7 +160,7 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
       title: d.name ? `${d.name}, seu ingresso chegou` : "Seu ingresso chegou",
       paragraphs: [
         `Você está na lista de convidados do drop <strong>${esc(d.drop_title)}</strong>. A pré-venda é exclusiva e o seu acesso já está liberado.`,
-        `Clique no botão abaixo: você entra direto na sua conta e vai para a pré-venda. Cada convidado pode levar até <strong>2 peças de cada produto</strong>.`,
+        `Clique no botão abaixo: você entra direto na sua conta e vai para a pré-venda.`,
         ends ? `A pré-venda vai até <strong>${esc(ends)}</strong>.` : "",
         `As peças são feitas sob encomenda, com produção em até <strong>${esc(days)} dias</strong>, mais o prazo da transportadora.`,
       ].filter(Boolean),
@@ -173,7 +173,7 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
     const text = [
       `${d.name ? `${d.name}, seu` : "Seu"} ingresso para o drop ${d.drop_title} chegou.`,
       "",
-      "A pré-venda é exclusiva e o seu acesso já está liberado. Cada convidado pode levar até 2 peças de cada produto.",
+      "A pré-venda é exclusiva e o seu acesso já está liberado.",
       ends ? `A pré-venda vai até ${ends}.` : "",
       `Produção em até ${days} dias, mais o prazo da transportadora.`,
       "",

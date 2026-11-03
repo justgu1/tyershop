@@ -37,7 +37,7 @@ const groups = (sections.length ? sections : [{ key: 'all', title: drop.title, l
         <h1 class="dc-banner__title">{drop.title}</h1>
         {drop.subtitle && <p class="dc-banner__desc">{drop.subtitle}</p>}
         <p class="dc-banner__desc">
-          Até 2 peças de cada produto por pessoa. Produção em até {drop.production_days} dias, mais o prazo da transportadora.
+          Produção em até {drop.production_days} dias, mais o prazo da transportadora.
         </p>
         <p class="dc-banner__count">{`${products.length} ${products.length === 1 ? 'peça' : 'peças'}`}</p>
       </div>
@@ -90,7 +90,7 @@ const groups = (sections.length ? sections : [{ key: 'all', title: drop.title, l
     {phase === 'presale' && (
       <>
         <p class="drop__text">
-          Pré-venda exclusiva para convidados: até 2 peças de cada produto por pessoa. Produção em até {drop.production_days} dias,
+          Pré-venda exclusiva para convidados. Produção em até {drop.production_days} dias,
           mais o prazo da transportadora.
         </p>
         {access === 'login' && (
