@@ -140,15 +140,9 @@ export const PHASE_LABEL: Record<DropPhase, string> = {
 
 /** Alvo, rótulo e CTA do cronômetro de cada fase; `target` é null quando não há contagem. */
 export function dropCountdown(drop: PublicDrop) {
-  const target =
-    drop.phase === 'coming_soon'
-      ? drop.preorder_starts_at
-      : drop.phase === 'presale'
-        ? (drop.general_starts_at ?? drop.preorder_ends_at)
-        : drop.phase === 'general'
-          ? drop.general_ends_at
-          : null;
-  const label = { coming_soon: 'Pré-venda abre em', presale: 'Pré-venda termina em', general: 'Venda geral termina em', ended: '' }[drop.phase];
+  // Só conta o tempo até a pré-venda abrir; depois de aberta, ninguém precisa do cronômetro de fim.
+  const target = drop.phase === 'coming_soon' ? drop.preorder_starts_at : null;
+  const label = drop.phase === 'coming_soon' ? 'Pré-venda abre em' : '';
   const cta = drop.phase === 'ended' ? 'Entrar na lista do próximo' : drop.phase === 'coming_soon' ? 'Quero ser avisado' : 'Ver o drop';
   return { target, label, cta };
 }
