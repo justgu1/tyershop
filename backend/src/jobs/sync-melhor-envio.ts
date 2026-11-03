@@ -9,7 +9,7 @@ import { autoLabelEnabled, resumeStuckPurchases, syncShipments } from "../module
 export default async function syncMelhorEnvio(container: MedusaContainer) {
   const logger = container.resolve("logger") as any
   await syncShipments(container).catch((err) => logger.error(`[melhor-envio] acompanhamento: ${err.message}`))
-  if (autoLabelEnabled()) await resumeStuckPurchases(container).catch((err) => logger.error(`[melhor-envio] retomada: ${err.message}`))
+  if (await autoLabelEnabled(container)) await resumeStuckPurchases(container).catch((err) => logger.error(`[melhor-envio] retomada: ${err.message}`))
 }
 
 export const config = { name: "sync-melhor-envio", schedule: "*/30 * * * *" }

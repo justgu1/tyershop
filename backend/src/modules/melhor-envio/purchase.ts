@@ -30,7 +30,7 @@ export type LabelState = {
   updated_at: string
 }
 
-export const autoLabelEnabled = () => (process.env.MELHOR_ENVIO_AUTO_LABEL ?? "").trim().toLowerCase() === "true"
+export { autoLabelEnabled } from "./auto-label"
 
 async function saveState(scope: MedusaContainer, order: { id: string; metadata?: Record<string, any> | null }, state: Omit<LabelState, "updated_at">) {
   const next: LabelState = { ...(order.metadata?.melhor_envio ?? {}), ...state, updated_at: new Date().toISOString() }

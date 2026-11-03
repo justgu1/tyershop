@@ -3,7 +3,7 @@ import { autoLabelEnabled, BusyError, purchaseLabel } from "../modules/melhor-en
 
 /** Etiqueta automática (desligada por padrão). Separada da confirmação: um erro aqui não repete nem impede o e-mail. */
 export default async function orderPlacedLabelHandler({ event: { data }, container }: SubscriberArgs<{ id: string }>) {
-  if (!autoLabelEnabled()) return
+  if (!(await autoLabelEnabled(container))) return
   await purchaseLabel(container, data.id, "auto").catch((err) => {
     if (!(err instanceof BusyError)) container.resolve("logger").error(`[melhor-envio] ${err.message}`)
   })
