@@ -109,6 +109,7 @@ export function buildCartPayload(input: {
       document: digits(input.cpf),
       address: a.address_1 ?? "",
       number: a.address_2 ?? "",
+      complement: a.metadata?.complement ? String(a.metadata.complement) : undefined,
       district: String(a.metadata?.neighborhood ?? ""),
       city: a.city ?? "",
       country_id: "BR",

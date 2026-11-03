@@ -437,6 +437,7 @@ function init() {
     setIfEmpty('ck-street', draft.street_name);
     setIfEmpty('ck-number', draft.street_number);
     setIfEmpty('ck-neighborhood', draft.neighborhood);
+    setIfEmpty('ck-complement', draft.complement);
     setIfEmpty('ck-city', draft.city);
     setIfEmpty('ck-province', draft.federal_unit);
   }
@@ -601,6 +602,7 @@ function init() {
       street_name: (qs<HTMLInputElement>('ck-street')?.value || '').trim(),
       street_number: (qs<HTMLInputElement>('ck-number')?.value || '').trim(),
       neighborhood: (qs<HTMLInputElement>('ck-neighborhood')?.value || '').trim(),
+      complement: (qs<HTMLInputElement>('ck-complement')?.value || '').trim(),
       city: (qs<HTMLInputElement>('ck-city')?.value || '').trim(),
       federal_unit: (qs<HTMLInputElement>('ck-province')?.value || '').trim(),
     };
@@ -621,7 +623,7 @@ function init() {
     postal_code?: string;
     phone?: string;
     is_default_shipping?: boolean;
-    metadata?: { neighborhood?: string } | null;
+    metadata?: { neighborhood?: string; complement?: string } | null;
   };
   let customerAddresses: SavedAddress[] = [];
 
@@ -637,6 +639,7 @@ function init() {
       'ck-street': addr.address_1 || '',
       'ck-number': addr.address_2 || '',
       'ck-neighborhood': addr.metadata?.neighborhood || '',
+      'ck-complement': addr.metadata?.complement || '',
       'ck-city': addr.city || '',
       'ck-province': addr.province || '',
     };
@@ -670,7 +673,7 @@ function init() {
       card.className = 'checkout-address-card' + (i === 0 ? ' is-selected' : '');
       card.dataset.addressId = addr.id;
       const name = `${addr.first_name || ''} ${addr.last_name || ''}`.trim();
-      const line2 = addr.metadata?.neighborhood ? ` — ${addr.metadata.neighborhood}` : '';
+      const line2 = [addr.metadata?.complement, addr.metadata?.neighborhood].filter(Boolean).map((v) => ` — ${v}`).join('');
       card.innerHTML = `
         ${addr.is_default_shipping ? '<span class="checkout-address-card__badge">Padrão</span>' : ''}
         <p class="checkout-address-card__name">${esc(name)}</p>
@@ -688,8 +691,15 @@ function init() {
     show('checkout-address-fields', false);
   }
 
+  // Edita o endereço escolhido: mostra os campos já preenchidos com ele em vez de limpar tudo.
+  qs('checkout-address-summary-edit')?.addEventListener('click', () => {
+    show('checkout-address-summary', false);
+    show('checkout-address-fields', true);
+    qs<HTMLInputElement>('ck-street')?.focus();
+  });
+
   qs('checkout-address-summary-new')?.addEventListener('click', () => {
-    ['ck-zip', 'ck-street', 'ck-number', 'ck-neighborhood', 'ck-city', 'ck-province'].forEach((id) => {
+    ['ck-zip', 'ck-street', 'ck-number', 'ck-complement', 'ck-neighborhood', 'ck-city', 'ck-province'].forEach((id) => {
       const el = qs<HTMLInputElement>(id);
       if (el) el.value = '';
     });
@@ -785,7 +795,7 @@ function init() {
           postal_code: addr.zip_code,
           country_code: 'br',
           phone: (qs<HTMLInputElement>('ck-phone')?.value || '').trim() || undefined,
-          metadata: addr.neighborhood ? { neighborhood: addr.neighborhood } : undefined,
+          metadata: addr.neighborhood || addr.complement ? { neighborhood: addr.neighborhood || undefined, complement: addr.complement || undefined } : undefined,
           is_default_shipping: customerAddresses.length === 0,
         }),
       });
@@ -1009,7 +1019,7 @@ function init() {
     setText('checkout-locked-name', `${payer.first_name} ${payer.last_name}`.trim());
     setText(
       'checkout-locked-address',
-      `${addr.street_name}, ${addr.street_number} — ${addr.neighborhood}, ${addr.city}/${addr.federal_unit} · ${addr.zip_code}`
+      `${addr.street_name}, ${addr.street_number}${addr.complement ? ` (${addr.complement})` : ''} — ${addr.neighborhood}, ${addr.city}/${addr.federal_unit} · ${addr.zip_code}`
     );
     // Formulário continua visível (só desabilitado por baixo do overlay) —
     // não some, pra não passar a sensação de "sumiu tudo que preenchi".
@@ -1144,7 +1154,7 @@ function init() {
   }
   [
     'ck-email', 'ck-first-name', 'ck-last-name', 'ck-cpf', 'ck-phone',
-    'ck-zip', 'ck-street', 'ck-number', 'ck-neighborhood', 'ck-city', 'ck-province',
+    'ck-zip', 'ck-street', 'ck-number', 'ck-complement', 'ck-neighborhood', 'ck-city', 'ck-province',
   ].forEach((id) => qs(id)?.addEventListener('input', scheduleDraftSave));
 
   // Wizard mobile — "Voltar" dentro do bloco de pagamento (passo 3 → 2).
@@ -1208,7 +1218,9 @@ function init() {
           shipping_address: {
             first_name: payer.first_name,
             last_name: payer.last_name,
-            address_1: `${addr.street_name}, ${addr.street_number}`,
+            address_1: addr.street_name,
+            address_2: addr.street_number,
+            metadata: { neighborhood: addr.neighborhood, complement: addr.complement },
             city: addr.city,
             province: addr.federal_unit,
             postal_code: addr.zip_code,

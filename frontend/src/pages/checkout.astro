@@ -120,6 +120,9 @@ const c = (key: string) => t(lang, 'checkout', key);
                      cru, com "Avançar" e uma saída pra cadastrar um novo. -->
                 <div id="checkout-address-summary" class="checkout-account-card checkout-account-card--addresses" hidden>
                   <div class="checkout-address-cards" id="checkout-address-cards"></div>
+                  <button type="button" id="checkout-address-summary-edit" class="checkout-link-btn">
+                    Editar este endereço
+                  </button>
                   <button type="button" id="checkout-address-summary-new" class="checkout-link-btn">
                     Usar outro endereço
                   </button>
@@ -141,6 +144,10 @@ const c = (key: string) => t(lang, 'checkout', key);
                       <span>{c('street_number')} <em class="checkout-field__required">*</em></span>
                       <input id="ck-number" name="address-line2" type="text" required autocomplete="address-line2" />
                       <span class="checkout-field__error" data-error-for="ck-number" hidden></span>
+                    </label>
+                    <label class="checkout-field">
+                      <span>Complemento</span>
+                      <input id="ck-complement" name="address-line3" type="text" maxlength="60" placeholder="Apto, bloco, casa…" autocomplete="address-line3" />
                     </label>
                     <label class="checkout-field">
                       <span>{c('neighborhood')}</span>

@@ -68,6 +68,15 @@ describe("carrinho do Melhor Envio", () => {
 })
 
 describe("ponto de postagem no carrinho", () => {
+  it("leva o complemento do endereço de entrega quando informado", () => {
+    const { sender } = senderFromEnv(env)
+    const base = { display_id: 1, items: [], shipping_address: { first_name: "A", postal_code: "01000000", province: "SP", metadata: { neighborhood: "Sé", complement: "Apto 12" } } }
+    const input = { order: base, cpf: "98765432100", serviceId: 1, sender: sender!, pkg: { height: 3, width: 25, length: 30, weight: 0.2 } }
+    expect(buildCartPayload(input).to).toMatchObject({ complement: "Apto 12", district: "Sé" })
+    const semComplemento = { ...input, order: { ...base, shipping_address: { ...base.shipping_address, metadata: { neighborhood: "Sé" } } } }
+    expect(buildCartPayload(semComplemento).to.complement).toBeUndefined()
+  })
+
   it("vai no pedido quando informado e some quando não", () => {
     const { sender } = senderFromEnv(env)
     const input = {
