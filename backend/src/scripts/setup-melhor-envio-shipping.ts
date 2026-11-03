@@ -53,6 +53,15 @@ export default async function setup({ container }: ExecArgs) {
     logger.info(`Melhor Envio: ${toCreate.length} opções de envio criadas`)
   }
 
+  // Serviço que saiu de SERVICES (ex.: Jadlog) deixa de aparecer no checkout.
+  const outdated = existing.filter(
+    (o: any) => o.provider_id === "melhorenvio_melhorenvio" && !(String(o.data?.id).replace("melhorenvio-", "") in SERVICES)
+  )
+  if (outdated.length) {
+    await deleteShippingOptionsWorkflow(container).run({ input: { ids: outdated.map((o: any) => o.id) } })
+    logger.info(`Opções removidas: ${outdated.map((o: any) => o.name).join(", ")}`)
+  }
+
   const flat = existing.filter((o: any) => o.provider_id === "manual_manual" && o.price_type === "flat")
   if (flat.length) {
     await deleteShippingOptionsWorkflow(container).run({ input: { ids: flat.map((o: any) => o.id) } })
