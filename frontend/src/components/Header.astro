@@ -31,6 +31,8 @@ const latest = Astro.props.latest ?? null;
 // Sem drop ativo, o link leva o nome do drop mais recente em vez de "Drop" ao lado de "Drops".
 // Sem drop ativo nem anterior não há nome para mostrar: o link some em vez de aparecer como "Drop" ao lado de "Drops".
 const dropLabel = countdown?.title ?? latest?.title ?? null;
+// Drop prestes a abrir ou em pré-venda vem antes dos outros nas listas (menu de drops e menu do celular).
+const featuredDrop = countdown && (countdown.phase === "coming_soon" || countdown.phase === "presale") ? countdown : null;
 const dropHref = !countdown && latest ? getPathForLang(`/collections/${latest.handle}`, lang) : getPathForLang("/drop", lang);
 
 const url = getMedusaStoreUrl();
@@ -105,6 +107,14 @@ const searchGroupPopular = t(lang, "search", "group_popular");
           >
             <div class="mega__inner container">
               <ul class="mega__list" role="list">
+                {featuredDrop && (
+                  <li>
+                    <a href={getPathForLang("/drop", lang)} class="mega__item" data-img="" data-num="★">
+                      <span class="mega__item-num">★</span>
+                      <span class="mega__item-name">{featuredDrop.title}{featuredDrop.phase === "presale" ? " · pré-venda" : " · em breve"}</span>
+                    </a>
+                  </li>
+                )}
                 {
                   drops.map((drop, i) => (
                     <li>
@@ -474,6 +484,14 @@ const searchGroupPopular = t(lang, "search", "group_popular");
     </button>
   </div>
   <ul class="mob-menu__list">
+    {featuredDrop && (
+      <li>
+        <a href={getPathForLang("/drop", lang)} class="mob-menu__link">
+          {featuredDrop.title}
+          {featuredDrop.target && <Countdown targetIso={featuredDrop.target} label={featuredDrop.label} compact />}
+        </a>
+      </li>
+    )}
     {drops.length > 0 && (
       <li>
         <a
@@ -493,7 +511,7 @@ const searchGroupPopular = t(lang, "search", "group_popular");
         </li>
       ))
     }
-    {dropLabel && (
+    {dropLabel && !featuredDrop && (
       <li>
         <a href={dropHref} class="mob-menu__link">
           {dropLabel}

@@ -1,0 +1,24 @@
+---
+/** Grade de cartões simples: 2 colunas no celular (sem rolagem lateral), 3 no tablet e 4 no desktop. */
+import ProductTile from './ProductTile.astro';
+import type { Lang } from '../i18n/utils';
+
+interface Props {
+  products: any[];
+  lang: Lang;
+  label?: string;
+  badges?: (product: any) => { isPopular?: boolean; isNew?: boolean } | undefined;
+}
+const { products, lang, label, badges } = Astro.props;
+---
+
+<ul class="pgrid" aria-label={label}>
+  {products.map((p) => <ProductTile product={p} lang={lang} badges={badges?.(p)} />)}
+</ul>
+
+<style>
+  .pgrid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 8px; }
+  @media (min-width: 640px) { .pgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 14px; } }
+  @media (min-width: 1024px) { .pgrid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 22px 14px; } }
+  @media (min-width: 1500px) { .pgrid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+</style>

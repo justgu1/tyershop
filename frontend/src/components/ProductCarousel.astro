@@ -11,7 +11,7 @@
  * próxima) logo abaixo do título — nunca sobre a imagem — depois o
  * viewport com scroll horizontal de verdade em qualquer largura.
  */
-import ProductCard from './ProductCard.astro';
+import ProductTile from './ProductTile.astro';
 import type { Lang } from '../i18n/utils';
 
 interface Props {
@@ -26,12 +26,14 @@ interface Props {
    * era: título à esquerda, cards colados na esquerda quando cabem
    * todos). `center` centraliza os dois (usado só na Home hoje). */
   align?: 'left' | 'center' | 'right';
+  /** No celular vira grade de 2 colunas, sem rolagem lateral (a loja). */
+  mobileGrid?: boolean;
 }
 
-const { products, lang, title, headingId, ariaLabel, cardBadges, align = 'left' } = Astro.props;
+const { products, lang, title, headingId, ariaLabel, cardBadges, align = 'left', mobileGrid = false } = Astro.props;
 ---
 
-<section class="product-carousel" data-carousel data-align={align} aria-labelledby={headingId}>
+<section class="product-carousel" data-carousel data-align={align} data-mobile-grid={mobileGrid ? "true" : undefined} aria-labelledby={headingId}>
   <div class="product-carousel__head">
     <h2 class="product-carousel__title" id={headingId}>{title}</h2>
     <slot name="actions" />
@@ -48,9 +50,9 @@ const { products, lang, title, headingId, ariaLabel, cardBadges, align = 'left' 
   <div class="product-carousel__viewport" data-carousel-viewport role="region" aria-label={ariaLabel ?? title} tabindex="0">
     <div class="product-carousel__track" role="list" data-carousel-track>
       {products.map((p) => (
-        <div class="product-carousel__cell" role="listitem">
-          <ProductCard product={p} lang={lang} role="listitem" badges={cardBadges?.(p)} />
-        </div>
+        <ul class="product-carousel__cell" role="listitem" style="list-style:none;margin:0;padding:0">
+          <ProductTile product={p} lang={lang} badges={cardBadges?.(p)} />
+        </ul>
       ))}
     </div>
   </div>
@@ -191,7 +193,7 @@ const { products, lang, title, headingId, ariaLabel, cardBadges, align = 'left' 
     justify-content: center;
   }
   .product-carousel__cell {
-    flex: 0 0 clamp(200px, 22vw, 260px);
+    flex: 0 0 clamp(150px, 14vw, 190px);
     min-width: 0;
     scroll-snap-align: start;
   }
@@ -201,7 +203,12 @@ const { products, lang, title, headingId, ariaLabel, cardBadges, align = 'left' 
      é literalmente `auto`), foi um bug real corrigido nesta mesma sessão. */
   @media (max-width: 640px) {
     .product-carousel__cell {
-      flex-basis: clamp(220px, 72vw, 300px);
+      flex-basis: clamp(150px, 46vw, 200px);
     }
+    /* Loja no celular: grade de 2 colunas, sem rolagem lateral nem paginação. */
+    .product-carousel[data-mobile-grid] .product-carousel__viewport { overflow: visible; scroll-snap-type: none; }
+    .product-carousel[data-mobile-grid] .product-carousel__track { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: 12px 8px; padding: 2px 0 6px; }
+    .product-carousel[data-mobile-grid] .product-carousel__cell { flex: initial; min-width: 0; }
+    .product-carousel[data-mobile-grid] .product-carousel__controlbar { display: none !important; }
   }
 </style>
