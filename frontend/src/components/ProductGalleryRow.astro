@@ -4,7 +4,7 @@
  */
 import { getPathForLang, type Lang } from '../i18n/utils';
 import { buildFullProductGallery, buildVariantSpecificGallery } from '../lib/product-variant-gallery';
-import { getProductVariantData, isVariantSoldOut } from '../lib/product-variants';
+import { getProductVariantData, isProductSoldOut } from '../lib/product-variants';
 
 interface Props {
   product: any;
@@ -14,9 +14,7 @@ interface Props {
 const { product, lang = 'pt' } = Astro.props;
 const { stockReliable, normalizedVariants, defaultVariant } = getProductVariantData(product);
 const variants = product.variants ?? [];
-const soldOut = variants.length
-  ? variants.every((v: any) => isVariantSoldOut(v, stockReliable || v.manage_inventory === true))
-  : isVariantSoldOut(defaultVariant, stockReliable);
+const soldOut = isProductSoldOut(product);
 const info = normalizedVariants.find((n: any) => n.id === defaultVariant?.id) ?? normalizedVariants[0];
 const price = info?.priceDisplay ?? null;
 const original = info?.originalDisplay ?? null;
