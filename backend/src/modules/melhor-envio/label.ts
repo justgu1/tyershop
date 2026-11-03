@@ -1,3 +1,4 @@
+import { isValidCpf } from "../../utils/cpf"
 import { SERVICES } from "./quote"
 
 /** Remetente: quem aparece na etiqueta. Tudo vem do ambiente; sem os campos obrigatórios a compra automática não roda. */
@@ -144,5 +145,5 @@ export const agencyFromEnv = (env: Record<string, string | undefined>) => Number
 export function cpfFromPayer(payment: { payer?: { identification?: { type?: string; number?: string } } } | null | undefined): string {
   const id = payment?.payer?.identification
   const digits = String(id?.number ?? "").replace(/\D/g, "")
-  return (!id?.type || id.type.toUpperCase() === "CPF") && digits.length === 11 ? digits : ""
+  return (!id?.type || id.type.toUpperCase() === "CPF") && isValidCpf(digits) ? digits : ""
 }
