@@ -889,13 +889,24 @@ function init() {
   }
   void loadAccountData();
 
-  /** Guarda o CPF na conta (best-effort): as próximas compras já vêm com ele e a etiqueta o acha no cadastro. */
-  async function saveCpfOnAccount(cpf: string) {
-    if (!currentAuthToken || cpf.length !== 11) return;
+  /** Grava no perfil da conta o que a pessoa digitou (nome, sobrenome, telefone e CPF), para a próxima compra e o admin já terem tudo. Melhor esforço. */
+  async function saveProfileOnAccount(payer: ReturnType<typeof payerFromForm>) {
+    if (!currentAuthToken) return;
+    const phone = (qs<HTMLInputElement>('ck-phone')?.value || '').trim();
     try {
-      await medusaFetch('/store/customers/me', { method: 'POST', body: JSON.stringify({ metadata: { cpf } }) });
+      await medusaFetch('/store/customers/me', {
+        method: 'POST',
+        body: JSON.stringify({
+          first_name: payer.first_name || undefined,
+          last_name: payer.last_name || undefined,
+          phone: phone || undefined,
+          metadata: payer.cpf.length === 11 ? { cpf: payer.cpf } : undefined,
+        }),
+      });
+      // O cache local do cabeçalho/conta ficou com o perfil antigo: força reler na próxima página.
+      localStorage.removeItem('tyer_customer');
     } catch {
-      /* o CPF já foi no pedido: a conta só deixa de lembrar dele */
+      /* os dados já foram no pedido: a conta só deixa de lembrar deles */
     }
   }
 
@@ -1366,7 +1377,7 @@ function init() {
       // Best-effort, não trava o checkout se falhar — disponibiliza esse
       // endereço pra próxima compra (card no passo 2 do próximo checkout).
       void persistAddressToAccount(addr, payer);
-      void saveCpfOnAccount(payer.cpf);
+      void saveProfileOnAccount(payer);
 
       const shipRes = await medusaFetch(`/store/shipping-options?cart_id=${cartId}`);
       const option = (shipRes?.shipping_options ?? []).find((o: any) => o?.data?.id === `melhorenvio-${shipChoice!.id}` || o?.name === shipChoice!.name);
