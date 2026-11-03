@@ -29,6 +29,11 @@ describe("ticket email", () => {
     expect(mail.subject).toBe("Seu ingresso para o drop Red Rose")
   })
 
+  it("não leva a faixa de redes sociais, para não parecer e-mail promocional", () => {
+    expect(mail.html).not.toContain("/email/instagram.png")
+    expect(mail.text).not.toContain("instagram")
+  })
+
   it("escapes user-provided values", () => {
     const evil = renderTemplate("ticket", { ...data, name: '<img src=x onerror="alert(1)">' })
     expect(evil.html).not.toContain("<img src=x")
