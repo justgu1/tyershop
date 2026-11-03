@@ -32,7 +32,7 @@ export async function ensureAccount(scope: MedusaContainer, email: string, name?
 
   let authIdentity = existing
   let rotated = false
-  if (authIdentity && opts.ownerProved && !authIdentity.app_metadata?.lead_account) {
+  if (authIdentity && opts.ownerProved && !authIdentity.app_metadata?.lead_account && !authIdentity.app_metadata?.user_id) {
     rotated = true
     await authModule.updateProvider("emailpass", { entity_id: email, password: randomBytes(24).toString("hex") })
   }
