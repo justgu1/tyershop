@@ -13,7 +13,10 @@ interface Props {
   sections?: DropSection[];
   restock?: any[];
 }
-const { drop, access = 'none', products = [], sections = [], restock = [] } = Astro.props;
+const { drop, access = 'none', products = [], sections = [], restock: restockAll = [] } = Astro.props;
+// Peça que já está no drop aparece só na faixa do drop (e só para quem tem acesso), nunca duplicada no reestoque.
+const inDrop = new Set(products.map((p: any) => p.id));
+const restock = restockAll.filter((p: any) => !inDrop.has(p.id));
 const { phase } = drop;
 const heroBanner = drop.hero_kind === 'banner' ? drop.hero_url : null;
 const heroVideo = drop.hero_kind !== 'banner' ? drop.hero_url : null;

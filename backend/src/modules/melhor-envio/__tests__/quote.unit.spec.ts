@@ -29,7 +29,9 @@ describe("oauth state", () => {
     const now = 1_800_000_000_000
     const state = signState(now)
     expect(verifyState(state, now + 60_000)).toEqual(expect.any(String))
-    expect(verifyState(state.replace(/.$/, "0"), now)).toBeNull()
+    // Troca o último caractere por outro diferente: com "0" fixo o teste passava a ser inócuo quando o estado já terminava em 0.
+    const tampered = state.slice(0, -1) + (state.endsWith("0") ? "1" : "0")
+    expect(verifyState(tampered, now)).toBeNull()
     expect(verifyState(state, now + 16 * 60_000)).toBeNull()
     expect(verifyState(undefined)).toBeNull()
   })
