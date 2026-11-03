@@ -196,6 +196,24 @@ const c = (key: string) => t(lang, 'checkout', key);
           </div>
         </div>
 
+        <div id="checkout-busy" class="checkout-busy" role="status" aria-live="polite" hidden>
+          <div class="checkout-busy__card">
+            <div class="checkout-busy__stage" aria-hidden="true">
+              <svg class="checkout-busy__ball" width="56" height="56" viewBox="0 0 56 56" fill="none">
+                <circle cx="28" cy="28" r="25" fill="#e77e23" />
+                <g stroke="#0b0b0b" stroke-width="2.2" stroke-linecap="round">
+                  <path d="M28 3v50M3 28h50" />
+                  <path d="M9 9c10 8 10 30 0 38M47 9c-10 8-10 30 0 38" />
+                </g>
+              </svg>
+              <span class="checkout-busy__shadow"></span>
+            </div>
+            <div class="checkout-busy__bar" aria-hidden="true"><span></span></div>
+            <p class="checkout-busy__text" id="checkout-busy-text"></p>
+            <p class="checkout-busy__hint">Não feche esta página.</p>
+          </div>
+        </div>
+
         <div id="checkout-success" class="checkout-success" hidden>
           <div class="checkout-success__anim" aria-hidden="true">
             <span class="checkout-success__ring"></span>
@@ -884,6 +902,89 @@ const c = (key: string) => t(lang, 'checkout', key);
   /* `display:flex` do bloco ganha do `[hidden]` da UA: sem isto o "pedido confirmado" aparece junto do formulário. */
   .checkout-success[hidden] {
     display: none;
+  }
+  /* Aviso central durante preparo e confirmação: bola quicando + barra que corre (CSS puro, sem biblioteca). */
+  .checkout-busy {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: grid;
+    place-items: center;
+    background: rgba(8, 8, 8, 0.72);
+    backdrop-filter: blur(6px);
+  }
+  .checkout-busy[hidden] {
+    display: none;
+  }
+  .checkout-busy__card {
+    width: min(86vw, 360px);
+    text-align: center;
+    color: #fff;
+  }
+  .checkout-busy__stage {
+    position: relative;
+    height: 96px;
+    display: grid;
+    justify-items: center;
+    align-items: end;
+  }
+  .checkout-busy__ball {
+    position: absolute;
+    bottom: 12px;
+    animation: busy-bounce 0.9s cubic-bezier(0.3, 0, 0.7, 1) infinite;
+    transform-origin: 50% 100%;
+  }
+  .checkout-busy__shadow {
+    width: 44px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    animation: busy-shadow 0.9s cubic-bezier(0.3, 0, 0.7, 1) infinite;
+  }
+  .checkout-busy__bar {
+    position: relative;
+    height: 6px;
+    margin: 18px 0 16px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+  }
+  .checkout-busy__bar span {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 38%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, rgba(231, 126, 35, 0), #e77e23 40%, #ffb066);
+    animation: busy-run 1.3s ease-in-out infinite;
+  }
+  .checkout-busy__text {
+    margin: 0 0 6px;
+    min-height: 22px;
+    font-family: var(--font-title);
+    font-size: 20px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .checkout-busy__hint {
+    margin: 0;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.55);
+  }
+  @keyframes busy-bounce {
+    0%, 100% { transform: translateY(0) scale(1.08, 0.9); }
+    50% { transform: translateY(-46px) scale(1, 1); }
+  }
+  @keyframes busy-shadow {
+    0%, 100% { transform: scaleX(1); opacity: 0.7; }
+    50% { transform: scaleX(0.55); opacity: 0.3; }
+  }
+  @keyframes busy-run {
+    0% { left: -40%; }
+    100% { left: 102%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .checkout-busy__ball, .checkout-busy__shadow { animation: none; }
+    .checkout-busy__bar span { animation-duration: 2.6s; }
   }
   .checkout-success {
     text-align: center;

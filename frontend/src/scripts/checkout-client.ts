@@ -459,6 +459,29 @@ function init() {
     }
   }
 
+  /** Aviso central animado (barra + bola) durante as etapas demoradas; as mensagens se revezam enquanto espera. */
+  let busyTimer: ReturnType<typeof setInterval> | null = null;
+  function startBusy(messages: string[]) {
+    const box = qs('checkout-busy');
+    if (!box) return;
+    let i = 0;
+    setText('checkout-busy-text', messages[0] ?? '');
+    box.hidden = false;
+    if (busyTimer) clearInterval(busyTimer);
+    if (messages.length > 1) {
+      busyTimer = setInterval(() => {
+        i = Math.min(i + 1, messages.length - 1);
+        setText('checkout-busy-text', messages[i]);
+      }, 2200);
+    }
+  }
+  function stopBusy() {
+    if (busyTimer) clearInterval(busyTimer);
+    busyTimer = null;
+    const box = qs('checkout-busy');
+    if (box) box.hidden = true;
+  }
+
   async function completeCart() {
     // Rota própria: a original responde 409 enquanto o pedido ainda está sendo concluído em compras simultâneas.
     const data = await medusaFetch('/store/checkout/complete', { method: 'POST', body: JSON.stringify({ cart_id: cartId }) });
@@ -1072,6 +1095,7 @@ function init() {
       cta.disabled = true;
       cta.textContent = t('preparing');
     }
+    startBusy(['Confirmando seus dados…', 'Calculando o frete…', 'Preparando o pagamento…']);
     // Captura os dados AGORA (clique) e trava a edição por baixo enquanto a
     // cadeia de chamadas roda (pode levar vários segundos — registro, cart,
     // frete, payment session). Sem isso o usuário podia mexer nos campos
@@ -1162,6 +1186,7 @@ function init() {
       setText('checkout-contact-error', err instanceof Error ? err.message : t('errorGeneric'));
       show('checkout-contact-error', true);
     } finally {
+      stopBusy();
       if (cta) cta.disabled = false;
     }
   }
@@ -1250,6 +1275,7 @@ function init() {
       cta.disabled = true;
       cta.textContent = t('processing');
     }
+    startBusy(['Enviando seu pagamento com segurança…', 'Confirmando a transação…', 'Quase lá, finalizando seu pedido…']);
     try {
       const payer = payerFromForm();
       const tokenResult = await mp.fields.createCardToken({
@@ -1276,6 +1302,7 @@ function init() {
       show('checkout-card-error', true);
       if (cta) cta.textContent = originalLabel;
     } finally {
+      stopBusy();
       if (cta) cta.disabled = false;
     }
   }
@@ -1289,6 +1316,7 @@ function init() {
     show('checkout-pix-error', false);
     const cta = qs<HTMLButtonElement>('checkout-summary-cta');
     if (cta) cta.disabled = true;
+    startBusy(['Gerando seu Pix…', 'Quase pronto…']);
     try {
       const payer = payerFromForm();
       const data = await medusaFetch('/store/checkout/mercadopago/pix', {
@@ -1310,6 +1338,8 @@ function init() {
       setText('checkout-pix-error', err instanceof Error ? err.message : t('errorGeneric'));
       show('checkout-pix-error', true);
       if (cta) cta.disabled = false;
+    } finally {
+      stopBusy();
     }
   }
 
@@ -1330,6 +1360,7 @@ function init() {
     show('checkout-boleto-error', false);
     const cta = qs<HTMLButtonElement>('checkout-summary-cta');
     if (cta) cta.disabled = true;
+    startBusy(['Gerando seu boleto…', 'Quase pronto…']);
     try {
       const payer = payerFromForm();
       const addr = addressFromForm();
@@ -1349,6 +1380,8 @@ function init() {
       setText('checkout-boleto-error', err instanceof Error ? err.message : t('errorGeneric'));
       show('checkout-boleto-error', true);
       if (cta) cta.disabled = false;
+    } finally {
+      stopBusy();
     }
   }
 
