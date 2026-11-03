@@ -1,4 +1,4 @@
-import { findInCart, getLabel } from "../client"
+import { findInCart, getLabel, printLabelUrl } from "../client"
 
 const respond = (status: number, body: unknown) => Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(body) } as Response)
 
@@ -36,5 +36,19 @@ describe("findInCart", () => {
   it("carrinho grande demais para conferir é erro, não ausência", async () => {
     jest.spyOn(global, "fetch").mockImplementation(() => respond(200, { data: [], last_page: 99 }))
     await expect(findInCart("token", "Pedido #9")).rejects.toThrow(/grande demais/)
+  })
+})
+
+describe("printLabelUrl", () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  it("devolve o endereço público do PDF da etiqueta", async () => {
+    jest.spyOn(global, "fetch").mockImplementation(() => respond(200, { url: "https://melhorenvio.com.br/imprimir/abc" }))
+    await expect(printLabelUrl("token", "ME-1")).resolves.toBe("https://melhorenvio.com.br/imprimir/abc")
+  })
+
+  it("sem endereço na resposta é erro", async () => {
+    jest.spyOn(global, "fetch").mockImplementation(() => respond(200, {}))
+    await expect(printLabelUrl("token", "ME-1")).rejects.toThrow(/imprimir/)
   })
 })
