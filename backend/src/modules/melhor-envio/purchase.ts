@@ -107,6 +107,9 @@ export async function purchaseLabel(scope: MedusaContainer, orderId: string, ori
   return withLock(scope, `melhor-envio-label:${orderId}`, () => purchaseLabelLocked(scope, orderId, origin))
 }
 
+export const PAYMENT_NOT_CONFIRMED =
+  "O Melhor Envio não confirmou o pagamento da etiqueta: ela continua no carrinho. Confira o saldo da conta e finalize o pagamento por lá, ou tente de novo."
+
 const DONE: LabelState["status"][] = ["gerada", "postada", "entregue"]
 
 async function purchaseLabelLocked(scope: MedusaContainer, orderId: string, origin: "auto" | "manual"): Promise<LabelState> {
@@ -183,6 +186,9 @@ async function purchaseLabelLocked(scope: MedusaContainer, orderId: string, orig
       if (!paid) {
         await checkoutLabel(token, meId)
         changed = true
+        // O checkout pode responder sem erro e a etiqueta seguir no carrinho (saldo insuficiente): só vale como paga depois de conferir.
+        const after = await getLabel(token, meId)
+        if (after.status === "pending") throw new Error(PAYMENT_NOT_CONFIRMED)
       }
       await saveState(scope, order, { status: "carrinho", paid: true })
     }

@@ -70,6 +70,18 @@ const InvoiceWidget = ({ data }: { data: { id: string; display_id?: number; meta
     }
   }
 
+  async function printLabel() {
+    setLabelBusy(true)
+    try {
+      const r = await adminFetch<{ url: string }>(`/admin/orders/${data.id}/melhor-envio/imprimir`)
+      window.open(r.url, "_blank", "noopener")
+    } catch (e: any) {
+      setLabel((prev) => ({ ...(prev as Label), error: e.message }))
+    } finally {
+      setLabelBusy(false)
+    }
+  }
+
   const labelText: Record<string, string> = {
     carrinho: "No carrinho do Melhor Envio",
     gerada: "Etiqueta comprada, aguardando a postagem",
@@ -88,6 +100,11 @@ const InvoiceWidget = ({ data }: { data: { id: string; display_id?: number; meta
           {label.tracking_code ? ` — rastreio ${label.tracking_code}` : ""}
           {label.error ? <span style={{ display: "block", color: "#b91c1c", marginTop: 4 }}>{label.error}</span> : null}
         </p>
+      )}
+      {label && (label.status === "gerada" || label.status === "postada") && (
+        <button type="button" onClick={printLabel} disabled={labelBusy} style={{ padding: "8px 14px", borderRadius: 6, border: 0, background: "#e77e23", color: "#fff", cursor: "pointer" }}>
+          {labelBusy ? "Abrindo..." : "Imprimir etiqueta"}
+        </button>
       )}
       {(!label || label.status === "erro" || label.status === "carrinho") && (
         <button type="button" onClick={buyLabel} disabled={labelBusy} style={{ padding: "8px 14px", borderRadius: 6, border: 0, background: "#e77e23", color: "#fff", cursor: "pointer" }}>

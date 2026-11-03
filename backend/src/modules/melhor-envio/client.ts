@@ -127,6 +127,13 @@ export async function generateLabel(accessToken: string, id: string): Promise<vo
   await meRequest(accessToken, "/shipment/generate", { orders: [id] })
 }
 
+/** Endereço público do PDF da etiqueta (abre no navegador, sem login no Melhor Envio). */
+export async function printLabelUrl(accessToken: string, id: string): Promise<string> {
+  const data = await meRequest<{ url?: string }>(accessToken, "/shipment/print", { mode: "public", orders: [id] })
+  if (!data?.url) throw new Error("O Melhor Envio não devolveu o endereço da etiqueta para imprimir.")
+  return data.url
+}
+
 export type TrackingInfo = { status?: string; tracking?: string | null; melhorenvio_tracking?: string | null }
 
 export async function tracking(accessToken: string, ids: string[]): Promise<Record<string, TrackingInfo>> {
