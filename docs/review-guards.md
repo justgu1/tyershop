@@ -120,3 +120,6 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
 - **Produto sem controle de estoque (`manage_inventory: false`) nunca aparece como esgotado nem com limite de quantidade.** O
   frontend lia o nível de estoque zerado e escondia a Tyer Gang. Falta teste de frontend (não há runner configurado).
   Origem: Tyer Gang esgotada em produção, `isVariantSoldOut`.
+- **A tela Minha Conta não envia `email` ao atualizar o perfil.** O Medusa recusa o campo em `POST /store/customers/me` e o
+  e-mail da conta é o que dá acesso à pré-venda. Falta teste de frontend (não há runner configurado).
+  Origem: erro "Unrecognized fields: 'email'" ao salvar dados em produção.

@@ -34,7 +34,7 @@ const pk = getPublishableKey();
         </div>
         <div class="account-form__field">
           <label for="account-email">Email</label>
-          <input id="account-email" name="email" type="email" autocomplete="email" required />
+          <input id="account-email" name="email" type="email" autocomplete="email" readonly aria-readonly="true" />
         </div>
         <p class="account-form__status" id="account-profile-status" hidden></p>
         <button type="submit" class="btn btn-primary">Salvar dados</button>
@@ -144,7 +144,6 @@ const pk = getPublishableKey();
       var payload = {
         first_name: String(fd.get("first_name") || ""),
         last_name: String(fd.get("last_name") || ""),
-        email: String(fd.get("email") || ""),
       };
       setStatus(profileStatus, "Salvando...", false);
       try {
