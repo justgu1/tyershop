@@ -1,6 +1,7 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { useCallback, useEffect, useState } from "react"
 import { adminFetch, ui } from "../../lib/api"
+import { methodLabel } from "../../../utils/payment-method"
 
 type Item = {
   cart_id: string
@@ -64,6 +65,7 @@ const PagamentosPage = () => {
         <thead>
           <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
             <th>E-mail</th>
+            <th>Forma</th>
             <th>Valor</th>
             <th>Situação</th>
             <th>Criado</th>
@@ -77,6 +79,7 @@ const PagamentosPage = () => {
             return (
               <tr key={i.cart_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
                 <td style={{ padding: "8px 0" }}>{i.email ?? "—"}</td>
+                <td>{methodLabel(i.method)}</td>
                 <td>{brl(i.amount)}</td>
                 <td style={{ color: s.color, fontWeight: 600 }}>{s.label}</td>
                 <td>{when(i.created_at)}</td>
@@ -87,7 +90,7 @@ const PagamentosPage = () => {
           })}
           {!items.length && !loading && (
             <tr>
-              <td colSpan={6} style={{ padding: 16, color: "#6b7280" }}>
+              <td colSpan={7} style={{ padding: 16, color: "#6b7280" }}>
                 Nada pendente.
               </td>
             </tr>

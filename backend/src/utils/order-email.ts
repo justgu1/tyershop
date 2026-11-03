@@ -1,6 +1,7 @@
 import { MedusaContainer } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { productionDaysOfProducts } from "../modules/melhor-envio/quote"
+import { methodLabel } from "./payment-method"
 
 const siteUrl = () => (process.env.SITE_URL || "http://localhost:4321").replace(/\/$/, "")
 export const ordersUrl = () => `${siteUrl()}/account/orders`
@@ -45,7 +46,6 @@ const absolute = (url?: string | null) => {
   return `${(process.env.SITE_URL || "").replace(/\/$/, "")}${url.startsWith("/") ? "" : "/"}${url}`
 }
 
-const METHOD_LABEL: Record<string, string> = { card: "Cartão de crédito", pix: "Pix", boleto: "Boleto" }
 const STATUS_LABEL: Record<string, string> = { approved: "aprovado", authorized: "autorizado", pending: "aguardando", in_process: "em análise" }
 
 /** Pagamento do pedido (forma, situação e número no Mercado Pago), a partir da sessão de pagamento. */
@@ -56,7 +56,7 @@ export async function paymentInfo(scope: MedusaContainer, orderId: string) {
   const payment = (data[0] as any)?.payment_collections?.[0]?.payments?.[0]
   const d = (payment?.data ?? {}) as { method?: string; mp_status?: string; mp_payment_id?: number | string }
   if (!payment) return null
-  return { method: METHOD_LABEL[d.method ?? ""] ?? "Mercado Pago", status: STATUS_LABEL[d.mp_status ?? ""] ?? null, id: d.mp_payment_id ? String(d.mp_payment_id) : null }
+  return { method: methodLabel(d.method, "Mercado Pago"), status: STATUS_LABEL[d.mp_status ?? ""] ?? null, id: d.mp_payment_id ? String(d.mp_payment_id) : null }
 }
 
 export async function confirmationData(scope: MedusaContainer, order: any) {
