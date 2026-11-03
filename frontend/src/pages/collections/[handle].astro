@@ -33,16 +33,26 @@ try {
     collection = list.find((c) => String(c?.handle ?? '') === h && !isHiddenCollection(c)) ?? null;
   }
 
+  // Categoria (ex.: Pulseiras) aberta pelo mesmo endereço de uma coleção.
+  let filter = collection?.id ? `collection_id[]=${encodeURIComponent(collection.id)}` : '';
+  if (!collection) {
+    const catRes = await fetch(`${base}/store/product-categories?handle=${encodeURIComponent(h)}`, { headers, signal: AbortSignal.timeout(8000) });
+    const cat = catRes.ok ? ((await catRes.json()).product_categories ?? [])[0] : null;
+    if (cat?.id) {
+      collection = { id: cat.id, title: cat.name, handle: cat.handle };
+      filter = `category_id[]=${encodeURIComponent(cat.id)}`;
+    }
+  }
+
   if (collection?.id) {
     const pRes = await fetch(
-      `${base}/store/products?${q}&collection_id[]=${encodeURIComponent(collection.id)}&limit=60`,
+      `${base}/store/products?${q}&${filter}&limit=60`,
       { headers, signal: AbortSignal.timeout(8000) }
     );
     if (pRes.ok) {
       const d = await pRes.json();
-      // Regatas depois das camisas; o resto mantém a ordem da API (a ordenação é estável).
       products = (d.products ?? []).sort(
-        (a: any, b: any) => Number(/^regata/i.test(a.title ?? '')) - Number(/^regata/i.test(b.title ?? ''))
+        (a: any, b: any) => (new Date(b?.created_at ?? 0).getTime() || 0) - (new Date(a?.created_at ?? 0).getTime() || 0)
       );
     }
   }

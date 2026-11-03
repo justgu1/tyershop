@@ -11,12 +11,8 @@ interface Props {
   access?: DropAccess;
   products?: any[];
   sections?: DropSection[];
-  restock?: any[];
 }
-const { drop, access = 'none', products = [], sections = [], restock: restockAll = [] } = Astro.props;
-// Peça que já está no drop aparece só na faixa do drop (e só para quem tem acesso), nunca duplicada no reestoque.
-const inDrop = new Set(products.map((p: any) => p.id));
-const restock = restockAll.filter((p: any) => !inDrop.has(p.id));
+const { drop, access = 'none', products = [], sections = [] } = Astro.props;
 const { phase } = drop;
 const heroBanner = drop.hero_kind === 'banner' ? drop.hero_url : null;
 const heroVideo = drop.hero_kind !== 'banner' ? drop.hero_url : null;
@@ -57,16 +53,6 @@ const groups = (sections.length ? sections : [{ key: 'all', title: drop.title, l
         </div>
       </section>
     ))}
-    {restock.length > 0 && (
-      <section class="dc-section" aria-label="Reestoque">
-        <div class="container">
-          <SectionBand index={groups.length + 1} title="Reestoque" label="Starter · pronta entrega" />
-          <div class="dc-mosaic" role="list" aria-label="Reestoque">
-            {restock.map((p, i) => <CollectionMosaicItem product={p} lang="pt" reverse={i % 2 === 1} />)}
-          </div>
-        </div>
-      </section>
-    )}
   </main>
 ) : (
 <section class={`drop drop--${phase}`}>

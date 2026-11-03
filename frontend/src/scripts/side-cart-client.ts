@@ -218,15 +218,7 @@ function escHtml(s: string) {
 }
 
 function formatVariantLabel(raw: string): string {
-  const text = String(raw || '').trim();
-  if (!text) return '';
-  if (text.includes(':')) return text;
-  const parts = text
-    .split(/[\/|]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (!parts.length) return text;
-  return parts.map((value, idx) => `Opcao ${idx + 1}: ${value}`).join(' | ');
+  return String(raw || '').trim();
 }
 
 function renderCart() {

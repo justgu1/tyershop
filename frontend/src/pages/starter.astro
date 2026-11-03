@@ -1,6 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import ProductCard from '../components/ProductCard.astro';
+import CollectionMosaicItem from '../components/CollectionMosaicItem.astro';
 import { fetchStarterProducts } from '../lib/drop';
 
 export const prerender = false;
@@ -12,11 +12,7 @@ const products = await fetchStarterProducts();
   <section class="starter-page">
     <h1>TYER STARTER</h1>
     <p>Linha fixa com estoque pronto: sem prazo de produção.</p>
-    <ul class="starter-page__grid" role="list">
-      {products.map((product) => (
-        <li><ProductCard product={product} lang="pt" /></li>
-      ))}
-    </ul>
+    <div class="starter-page__grid"><div role="list" aria-label="Linha Starter">{products.map((p, i) => <CollectionMosaicItem product={p} lang="pt" reverse={i % 2 === 1} />)}</div></div>
   </section>
 </Layout>
 
@@ -24,5 +20,5 @@ const products = await fetchStarterProducts();
   .starter-page { background: #0b0b0b; color: #fff; padding: 140px 20px 96px; text-align: center; min-height: 70vh; }
   .starter-page h1 { margin: 0 0 8px; font-family: var(--font-title); font-size: clamp(36px, 8vw, 64px); text-transform: uppercase; }
   .starter-page p { margin: 0 0 40px; color: rgba(255, 255, 255, 0.7); }
-  .starter-page__grid { max-width: 1200px; margin: 0 auto; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; text-align: left; }
+  .starter-page__grid { max-width: 1200px; margin: 0 auto; text-align: left; }
 </style>

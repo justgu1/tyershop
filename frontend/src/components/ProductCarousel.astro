@@ -11,7 +11,7 @@
  * próxima) logo abaixo do título — nunca sobre a imagem — depois o
  * viewport com scroll horizontal de verdade em qualquer largura.
  */
-import ProductCard from './ProductCard.astro';
+import ProductTile from './ProductTile.astro';
 import type { Lang } from '../i18n/utils';
 
 interface Props {
@@ -26,33 +26,37 @@ interface Props {
    * era: título à esquerda, cards colados na esquerda quando cabem
    * todos). `center` centraliza os dois (usado só na Home hoje). */
   align?: 'left' | 'center' | 'right';
+  /** Setas sempre visíveis, mesmo quando todos os cards cabem (a loja). */
+  alwaysControls?: boolean;
 }
 
-const { products, lang, title, headingId, ariaLabel, cardBadges, align = 'left' } = Astro.props;
+const { products, lang, title, headingId, ariaLabel, cardBadges, align = 'left', alwaysControls = false } = Astro.props;
 ---
 
-<section class="product-carousel" data-carousel data-align={align} aria-labelledby={headingId}>
+<section class="product-carousel" data-carousel data-align={align} data-always-controls={alwaysControls ? "true" : undefined} aria-labelledby={headingId}>
   <div class="product-carousel__head">
     <h2 class="product-carousel__title" id={headingId}>{title}</h2>
     <slot name="actions" />
   </div>
-  <div class="product-carousel__controlbar" data-carousel-controlbar role="group" aria-label="Navegação do carrossel" hidden>
+  <div class="product-carousel__stage">
     <button type="button" class="product-carousel__nav product-carousel__nav--prev" data-carousel-prev aria-label="Produto anterior">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
     </button>
-    <div class="product-carousel__pager" role="tablist" aria-label="Ir para o produto" data-carousel-pager></div>
     <button type="button" class="product-carousel__nav product-carousel__nav--next" data-carousel-next aria-label="Próximo produto">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
     </button>
-  </div>
-  <div class="product-carousel__viewport" data-carousel-viewport role="region" aria-label={ariaLabel ?? title} tabindex="0">
-    <div class="product-carousel__track" role="list" data-carousel-track>
-      {products.map((p) => (
-        <div class="product-carousel__cell" role="listitem">
-          <ProductCard product={p} lang={lang} role="listitem" badges={cardBadges?.(p)} />
-        </div>
-      ))}
+    <div class="product-carousel__viewport" data-carousel-viewport role="region" aria-label={ariaLabel ?? title} tabindex="0">
+      <div class="product-carousel__track" role="list" data-carousel-track>
+        {products.map((p) => (
+          <ul class="product-carousel__cell" role="listitem" style="list-style:none;margin:0;padding:0">
+            <ProductTile product={p} lang={lang} badges={cardBadges?.(p)} />
+          </ul>
+        ))}
+      </div>
     </div>
+  </div>
+  <div class="product-carousel__controlbar" data-carousel-controlbar role="group" aria-label="Navegação do carrossel" hidden>
+    <div class="product-carousel__pager" role="tablist" aria-label="Ir para o produto" data-carousel-pager></div>
   </div>
   <p class="sr-only" aria-live="polite" data-carousel-live></p>
 </section>
@@ -98,71 +102,51 @@ const { products, lang, title, headingId, ariaLabel, cardBadges, align = 'left' 
     align-items: center;
     justify-content: center;
     gap: 14px;
-    margin-bottom: 16px;
+    margin-top: 6px;
   }
   .product-carousel__controlbar[hidden] {
     display: none !important;
   }
+  .product-carousel__stage { position: relative; }
   .product-carousel__nav {
-    flex-shrink: 0;
-    width: 34px;
-    height: 34px;
+    position: absolute;
+    top: 40%;
+    transform: translateY(-50%);
+    z-index: 2;
+    display: none;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     border: 1px solid var(--c-border, rgba(255, 255, 255, 0.16));
-    background: transparent;
+    background: var(--c-surface, #fff);
     color: var(--c-text);
-    display: flex;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+    transition: border-color 0.15s ease, opacity 0.15s ease;
   }
-  .product-carousel__nav:hover:not(:disabled) {
-    border-color: var(--c-accent);
-    background: var(--c-surface2, rgba(255, 255, 255, 0.06));
-  }
+  .product-carousel.has-controls .product-carousel__nav { display: flex; }
+  .product-carousel__nav--prev { left: 6px; }
+  .product-carousel__nav--next { right: 6px; }
+  .product-carousel__nav:hover:not(:disabled) { border-color: var(--c-accent); }
   .product-carousel__nav:disabled {
     opacity: 0.3;
     cursor: not-allowed;
   }
-  /* Numerada só faz sentido quando o scroll mostra um card de cada vez
-     (mobile) — no desktop vários cards ficam visíveis ao mesmo tempo, o
-     número clicado não corresponde a uma posição real de scroll. Setas
-     continuam funcionando nos dois. */
-  .product-carousel__pager {
-    display: none;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  @media (max-width: 640px) {
-    .product-carousel__pager {
-      display: flex;
-    }
-  }
+  .product-carousel__pager { display: flex; align-items: center; gap: 8px; justify-content: center; }
   .product-carousel__pager :global(button) {
-    min-width: 26px;
-    height: 26px;
-    padding: 0 4px;
-    border-radius: 6px;
-    border: 1px solid var(--c-border, rgba(255, 255, 255, 0.16));
-    background: transparent;
-    color: var(--c-muted, rgba(255, 255, 255, 0.6));
-    font-size: 12px;
-    font-weight: 700;
+    width: 8px;
+    height: 8px;
+    padding: 0;
+    border-radius: 50%;
+    border: 0;
+    background: var(--c-border, rgba(128, 128, 128, 0.4));
     cursor: pointer;
-    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+    transition: background 0.15s ease, transform 0.15s ease;
   }
-  .product-carousel__pager :global(button:hover) {
-    border-color: var(--c-accent);
-    color: var(--c-text);
-  }
-  .product-carousel__pager :global(button.is-active) {
-    background: var(--c-accent);
-    border-color: var(--c-accent);
-    color: #000;
-  }
+  .product-carousel__pager :global(button.is-active) { background: var(--c-accent); transform: scale(1.3); }
+  .product-carousel { min-width: 0; max-width: 100%; }
   .product-carousel__viewport {
     width: 100%;
     overflow-x: auto;
@@ -191,7 +175,7 @@ const { products, lang, title, headingId, ariaLabel, cardBadges, align = 'left' 
     justify-content: center;
   }
   .product-carousel__cell {
-    flex: 0 0 clamp(200px, 22vw, 260px);
+    flex: 0 0 clamp(220px, 22vw, 300px);
     min-width: 0;
     scroll-snap-align: start;
   }
@@ -201,7 +185,7 @@ const { products, lang, title, headingId, ariaLabel, cardBadges, align = 'left' 
      é literalmente `auto`), foi um bug real corrigido nesta mesma sessão. */
   @media (max-width: 640px) {
     .product-carousel__cell {
-      flex-basis: clamp(220px, 72vw, 300px);
+      flex-basis: clamp(220px, 74vw, 320px);
     }
   }
 </style>

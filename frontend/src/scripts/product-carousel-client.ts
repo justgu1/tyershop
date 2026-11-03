@@ -44,7 +44,6 @@ if (document.documentElement.dataset.carouselInitDone === 'true') {
         b.setAttribute('aria-label', `Ir para produto ${i + 1}`);
         b.setAttribute('aria-selected', i === currentIndex ? 'true' : 'false');
         b.className = i === currentIndex ? 'is-active' : '';
-        b.textContent = String(i + 1);
         b.addEventListener('click', () => goTo(i));
         pager.appendChild(b);
       });
@@ -99,7 +98,9 @@ if (document.documentElement.dataset.carouselInitDone === 'true') {
       // dando um resultado errado numa recheck (resize) subsequente.
       track.classList.remove('is-centered');
       const scrollable = track.scrollWidth > viewport.clientWidth + 1;
-      controlbar.hidden = !scrollable;
+      const showControls = scrollable || section.dataset.alwaysControls === 'true';
+      controlbar.hidden = !showControls || cells.length < 2;
+      section.classList.toggle('has-controls', showControls);
       // Só centraliza quando o carousel pediu align="center" (Home) — Loja
       // e PDP (align="left", padrão) ficam grudados na esquerda mesmo
       // quando cabe tudo, por pedido explícito.

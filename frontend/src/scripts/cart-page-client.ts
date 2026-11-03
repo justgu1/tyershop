@@ -3,13 +3,8 @@ import { createMedusaCartFromLocalCart } from '../lib/medusa-checkout-cart';
 import { fetchShippingQuote, isCep, linesSignature, onlyDigits, readSavedShipping, renderShippingOptions, saveShipping, type ShipOption, type ShipQuote } from '../lib/shipping';
 function fmt(cents: number) { return (Number(cents) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
 function escHtml(s: string) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-function formatVariantLabel(raw: string) {
-  const text = String(raw || '').trim();
-  if (!text) return '';
-  if (text.includes(':')) return text;
-  const parts = text.split(/[\/|]/).map((s) => s.trim()).filter(Boolean);
-  if (!parts.length) return text;
-  return parts.map((value, idx) => `Opcao ${idx + 1}: ${value}`).join(' | ');
+function formatVariantLabel(raw: string): string {
+  return String(raw || '').trim();
 }
 const couponState = { code: '', discountCents: 0, applied: false };
 function hasOutOfStock(items: ReturnType<typeof getCart>) {

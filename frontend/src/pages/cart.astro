@@ -101,7 +101,7 @@ const lang: Lang = getLangFromUrl(Astro.url);
 .cart-shell { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; }
 .cart-shell__items, .cart-shell__summary { min-width: 0; }
 @media (max-width: 980px) { .cart-shell { grid-template-columns: 1fr; } }
-.sc__body { background: #111; border: 1px solid #1e1e1e; border-radius: 8px; min-height: 340px; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; }
+.sc__body { background: #111; border: 1px solid #1e1e1e; border-radius: 8px; min-height: 160px; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; }
 .sc__empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: var(--c-muted); font-size: 14px; text-align: center; padding: 56px 0; }
 .sc__empty[hidden] { display: none !important; }
 /* Sem isso, a mensagem de vazio pisca pra quem TEM item — render() rodava

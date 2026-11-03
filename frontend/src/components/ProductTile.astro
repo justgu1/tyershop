@@ -1,0 +1,71 @@
+---
+/**
+ * Cartão simples de produto para listas (loja, drops anteriores, Starter, carrosséis): foto, nome, preço e etiquetas.
+ * Sem variações nem captura de e-mail: quem escolhe tamanho e cor é a página do produto.
+ */
+import { getPathForLang, type Lang } from '../i18n/utils';
+import { getVariantGalleryUrls } from '../lib/product-variant-gallery';
+import { getProductVariantData, isVariantSoldOut } from '../lib/product-variants';
+
+interface Props {
+  product: any;
+  lang?: Lang;
+  badges?: { isPopular?: boolean; isNew?: boolean };
+}
+
+const { product, lang = 'pt', badges } = Astro.props;
+const { stockReliable, normalizedVariants, defaultVariant } = getProductVariantData(product);
+
+const variants = product.variants ?? [];
+const soldOut = variants.length
+  ? variants.every((v: any) => isVariantSoldOut(v, stockReliable || v.manage_inventory === true))
+  : isVariantSoldOut(defaultVariant, stockReliable);
+const info = normalizedVariants.find((n: any) => n.id === defaultVariant?.id) ?? normalizedVariants[0];
+const price = info?.priceDisplay ?? null;
+const original = info?.originalDisplay ?? null;
+const discount = info?.discountPercent ?? 0;
+const exclusive = ['true', '1', 'yes', 'sim'].includes(String(product.metadata?.exclusive ?? product.metadata?.is_exclusive ?? '').toLowerCase());
+const [thumbRaw] = getVariantGalleryUrls(defaultVariant, product);
+const thumb = thumbRaw || product.thumbnail || '/no-data.webp';
+const href = getPathForLang(`/product/${product.handle ?? ''}`, lang);
+---
+
+<li class="ptile">
+  <a class="ptile__link" href={href} aria-label={product.title}>
+    <span class="ptile__img">
+      <img src={thumb} alt={product.title ?? ''} width="480" height="600" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/no-data.webp'" />
+      <span class="ptile__tags">
+        {soldOut && <span class="ptile__tag ptile__tag--soldout"><img src="/icons/cross.svg" alt="" width="12" height="12" />Esgotado</span>}
+        {!soldOut && discount > 0 && <span class="ptile__tag ptile__tag--discount">{discount}% off</span>}
+        {!soldOut && badges?.isNew && <span class="ptile__tag">Novo</span>}
+        {!soldOut && badges?.isPopular && <span class="ptile__tag">Em alta</span>}
+        {!soldOut && exclusive && <span class="ptile__tag">Exclusivo</span>}
+      </span>
+    </span>
+    <span class="ptile__title">{product.title}</span>
+    <span class="ptile__price">
+      {price && <strong>{price}</strong>}
+      {original && <s>{original}</s>}
+    </span>
+  </a>
+</li>
+
+<style>
+  .ptile { min-width: 0; list-style: none; }
+  .ptile__link { display: flex; flex-direction: column; gap: 6px; color: var(--tile-fg, inherit); text-decoration: none; }
+  .ptile__img { position: relative; display: block; aspect-ratio: 4 / 5; overflow: hidden; border-radius: 8px; background: #fff; }
+  .ptile__img img { width: 100%; height: 100%; object-fit: contain; display: block; transition: transform 0.35s ease; }
+  .ptile__link:hover .ptile__img img, .ptile__link:focus-visible .ptile__img img { transform: scale(1.04); }
+  .ptile__tags { position: absolute; top: 6px; left: 6px; right: 6px; display: flex; flex-wrap: wrap; gap: 4px; pointer-events: none; }
+  .ptile__tag { padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; background: rgba(10, 10, 10, 0.82); color: #fff; }
+  .ptile__tag--soldout { background: #000; display: inline-flex; align-items: center; gap: 5px; }
+  .ptile__tag--soldout img { width: 12px; height: 12px; }
+  .ptile__tag--discount { background: #16a34a; }
+  .ptile__title { font-size: 13px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ptile__price { display: flex; align-items: baseline; gap: 6px; font-size: 13px; }
+  .ptile__price strong { font-weight: 800; }
+  .ptile__price s { opacity: 0.55; font-size: 12px; }
+  @media (min-width: 640px) {
+    .ptile__title, .ptile__price { font-size: 14px; }
+  }
+</style>

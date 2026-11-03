@@ -15,6 +15,9 @@ export interface CartItem {
   quantity: number;
   maxQuantity?: number;
   stockState?: 'ok' | 'out_of_stock';
+  /** Peça em pré-venda: o limite por pessoa vale somando todas as variações do mesmo produto. */
+  productId?: string;
+  groupMax?: number;
 }
 
 const KEY = 'tyer_cart';
@@ -75,12 +78,20 @@ function sanitizeMax(maxQuantity?: number): number | undefined {
   return Math.floor(n);
 }
 
+/** Quanto ainda cabe nesta linha pelo limite por pessoa do produto (as outras variações já ocupam parte). */
+function groupRoom(items: CartItem[], item: CartItem): number {
+  if (!item.productId || !item.groupMax) return Infinity;
+  const others = items
+    .filter((i) => i.variantId !== item.variantId && i.productId === item.productId)
+    .reduce((s, i) => s + i.quantity, 0);
+  return Math.max(0, item.groupMax - others);
+}
+
 /** Limite máximo por linha para UI (stepper) e coerente com `clampQty`. */
 export function maxOrderableUnits(item: CartItem): number {
   const s = sanitizeMax(item.maxQuantity);
-  if (s) return s;
-  if (item.stockState === 'out_of_stock') return 1;
-  return CART_MAX_WHEN_UNKNOWN;
+  const base = s ?? (item.stockState === 'out_of_stock' ? 1 : CART_MAX_WHEN_UNKNOWN);
+  return Math.max(1, Math.min(base, groupRoom(read(), item)));
 }
 
 export function getCart(): CartItem[] { return read(); }
@@ -96,13 +107,16 @@ export function addItem(item: Omit<CartItem, 'quantity'> & { quantity?: number }
   if (idx >= 0) {
     const effectiveMax = sanitizeMax(items[idx].maxQuantity) ?? incomingMax;
     items[idx].maxQuantity = effectiveMax;
-    items[idx].quantity = clampQty(items[idx].quantity + (item.quantity ?? 1), effectiveMax);
+    items[idx].quantity = clampQty(items[idx].quantity + (item.quantity ?? 1), Math.min(effectiveMax ?? CART_MAX_WHEN_UNKNOWN, groupRoom(items, items[idx])));
     if (item.variantTitle) items[idx].variantTitle = item.variantTitle;
     if (item.thumbnail) items[idx].thumbnail = item.thumbnail;
     if (Number.isFinite(item.price)) items[idx].price = item.price;
   } else {
     const maxQuantity = incomingMax;
+    const sibling = item.productId ? items.find((i) => i.productId === item.productId && i.groupMax) : undefined;
+    if (sibling && groupRoom(items, { ...item, groupMax: sibling.groupMax } as CartItem) < 1) return;
     items.push({
+      ...(sibling ? { productId: sibling.productId, groupMax: sibling.groupMax } : {}),
       ...item,
       stockState: 'ok',
       maxQuantity,
@@ -120,7 +134,7 @@ export function updateQty(variantId: string, delta: number) {
   const items = read();
   const idx = items.findIndex(i => i.variantId === variantId);
   if (idx < 0) return;
-  items[idx].quantity = clampQty(items[idx].quantity + delta, items[idx].maxQuantity);
+  items[idx].quantity = clampQty(items[idx].quantity + delta, Math.min(items[idx].maxQuantity ?? CART_MAX_WHEN_UNKNOWN, groupRoom(items, items[idx])));
   write(items);
 }
 
@@ -128,7 +142,7 @@ export function setQty(variantId: string, quantity: number) {
   const items = read();
   const idx = items.findIndex(i => i.variantId === variantId);
   if (idx < 0) return;
-  items[idx].quantity = clampQty(quantity, items[idx].maxQuantity);
+  items[idx].quantity = clampQty(quantity, Math.min(items[idx].maxQuantity ?? CART_MAX_WHEN_UNKNOWN, groupRoom(items, items[idx])));
   write(items);
 }
 
@@ -241,7 +255,7 @@ async function fetchVariantSnapshot(variantId: string): Promise<VariantSnapshot>
 }
 
 /** Variantes de drop fora de venda (ou sem ingresso na pré-venda). Falha de rede não esvazia a bag. */
-async function fetchBlockedByDrop(variantIds: string[]): Promise<Set<string>> {
+async function fetchBlockedByDrop(variantIds: string[]): Promise<{ blocked: Set<string>; limit: { max: number; productByVariant: Record<string, string> } | null }> {
   try {
     const { base, key } = getStoreConfig();
     const token = localStorage.getItem('tyer_token');
@@ -254,10 +268,15 @@ async function fetchBlockedByDrop(variantIds: string[]): Promise<Set<string>> {
       },
       body: JSON.stringify({ variant_ids: variantIds }),
     });
-    if (!res.ok) return new Set();
-    return new Set((await res.json()).blocked_variant_ids ?? []);
+    if (!res.ok) return { blocked: new Set(), limit: null };
+    const body = await res.json();
+    const pl = body.presale_limit;
+    return {
+      blocked: new Set(body.blocked_variant_ids ?? []),
+      limit: pl?.max_per_product ? { max: Number(pl.max_per_product), productByVariant: pl.product_by_variant ?? {} } : null,
+    };
   } catch {
-    return new Set();
+    return { blocked: new Set(), limit: null };
   }
 }
 
@@ -277,7 +296,7 @@ export async function validateCartItems(): Promise<{
   const removedVariantIds: string[] = [];
   const outOfStockVariantIds: string[] = [];
 
-  const blocked = await fetchBlockedByDrop(current.map((i) => i.variantId));
+  const { blocked, limit } = await fetchBlockedByDrop(current.map((i) => i.variantId));
 
   snapshots.forEach(({ item, snapshot }) => {
     if (!snapshot.exists || blocked.has(item.variantId)) {
@@ -300,8 +319,31 @@ export async function validateCartItems(): Promise<{
     } else {
       merged.quantity = Math.max(1, Math.floor(Number(merged.quantity) || 1));
     }
+    const productId = limit?.productByVariant[item.variantId];
+    if (productId && limit) {
+      merged.productId = productId;
+      merged.groupMax = limit.max;
+    } else {
+      delete merged.productId;
+      delete merged.groupMax;
+    }
     nextItems.push(merged);
   });
+
+  // Quem já estava na bag acima do limite por pessoa volta para o limite, na ordem das linhas.
+  const used = new Map<string, number>();
+  for (const it of nextItems) {
+    if (!it.productId || !it.groupMax) continue;
+    const room = Math.max(0, it.groupMax - (used.get(it.productId) ?? 0));
+    it.quantity = Math.min(it.quantity, room);
+    used.set(it.productId, (used.get(it.productId) ?? 0) + it.quantity);
+  }
+  for (let n = nextItems.length - 1; n >= 0; n--) {
+    if (nextItems[n].productId && nextItems[n].quantity < 1) {
+      removedVariantIds.push(nextItems[n].variantId);
+      nextItems.splice(n, 1);
+    }
+  }
 
   const changed =
     removedVariantIds.length > 0 ||

@@ -10,6 +10,7 @@ const DEFAULT_FIELDS =
     'title',
     'handle',
     'thumbnail',
+    'created_at',
     'description',
     'metadata',
     '*options',

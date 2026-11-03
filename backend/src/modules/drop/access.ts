@@ -233,6 +233,15 @@ export async function loadCart(scope: MedusaContainer, cartId: string) {
  * Produtos de drop que este cliente não pode nem ver agora: em breve, encerrado,
  * ou em pré-venda sem ingresso resgatado. Produtos fora de qualquer drop nunca entram.
  */
+/** Produtos de drops em pré-venda agora: neles vale o limite por pessoa, que a bag já respeita antes do servidor negar. */
+export async function presaleProductIds(scope: MedusaContainer): Promise<Set<string>> {
+  const out = new Set<string>()
+  for (const { drop, productIds } of await dropRows(scope)) {
+    if (presentDrop(drop).phase === "presale") productIds.forEach((id) => out.add(id))
+  }
+  return out
+}
+
 export async function blockedProductIds(scope: MedusaContainer, customerId?: string | null): Promise<Set<string>> {
   const blocked = new Set<string>()
   for (const { drop, productIds } of await dropRows(scope)) {
