@@ -6,12 +6,13 @@ import {
   markOrderFulfillmentAsDeliveredWorkflow,
 } from "@medusajs/medusa/core-flows"
 import { addToCart, checkoutLabel, findInCart, generateLabel, getLabel, tracking, UnauthorizedError } from "./client"
-import { agencyFromEnv, buildCartPayload, DELIVERED, NEEDS_AGENCY, POSTED, senderFromEnv, serviceIdOf } from "./label"
+import { agencyFromEnv, buildCartPayload, cpfFromPayer, DELIVERED, NEEDS_AGENCY, POSTED, senderFromEnv, serviceIdOf } from "./label"
 import { buildPackage, loadShipments } from "./quote"
 import { MELHOR_ENVIO_MODULE } from "./index"
 import { setMetadataKey } from "../../utils/order-metadata"
 import { loadOrder, trackingUrl } from "../../utils/order-email"
 import type MelhorEnvioModuleService from "./service"
+import { getMercadoPagoClient } from "../../api/store/checkout/mercadopago/utils"
 
 /** Estado da etiqueta guardado em `order.metadata.melhor_envio`. */
 export type LabelState = {
@@ -72,7 +73,28 @@ async function cpfOf(scope: MedusaContainer, order: any): Promise<string> {
     const { data } = await scope.resolve(ContainerRegistrationKeys.QUERY).graph({ entity: "customer", fields: ["metadata"], filters: { id: order.customer_id } })
     candidates.unshift((data[0] as any)?.metadata?.cpf)
   }
-  return candidates.map((c) => String(c ?? "").replace(/\D/g, "")).find((c) => c.length === 11) ?? ""
+  const saved = candidates.map((c) => String(c ?? "").replace(/\D/g, "")).find((c) => c.length === 11)
+  if (saved) return saved
+  return cpfFromMercadoPago(scope, order.id)
+}
+
+/** Último recurso: o CPF que a pessoa informou ao pagar, guardado pelo Mercado Pago. */
+async function cpfFromMercadoPago(scope: MedusaContainer, orderId: string): Promise<string> {
+  try {
+    const { data } = await scope.resolve(ContainerRegistrationKeys.QUERY).graph({
+      entity: "order",
+      fields: ["payment_collections.payments.data"],
+      filters: { id: orderId },
+    })
+    const ids = ((data[0] as any)?.payment_collections ?? []).flatMap((pc: any) => pc.payments ?? []).map((p: any) => p.data?.mp_payment_id).filter(Boolean)
+    for (const id of ids) {
+      const cpf = cpfFromPayer(await getMercadoPagoClient().getPayment(id))
+      if (cpf) return cpf
+    }
+  } catch {
+    /* sem acesso ao Mercado Pago agora: segue como CPF não encontrado */
+  }
+  return ""
 }
 
 /**

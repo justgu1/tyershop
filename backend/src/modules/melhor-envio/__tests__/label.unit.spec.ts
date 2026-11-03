@@ -1,4 +1,4 @@
-import { agencyFromEnv, buildCartPayload, senderFromEnv, serviceIdOf } from "../label"
+import { agencyFromEnv, buildCartPayload, cpfFromPayer, senderFromEnv, serviceIdOf } from "../label"
 
 const env = {
   MELHOR_ENVIO_SENDER_NAME: "Tyer",
@@ -96,5 +96,17 @@ describe("ponto de postagem", () => {
     expect(agencyFromEnv({ MELHOR_ENVIO_AGENCY_ID: "49666" })).toBe(49666)
     expect(agencyFromEnv({ MELHOR_ENVIO_AGENCY_ID: "abc" })).toBeNull()
     expect(agencyFromEnv({})).toBeNull()
+  })
+})
+
+describe("CPF do pagador no Mercado Pago", () => {
+  it("lê o CPF do pagamento quando o cadastro não tem", () => {
+    expect(cpfFromPayer({ payer: { identification: { type: "CPF", number: "123.456.789-09" } } })).toBe("12345678909")
+  })
+
+  it("ignora documento que não é CPF ou está incompleto", () => {
+    expect(cpfFromPayer({ payer: { identification: { type: "CNPJ", number: "12345678000199" } } })).toBe("")
+    expect(cpfFromPayer({ payer: { identification: { type: "CPF", number: "123" } } })).toBe("")
+    expect(cpfFromPayer(null)).toBe("")
   })
 })
