@@ -664,7 +664,16 @@ function init() {
    * vez do form cru. Clicar num card só seleciona e preenche os inputs de
    * verdade por baixo — o "Avançar" continua sendo o CTA único do resumo
    * (`stage==='address'` → `submitAddress()`), sem botão novo. */
-  function renderAddressCards(addresses: SavedAddress[]) {
+  /** Endereço salvo escolhido nos cartões e, quando a pessoa está editando ou criando um, qual é (null = novo). */
+  let selectedAddressId: string | null = null;
+  let editingAddressId: string | null = null;
+
+  function setEditMode(on: boolean) {
+    show('checkout-address-edit-actions', on);
+    show('checkout-address-edit-error', false);
+  }
+
+  function renderAddressCards(addresses: SavedAddress[], selectId?: string | null) {
     const wrap = qs('checkout-address-cards');
     if (!wrap || !addresses.length) return;
     wrap.innerHTML = '';
@@ -677,10 +686,11 @@ function init() {
         seen.add(key);
         return true;
       });
-    sorted.forEach((addr, i) => {
+    const picked = sorted.find((a) => a.id === (selectId ?? selectedAddressId)) ?? null;
+    sorted.forEach((addr) => {
       const card = document.createElement('button');
       card.type = 'button';
-      card.className = 'checkout-address-card' + (i === 0 ? ' is-selected' : '');
+      card.className = 'checkout-address-card' + (addr.id === (picked?.id ?? sorted[0].id) ? ' is-selected' : '');
       card.dataset.addressId = addr.id;
       const name = `${addr.first_name || ''} ${addr.last_name || ''}`.trim();
       const line2 = [addr.metadata?.complement, addr.metadata?.neighborhood].filter(Boolean).map((v) => ` — ${v}`).join('');
@@ -692,19 +702,25 @@ function init() {
       card.addEventListener('click', () => {
         wrap.querySelectorAll('.checkout-address-card').forEach((c) => c.classList.remove('is-selected'));
         card.classList.add('is-selected');
+        selectedAddressId = addr.id;
         fillAddressFields(addr);
       });
       wrap.appendChild(card);
     });
-    fillAddressFields(sorted[0]);
+    const current = picked ?? sorted[0];
+    selectedAddressId = current.id;
+    fillAddressFields(current);
     show('checkout-address-summary', true);
     show('checkout-address-fields', false);
+    setEditMode(false);
   }
 
   // Edita o endereço escolhido: mostra os campos já preenchidos com ele em vez de limpar tudo.
   qs('checkout-address-summary-edit')?.addEventListener('click', () => {
+    editingAddressId = selectedAddressId;
     show('checkout-address-summary', false);
     show('checkout-address-fields', true);
+    setEditMode(true);
     qs<HTMLInputElement>('ck-street')?.focus();
   });
 
@@ -715,7 +731,64 @@ function init() {
     });
     show('checkout-address-summary', false);
     show('checkout-address-fields', true);
+    editingAddressId = null;
+    setEditMode(true);
     qs<HTMLInputElement>('ck-street')?.focus();
+  });
+
+  // Cancelar volta aos endereços salvos, com o escolhido como estava (descarta o que foi digitado).
+  qs('checkout-address-cancel')?.addEventListener('click', () => {
+    const back = customerAddresses.find((x) => x.id === selectedAddressId) ?? customerAddresses[0];
+    if (!back) return;
+    fillAddressFields(back);
+    show('checkout-address-fields', false);
+    show('checkout-address-summary', true);
+    setEditMode(false);
+  });
+
+  // Salvar grava a edição (ou o endereço novo) na conta e volta aos cartões, sem precisar seguir para o pagamento.
+  qs('checkout-address-save')?.addEventListener('click', async () => {
+    if (!validateRequiredFields(['ck-zip', 'ck-street', 'ck-number', 'ck-city', 'ck-province'])) return;
+    const btn = qs<HTMLButtonElement>('checkout-address-save');
+    const addr = addressFromForm();
+    const body = {
+      address_1: addr.street_name,
+      address_2: addr.street_number,
+      city: addr.city,
+      province: addr.federal_unit,
+      postal_code: addr.zip_code,
+      country_code: 'br',
+      metadata: { neighborhood: addr.neighborhood || undefined, complement: addr.complement || undefined },
+    };
+    if (btn) btn.disabled = true;
+    show('checkout-address-edit-error', false);
+    try {
+      const creating = !editingAddressId;
+      await medusaFetch(creating ? '/store/customers/me/addresses' : `/store/customers/me/addresses/${editingAddressId}`, {
+        method: 'POST',
+        body: JSON.stringify(
+          creating
+            ? {
+                ...body,
+                first_name: (qs<HTMLInputElement>('ck-first-name')?.value || '').trim(),
+                last_name: (qs<HTMLInputElement>('ck-last-name')?.value || '').trim(),
+                phone: (qs<HTMLInputElement>('ck-phone')?.value || '').trim() || undefined,
+                is_default_shipping: customerAddresses.length === 0,
+              }
+            : body
+        ),
+      });
+      const me = await medusaFetch('/store/customers/me');
+      customerAddresses = Array.isArray(me?.customer?.addresses) ? me.customer.addresses : customerAddresses;
+      const key = addressKey(addr.zip_code, addr.street_name, addr.street_number);
+      const saved = creating ? customerAddresses.find((x) => addressKey(x.postal_code, x.address_1, x.address_2) === key) : null;
+      renderAddressCards(customerAddresses, saved?.id ?? editingAddressId);
+    } catch (err) {
+      setText('checkout-address-edit-error', err instanceof Error ? err.message : 'Não foi possível salvar o endereço.');
+      show('checkout-address-edit-error', true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   });
 
   /** Passo 1 (dados) — cliente logado com nome/e-mail já conhecidos: card
