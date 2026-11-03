@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tyershop-backend
+  namespace: apps
+spec:
+  template:
+    spec:
+      containers:
+        - name: backend
+          env:
+            - name: SITE_URL
+              value: "https://tyershop.com"
+            - name: MERCADOPAGO_NOTIFICATION_URL
+              value: "https://medusa.tyershop.com/hooks/payment/mercadopago"
+            - name: EMAIL_TEST_MODE
+              value: "false"
+            - name: MELHOR_ENVIO_ENV
+              value: "production"
+            - name: MELHOR_ENVIO_REDIRECT_URI
+              value: "https://tyershop.com/melhor-envio/callback"
+            - name: STORE_CORS
+              value: "https://tyershop.com,https://www.tyershop.com"
+            - name: ADMIN_CORS
+              value: "https://medusa.tyershop.com"
+            - name: AUTH_CORS
+              value: "https://tyershop.com,https://www.tyershop.com,https://medusa.tyershop.com"
+            - name: AWS_BUCKET
+              value: tyershop-prod
+            - name: AWS_ACCESS_KEY_ID
+              value: tyershop-prod
+            - name: AWS_URL
+              value: https://api.tyershop.com/cdn/tyershop-prod

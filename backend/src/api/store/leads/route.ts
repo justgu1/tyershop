@@ -6,13 +6,15 @@ import { DROP_MODULE } from "../../../modules/drop"
 import { ensureAccount } from "../../../modules/lead/account"
 import { resolveDropPhase } from "../../../modules/drop/phase"
 import { statusOnCapture } from "../../../modules/lead/status"
+import { issueTickets } from "../../../modules/ticket/issue"
 import { unsubscribeUrl } from "../../../modules/lead/unsubscribe"
 import { StoreCreateLeadBody } from "./validators"
 
 const WHATSAPP_GROUP_URL = "https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN"
 
 /**
- * Captura pública: cria o lead como pendente (ou liberado, se o cronômetro da pré-venda está correndo) e nunca
+ * Captura pública: cria o lead como pendente (ou liberado, se o cronômetro da pré-venda está correndo ou se a pré-venda
+ * já abriu em um drop que libera quem se cadastra nela) e nunca
  * rebaixa quem já existe (um negado continua negado) nem revela o status de ninguém na resposta.
  */
 export async function POST(req: MedusaRequest<StoreCreateLeadBody>, res: MedusaResponse) {
@@ -29,13 +31,18 @@ export async function POST(req: MedusaRequest<StoreCreateLeadBody>, res: MedusaR
     req.scope.resolve("logger").warn(`drop atual indisponível no cadastro: ${(err as Error).message}`)
   }
 
+  const releaseInPresale = !!current?.release_leads_in_presale
   const [existing] = await leads.listLeads({ email }, { take: 1 })
   const isNew = !existing
+  let releasedInPresale: string | null = null
   if (isNew) {
-    await leads.createLeads({ email, name: name ?? null, status: statusOnCapture(null, phase), source })
+    const status = statusOnCapture(null, phase, releaseInPresale)
+    const created = await leads.createLeads({ email, name: name ?? null, status, source })
+    if (status === "liberado" && phase === "presale") releasedInPresale = created.id
   } else if (existing.status === "pendente") {
-    const next = statusOnCapture(existing.status, phase)
+    const next = statusOnCapture(existing.status, phase, releaseInPresale)
     if (next !== existing.status) await leads.updateLeads({ id: existing.id, status: next })
+    if (next === "liberado" && phase === "presale") releasedInPresale = existing.id
   }
   // Quem saiu da lista (ou foi negado) não é reativado nem recebe e-mail por um cadastro público: qualquer um poderia
   // reinscrever o endereço de outra pessoa. Voltar é decisão do admin.
@@ -64,6 +71,14 @@ export async function POST(req: MedusaRequest<StoreCreateLeadBody>, res: MedusaR
       })
     } catch (err) {
       req.scope.resolve("logger").warn(`lead_welcome não enviado: ${(err as Error).message}`)
+    }
+  }
+  // Com a pré-venda aberta ninguém espera a próxima emissão em lote: quem acabou de ser liberado recebe o ingresso agora.
+  if (releasedInPresale && current) {
+    try {
+      await issueTickets(req.scope, current.id, releasedInPresale)
+    } catch (err) {
+      req.scope.resolve("logger").warn(`ingresso do lead não emitido: ${(err as Error).message}`)
     }
   }
   res.status(201).json({ ok: true })

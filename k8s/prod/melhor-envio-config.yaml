@@ -1,0 +1,7 @@
+# Id do ponto de postagem da Jadlog em produção (lista em /api/v2/me/shipment/agencies com o token de produção). Preencher antes do go-live.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tyershop-melhor-envio
+data:
+  MELHOR_ENVIO_AGENCY_ID: "CHANGEME"

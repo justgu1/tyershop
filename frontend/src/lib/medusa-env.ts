@@ -32,6 +32,11 @@ export function getMercadoPagoPublicKey(): string {
   return process.env.PUBLIC_MERCADOPAGO_PUBLIC_KEY || '';
 }
 
+/** Chave pública do Google Maps (Places): autocompleta o endereço no checkout. Vazia = o cliente digita o endereço à mão. */
+export function getGoogleMapsKey(): string {
+  return process.env.PUBLIC_GOOGLE_MAPS_KEY || '';
+}
+
 /**
  * URL do gateway leve (newsletter/aviso de stock) — mesma lógica de runtime:
  * `PUBLIC_*` do frontend é build-time no CI, então window.__API_URL__

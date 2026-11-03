@@ -3,18 +3,28 @@ import Countdown from './Countdown.astro';
 import LeadForm from './LeadForm.astro';
 import AccessForm from './AccessForm.astro';
 import CollectionMosaicItem from '../CollectionMosaicItem.astro';
-import { PHASE_LABEL, type DropAccess, type PublicDrop } from '../../lib/drop';
+import SectionBand from './SectionBand.astro';
+import { PHASE_LABEL, type DropAccess, type DropSection, type PublicDrop } from '../../lib/drop';
 
 interface Props {
   drop: PublicDrop;
   access?: DropAccess;
   products?: any[];
+  sections?: DropSection[];
+  restock?: any[];
 }
-const { drop, access = 'none', products = [] } = Astro.props;
+const { drop, access = 'none', products = [], sections = [], restock: restockAll = [] } = Astro.props;
+// Peça que já está no drop aparece só na faixa do drop (e só para quem tem acesso), nunca duplicada no reestoque.
+const inDrop = new Set(products.map((p: any) => p.id));
+const restock = restockAll.filter((p: any) => !inDrop.has(p.id));
 const { phase } = drop;
 const heroBanner = drop.hero_kind === 'banner' ? drop.hero_url : null;
 const heroVideo = drop.hero_kind !== 'banner' ? drop.hero_url : null;
 const showProducts = access === 'granted' && products.length > 0;
+const byId = new Map<string, any>(products.map((p) => [p.id, p]));
+const groups = (sections.length ? sections : [{ key: 'all', title: drop.title, label: null, banner_url: null, banner_mobile_url: null, product_ids: products.map((p) => p.id) }])
+  .map((s) => ({ ...s, items: s.product_ids.map((id) => byId.get(id)).filter(Boolean) }))
+  .filter((s) => s.items.length);
 ---
 
 {showProducts ? (
@@ -30,14 +40,33 @@ const showProducts = access === 'granted' && products.length > 0;
         <p class="dc-banner__desc">
           Até 2 peças de cada produto por pessoa. Produção em até {drop.production_days} dias, mais o prazo da transportadora.
         </p>
-        <p class="dc-banner__count">{products.length} {products.length === 1 ? 'peça' : 'peças'}</p>
+        <p class="dc-banner__count">{`${products.length} ${products.length === 1 ? 'peça' : 'peças'}`}</p>
       </div>
     </section>
     <div class="container">
-      <div class="dc-mosaic" role="list" aria-label={drop.title}>
-        {products.map((p, i) => <CollectionMosaicItem product={p} lang="pt" reverse={i % 2 === 1} />)}
-      </div>
     </div>
+    {groups.map((s, n) => (
+      <section class="dc-section" aria-label={s.title || drop.title}>
+        <div class={s.banner_url ? 'dc-section__band dc-section__band--full' : 'container'}>
+          <SectionBand index={n + 1} title={s.title || drop.title} label={s.label} bannerUrl={s.banner_url} bannerMobileUrl={s.banner_mobile_url} />
+        </div>
+        <div class="container">
+          <div class="dc-mosaic" role="list" aria-label={s.title || drop.title}>
+            {s.items.map((p, i) => <CollectionMosaicItem product={p} lang="pt" reverse={i % 2 === 1} />)}
+          </div>
+        </div>
+      </section>
+    ))}
+    {restock.length > 0 && (
+      <section class="dc-section" aria-label="Reestoque">
+        <div class="container">
+          <SectionBand index={groups.length + 1} title="Reestoque" label="Starter · pronta entrega" />
+          <div class="dc-mosaic" role="list" aria-label="Reestoque">
+            {restock.map((p, i) => <CollectionMosaicItem product={p} lang="pt" reverse={i % 2 === 1} />)}
+          </div>
+        </div>
+      </section>
+    )}
   </main>
 ) : (
 <section class={`drop drop--${phase}`}>
@@ -59,14 +88,13 @@ const showProducts = access === 'granted' && products.length > 0;
 
     {phase === 'presale' && (
       <>
-        <Countdown targetIso={drop.general_starts_at ?? drop.preorder_ends_at} label="Pré-venda termina em" />
         <p class="drop__text">
           Pré-venda exclusiva para convidados: até 2 peças de cada produto por pessoa. Produção em até {drop.production_days} dias,
           mais o prazo da transportadora.
         </p>
         {access === 'login' && (
           <>
-            <p class="drop__text drop__text--muted">Recebeu um convite? Digite seu e-mail para entrar ou criar sua senha.</p>
+            <p class="drop__text drop__text--muted">Digite seu e-mail: se já tiver conta, pedimos a senha; se não, enviamos seu acesso à pré-venda.</p>
             <AccessForm cta="Continuar" />
           </>
         )}
@@ -81,7 +109,6 @@ const showProducts = access === 'granted' && products.length > 0;
 
     {phase === 'general' && (
       <>
-        <Countdown targetIso={drop.general_ends_at} label="Venda geral termina em" />
         <p class="drop__text">
           Venda geral aberta para todos, enquanto durar o lote. Produção em até {drop.production_days} dias, mais o prazo da
           transportadora.
@@ -104,9 +131,9 @@ const showProducts = access === 'granted' && products.length > 0;
 )}
 
 <style>
-  .dc { padding-bottom: 64px; background: #0b0b0b; color: #fff; }
+  .dc { padding-bottom: 64px; color: #fff; }
   .dc .container { max-width: var(--max-w, 1200px); margin-inline: auto; width: 100%; box-sizing: border-box; }
-  .dc-banner { position: relative; min-height: min(56vh, 520px); display: flex; align-items: flex-end; overflow: hidden; margin-bottom: 48px; background: #111; }
+  .dc-banner { position: relative; min-height: min(56vh, 520px); display: flex; align-items: flex-end; overflow: hidden; margin-bottom: 48px; }
   .dc-banner__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 25%; }
   .dc-banner__overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0, 0, 0, 0.88) 0%, rgba(0, 0, 0, 0.35) 55%, rgba(0, 0, 0, 0.15) 100%); }
   .dc-banner__content { position: relative; z-index: 1; padding-top: calc(var(--header-h) + 24px); padding-bottom: 40px; }
@@ -115,7 +142,9 @@ const showProducts = access === 'granted' && products.length > 0;
   .dc-banner__desc { max-width: 56ch; font-size: 15px; line-height: 1.55; color: rgba(255, 255, 255, 0.82); margin: 0 0 12px; }
   .dc-banner__count { margin: 0; font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.7); }
   .dc-mosaic { display: flex; flex-direction: column; }
-  .drop { position: relative; overflow: hidden; min-height: 70vh; display: grid; place-items: center; padding: 120px 20px 80px; text-align: center; background: #0b0b0b; color: #fff; }
+  .dc-section { margin-top: 40px; }
+  .dc-section__band--full { width: 100%; }
+  .drop { position: relative; overflow: hidden; min-height: 70vh; display: grid; place-items: center; padding: 120px 20px 80px; text-align: center; color: #fff; }
   .drop--presale, .drop--general { min-height: 0; padding-bottom: 56px; }
   .drop__bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .drop__shade { position: absolute; inset: 0; background: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.75)); }

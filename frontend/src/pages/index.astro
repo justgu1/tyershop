@@ -8,6 +8,8 @@ import { fetchDrops, fetchStarterProducts, dropCountdown, PHASE_LABEL } from '..
 import { fetchCollectionsWithCounts } from '../lib/collections';
 import { cached } from '../lib/ssr-cache';
 
+const HISTORY_VIDEO_URL = 'https://www.youtube.com/watch?v=zGpL52lmYp4';
+
 // Home busca catálogo no Medusa: precisa renderizar por requisição —
 // pré-renderizada o HTML congelaria com o estado do build (sem backend).
 export const prerender = false;
@@ -354,10 +356,13 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
         <p class="history__text-body"><em>TYER GANG.</em></p>
       </div>
       <div class="history__image">
-        <video class="history__video" muted loop playsinline preload="none" poster="/video/historia-poster.webp" width="1280" height="720" aria-hidden="true">
-          <source src="/video/historia.webm" type="video/webm" />
-          <source src="/video/historia.mp4" type="video/mp4" />
-        </video>
+        <a class="history__more" href={HISTORY_VIDEO_URL} target="_blank" rel="noopener">Clique aqui para assistir o trailer oficial da Tyer</a>
+        <a href={HISTORY_VIDEO_URL} target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
+          <video class="history__video" muted loop playsinline preload="none" poster="/video/historia-poster.webp" width="1280" height="720" aria-hidden="true">
+            <source src="/video/historia.webm" type="video/webm" />
+            <source src="/video/historia.mp4" type="video/mp4" />
+          </video>
+        </a>
       </div>
     </div>
   </section>
@@ -790,6 +795,8 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 .history__text { display: flex; flex-direction: column; gap: 16px; }
 .history__title { font-family: var(--font-title); font-size: clamp(36px, 5vw, 64px); text-transform: uppercase; line-height: 0.95; margin: 0; }
 .history__text-body { font-size: 15px; line-height: 1.8; color: var(--c-muted); }
+.history__more { display: block; margin-bottom: 12px; text-align: center; font-size: 14px; font-weight: 700; letter-spacing: 0.04em; color: #fff; text-decoration: none; transition: color .2s ease, letter-spacing .2s ease; }
+.history__more:hover, .history__more:focus-visible { color: var(--c-accent, #e77e23); letter-spacing: 0.08em; text-decoration: underline; text-underline-offset: 4px; }
 .history__image img, .history__video { width: 100%; height: auto; border-radius: 8px; display: block; background: #000; aspect-ratio: 16 / 9; }
 </style>
 <style is:global>

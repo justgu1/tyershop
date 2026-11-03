@@ -27,14 +27,24 @@ export type PublicDrop = {
   whatsapp_url: string | null;
 };
 
+export type DropSection = {
+  key: string;
+  title: string;
+  label: string | null;
+  banner_url: string | null;
+  banner_mobile_url: string | null;
+  product_ids: string[];
+};
+
 export type DropPayload = {
   drop: PublicDrop | null;
   previous: PublicDrop[];
   access: DropAccess;
   product_ids: string[];
+  sections: DropSection[];
 };
 
-const EMPTY: DropPayload = { drop: null, previous: [], access: 'none', product_ids: [] };
+const EMPTY: DropPayload = { drop: null, previous: [], access: 'none', product_ids: [], sections: [] };
 
 export async function fetchDrops(token?: string): Promise<DropPayload> {
   // Sem conta o resultado é igual para todos: vale guardar por alguns segundos (a fase muda por data, e o cronômetro recarrega a página).
@@ -58,6 +68,7 @@ async function fetchDropsUncached(token?: string): Promise<DropPayload> {
       previous: data.previous ?? [],
       access: data.access ?? 'none',
       product_ids: data.product_ids ?? [],
+      sections: data.sections ?? [],
     };
   } catch {
     return EMPTY;
@@ -94,22 +105,27 @@ async function fetchProductsByIdsUncached(ids: string[], token?: string): Promis
 /** Linha fixa Starter, na ordem do catálogo: sempre à venda (esgotado aparece como esgotado). */
 const STARTER_HANDLES = ['regata-savage-mode', 'shorts-tyer-pro', 'camiseta-tyer-starter-dry-fit'];
 
-export async function fetchStarterProducts(): Promise<any[]> {
-  return cached('starter', 30_000, () => fetchStarterUncached(), (v) => v.length > 0);
+/** Peças da linha Starter em reestoque, mostradas na /drop (aberta a todos: Starter tem estoque físico). */
+const RESTOCK_HANDLES = ['camiseta-tyer-starter-dry-fit'];
+
+export async function fetchStarterProducts(handles = STARTER_HANDLES): Promise<any[]> {
+  return cached(`starter:${handles.join(',')}`, 30_000, () => fetchStarterUncached(handles), (v) => v.length > 0);
 }
 
-async function fetchStarterUncached(): Promise<any[]> {
+export const fetchRestockProducts = () => fetchStarterProducts(RESTOCK_HANDLES);
+
+async function fetchStarterUncached(handles: string[]): Promise<any[]> {
   try {
     const url = getMedusaStoreUrl();
     const headers = { 'x-publishable-api-key': getPublishableKey() };
     const regionId = await resolveDefaultRegionId(url, headers);
-    const handles = STARTER_HANDLES.map((h) => `handle[]=${encodeURIComponent(h)}`).join('&');
-    const query = `${handles}&${getProductListQueryString(regionId)}&limit=${STARTER_HANDLES.length}`;
+    const handleQuery = handles.map((h) => `handle[]=${encodeURIComponent(h)}`).join('&');
+    const query = `${handleQuery}&${getProductListQueryString(regionId)}&limit=${handles.length}`;
     const res = await fetch(`${url}/store/products?${query}`, { headers, signal: AbortSignal.timeout(8000) });
     if (!res.ok) return [];
     const { products = [] } = await res.json();
     const byHandle = new Map<string, any>(products.map((p: any) => [p.handle, p]));
-    return STARTER_HANDLES.map((h) => byHandle.get(h)).filter(Boolean);
+    return handles.map((h) => byHandle.get(h)).filter(Boolean);
   } catch {
     return [];
   }
@@ -124,15 +140,9 @@ export const PHASE_LABEL: Record<DropPhase, string> = {
 
 /** Alvo, rótulo e CTA do cronômetro de cada fase; `target` é null quando não há contagem. */
 export function dropCountdown(drop: PublicDrop) {
-  const target =
-    drop.phase === 'coming_soon'
-      ? drop.preorder_starts_at
-      : drop.phase === 'presale'
-        ? (drop.general_starts_at ?? drop.preorder_ends_at)
-        : drop.phase === 'general'
-          ? drop.general_ends_at
-          : null;
-  const label = { coming_soon: 'Pré-venda abre em', presale: 'Pré-venda termina em', general: 'Venda geral termina em', ended: '' }[drop.phase];
+  // Só conta o tempo até a pré-venda abrir; depois de aberta, ninguém precisa do cronômetro de fim.
+  const target = drop.phase === 'coming_soon' ? drop.preorder_starts_at : null;
+  const label = drop.phase === 'coming_soon' ? 'Pré-venda abre em' : '';
   const cta = drop.phase === 'ended' ? 'Entrar na lista do próximo' : drop.phase === 'coming_soon' ? 'Quero ser avisado' : 'Ver o drop';
   return { target, label, cta };
 }

@@ -2,7 +2,9 @@ import { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/
 import { DROP_MODULE } from "../../../modules/drop"
 import DropModuleService from "../../../modules/drop/service"
 import { presentDrop } from "../../../modules/drop/present"
+import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { getDropProductIds } from "../../../modules/drop/products"
+import { buildSections, DropSection } from "../../../modules/drop/sections"
 import { hasTicket } from "../../../modules/ticket/access"
 
 const PUBLIC_FIELDS = [
@@ -28,6 +30,18 @@ const PUBLIC_FIELDS = [
 const pick = (d: ReturnType<typeof presentDrop>) =>
   Object.fromEntries(PUBLIC_FIELDS.map((k) => [k, (d as Record<string, unknown>)[k] ?? null]))
 
+async function sectionsOf(req: AuthenticatedMedusaRequest, productIds: string[]) {
+  if (!productIds.length) return []
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+  const { data } = await query.graph({
+    entity: "product",
+    fields: ["id", "collection.id", "collection.handle", "collection.title", "collection.metadata"],
+    filters: { id: productIds },
+  })
+  const byId = new Map((data as any[]).map((p) => [p.id, p]))
+  return buildSections(productIds.map((id) => byId.get(id) ?? { id }))
+}
+
 export async function GET(req: AuthenticatedMedusaRequest, res: MedusaResponse) {
   const drops = req.scope.resolve<DropModuleService>(DROP_MODULE)
 
@@ -41,6 +55,7 @@ export async function GET(req: AuthenticatedMedusaRequest, res: MedusaResponse) 
 
   let access: "granted" | "locked" | "login" | "none" = "none"
   let productIds: string[] = []
+  let sections: DropSection[] = []
 
   if (current) {
     const { phase } = presentDrop(current)
@@ -56,7 +71,10 @@ export async function GET(req: AuthenticatedMedusaRequest, res: MedusaResponse) 
       }
     }
     // Sem direito de acesso a lista de produtos nem sai do servidor.
-    if (access === "granted") productIds = await getDropProductIds(req.scope, current.id)
+    if (access === "granted") {
+      productIds = await getDropProductIds(req.scope, current.id)
+      sections = await sectionsOf(req, productIds)
+    }
   }
 
   res.json({
@@ -64,5 +82,6 @@ export async function GET(req: AuthenticatedMedusaRequest, res: MedusaResponse) 
     previous: previous.map(pick),
     access,
     product_ids: productIds,
+    sections,
   })
 }

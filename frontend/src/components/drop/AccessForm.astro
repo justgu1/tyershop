@@ -11,8 +11,9 @@ const { cta = 'Continuar' } = Astro.props;
     <button class="access__btn" type="submit" data-submit>{cta}</button>
   </div>
   <div class="access__pass" data-pass hidden>
-    <input class="access__input" type="password" name="password" minlength="8" autocomplete="current-password" aria-label="Senha" />
+    <input class="access__input" type="password" name="password" minlength="8" autocomplete="current-password" placeholder="Sua senha" aria-label="Senha" />
   </div>
+  <button class="access__link" type="button" data-forgot hidden>Esqueci minha senha</button>
   <p class="access__msg" role="status" aria-live="polite"></p>
 </form>
 
@@ -24,6 +25,8 @@ const { cta = 'Continuar' } = Astro.props;
   .access__input { flex: 1; min-width: 0; padding: 14px 16px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.06); color: #fff; font-size: 15px; }
   .access__btn { padding: 14px 20px; border: 0; border-radius: 8px; background: var(--c-accent, #e77e23); color: #fff; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; font-size: 13px; cursor: pointer; white-space: nowrap; }
   .access__btn:disabled { opacity: 0.6; cursor: wait; }
+  .access__link { margin-top: 10px; padding: 0; border: 0; background: none; color: rgba(255, 255, 255, 0.75); font-size: 13px; text-decoration: underline; cursor: pointer; }
+  .access__link:hover { color: #fff; }
   .access__msg { min-height: 20px; margin: 8px 0 0; font-size: 13px; color: rgba(255, 255, 255, 0.75); }
   .access__msg.is-error { color: #f87171; }
   @media (max-width: 480px) { .access__row { flex-direction: column; } }
@@ -37,13 +40,24 @@ const { cta = 'Continuar' } = Astro.props;
   const post = (url: string, body: unknown, extra: Record<string, string> = {}) =>
     fetch(url, { method: 'POST', headers: { ...headers(), ...extra }, body: JSON.stringify(body) });
 
+  /** Token de quem tem só conta de admin (ou só e-mail) não traz perfil de cliente: actor_id vem vazio. */
+  const hasCustomer = (token: string) => {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return !!payload.actor_id;
+    } catch {
+      return false;
+    }
+  };
+
   document.querySelectorAll<HTMLFormElement>('[data-access-form]').forEach((form) => {
     const email = form.querySelector<HTMLInputElement>('input[name="email"]')!;
     const password = form.querySelector<HTMLInputElement>('input[name="password"]')!;
     const passBox = form.querySelector<HTMLElement>('[data-pass]')!;
     const btn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
+    const forgot = form.querySelector<HTMLButtonElement>('[data-forgot]')!;
     const msg = form.querySelector<HTMLElement>('.access__msg')!;
-    let mode: 'identify' | 'login' | 'register' = 'identify';
+    let mode: 'identify' | 'login' = 'identify';
 
     const say = (text: string, error = true) => {
       msg.textContent = text;
@@ -51,26 +65,34 @@ const { cta = 'Continuar' } = Astro.props;
     };
 
     async function login() {
-      const res = await post('/auth/customer/emailpass', { email: email.value.trim(), password: password.value });
+      const body = { email: email.value.trim(), password: password.value };
+      const res = await post('/auth/customer/emailpass', body);
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.token) throw new Error('E-mail ou senha inválidos.');
-      return data.token as string;
+      if (hasCustomer(data.token)) return data.token as string;
+      // A conta existe (ex.: admin), mas ainda não é cliente da loja: cria o perfil e entra de novo.
+      const created = await post('/store/customers', { email: body.email }, { authorization: `Bearer ${data.token}` });
+      if (!created.ok) throw new Error('Não foi possível entrar com esta conta.');
+      const again = await post('/auth/customer/emailpass', body);
+      const token = (await again.json().catch(() => ({}))).token;
+      if (!again.ok || !token) throw new Error('E-mail ou senha inválidos.');
+      return token as string;
     }
 
-    async function register() {
-      const body = { email: email.value.trim(), password: password.value };
-      const reg = await post('/auth/customer/emailpass/register', body);
-      const regData = await reg.json().catch(() => ({}));
-      if (!reg.ok || !regData.token) throw new Error(regData?.message || 'Não foi possível criar a conta.');
-      const created = await post('/store/customers', { email: body.email }, { authorization: `Bearer ${regData.token}` });
-      if (!created.ok) throw new Error('Não foi possível criar a conta.');
-      return login();
-    }
+    forgot.addEventListener('click', async () => {
+      forgot.disabled = true;
+      try {
+        await post('/auth/customer/emailpass/reset-password', { identifier: email.value.trim() });
+        say('Se este e-mail tiver conta, enviamos o link para criar uma nova senha.', false);
+      } finally {
+        forgot.disabled = false;
+      }
+    });
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!/^\S+@\S+\.\S+$/.test(email.value.trim())) return say('Digite um e-mail válido.');
-      if (mode !== 'identify' && password.value.length < 8) return say('A senha precisa ter ao menos 8 caracteres.');
+      if (mode === 'login' && password.value.length < 8) return say('A senha precisa ter ao menos 8 caracteres.');
 
       btn.disabled = true;
       say('', false);
@@ -78,18 +100,22 @@ const { cta = 'Continuar' } = Astro.props;
         if (mode === 'identify') {
           const res = await post('/store/drop/identify', { email: email.value.trim() });
           if (!res.ok) throw new Error('Não consegui verificar agora. Tente de novo.');
-          const { exists } = await res.json();
-          mode = exists ? 'login' : 'register';
-          password.autocomplete = exists ? 'current-password' : 'new-password';
-          password.placeholder = exists ? 'Sua senha' : 'Crie uma senha';
-          passBox.hidden = false;
-          email.readOnly = true;
-          btn.textContent = exists ? 'Entrar' : 'Criar conta';
-          say('Digite sua senha. Se ainda não definiu uma, entre pelo link do ingresso que enviamos ao seu e-mail.', false);
-          password.focus();
+          if ((await res.json()).exists) {
+            mode = 'login';
+            passBox.hidden = false;
+            forgot.hidden = false;
+            email.readOnly = true;
+            btn.textContent = 'Entrar';
+            say('Digite sua senha. Se ainda não definiu uma, use o link do ingresso que enviamos ao seu e-mail ou "Esqueci minha senha".', false);
+            password.focus();
+            return;
+          }
+          const lead = await post('/store/leads', { email: email.value.trim(), source: 'pedir_acesso' });
+          if (!lead.ok) throw new Error('Não consegui registrar agora. Tente de novo.');
+          location.assign('/drop/obrigado');
           return;
         }
-        const token = mode === 'login' ? await login() : await register();
+        const token = await login();
         localStorage.setItem('tyer_token', token);
         localStorage.removeItem('tyer_customer');
         window.dispatchEvent(new Event('tyer:auth'));

@@ -86,7 +86,7 @@ spec:
                   optional: true
             - name: SMTP_FROM
               value: "Tyer <suporte@tyershop.com>"
-            # Ligado por padrão: homolog e prod são o mesmo deploy, nada sai para cliente real sem desligar aqui.
+            # Ligado: nada sai para cliente real. Em produção o desligamento é decisão de go-live (prod/backend.yaml).
             # Multiplicador dos limites de requisição, lido de um ConfigMap que só existe durante uma janela de teste (kubectl, fora do git).
             - name: RATE_LIMIT_SCALE
               valueFrom:
@@ -199,17 +199,17 @@ spec:
                   key: MELHOR_ENVIO_SENDER_COMPLEMENT
                   optional: true
             - name: MELHOR_ENVIO_FROM_ZIP
-              value: "06365210"
+              value: "06365570"
             # Conexões por réplica. Réplicas x este valor precisa ficar abaixo do max_connections do PostgreSQL menos o que os
             # outros apps usam (hoje ~20); o ajuste do banco no repo de infra sobe o limite para 150.
             - name: DB_POOL_MAX
               value: "15"
             - name: STORE_CORS
-              value: "https://homolog.tyershop.com,https://tyershop.com,https://www.tyershop.com"
+              value: "https://homolog.tyershop.com"
             - name: ADMIN_CORS
               value: "https://medusa.homolog.tyershop.com"
             - name: AUTH_CORS
-              value: "https://homolog.tyershop.com,https://tyershop.com,https://www.tyershop.com,https://medusa.homolog.tyershop.com"
+              value: "https://homolog.tyershop.com,https://medusa.homolog.tyershop.com"
             - name: AWS_BUCKET
               value: tyershop
             - name: AWS_DEFAULT_REGION

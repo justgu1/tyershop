@@ -52,15 +52,15 @@ export async function previewTickets(scope: MedusaContainer, dropId: string) {
   }
 }
 
-/** Cria os ingressos que faltam e envia o e-mail de todos que ainda não receberam. */
-export async function issueTickets(scope: MedusaContainer, dropId: string) {
+/** Cria os ingressos que faltam e envia o e-mail de todos que ainda não receberam (ou só de `onlyLeadId`). */
+export async function issueTickets(scope: MedusaContainer, dropId: string, onlyLeadId?: string) {
   const { drop, liberados, tickets, leadById, ticketsService } = await load(scope, dropId)
 
   if (resolveDropPhase(drop) === "ended") {
     throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "Este drop já encerrou")
   }
 
-  const toCreate = leadsToIssue(liberados, tickets)
+  const toCreate = leadsToIssue(liberados, tickets).filter((l) => !onlyLeadId || l.id === onlyLeadId)
   const created = toCreate.length
     ? await ticketsService.createTickets(
         toCreate.map((l) => ({
@@ -74,7 +74,7 @@ export async function issueTickets(scope: MedusaContainer, dropId: string) {
     : []
   created.forEach((t, i) => leadById.set(toCreate[i].id, toCreate[i]))
 
-  const pending = ticketsToSend([...tickets, ...created])
+  const pending = ticketsToSend([...tickets, ...created]).filter((t) => !onlyLeadId || t.lead_id === onlyLeadId)
   const notifications = scope.resolve(Modules.NOTIFICATION) as any
   const siteUrl = (process.env.SITE_URL || "http://localhost:4321").replace(/\/$/, "")
 

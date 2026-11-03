@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tyershop-frontend
+  namespace: apps
+spec:
+  template:
+    spec:
+      containers:
+        - name: frontend
+          env:
+            - name: PUBLIC_MEDUSA_URL
+              value: "https://medusa.tyershop.com"
+            - name: MEDUSA_INTERNAL_URL
+              value: "http://tyershop-backend.tyershop-prod.svc.cluster.local:9000"
+            - name: MEDUSA_URL
+              value: "http://tyershop-backend.tyershop-prod.svc.cluster.local:9000"
+            - name: PUBLIC_API_URL
+              value: "https://api.tyershop.com"

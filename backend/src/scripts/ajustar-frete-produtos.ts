@@ -13,6 +13,10 @@ const JAQUETA: Medidas = { weight: 500, length: 35, width: 28, height: 8 };
 const CHAVEIRO: Medidas = { weight: 30, length: 16, width: 11, height: 3 };
 const PULSEIRA: Medidas = { weight: 20, length: 16, width: 11, height: 2 };
 
+// Pré-venda Tyer Gang e Caçada: 200 g por peça (a pulseira, 100 g).
+const PECA_PRE_VENDA: Medidas = { weight: 200, length: 30, width: 25, height: 3 };
+const PULSEIRA_CACADA: Medidas = { weight: 100, length: 16, width: 11, height: 2 };
+
 const POR_PRODUTO: Record<string, Medidas> = {
   "camiseta-tyer-five-stars": CAMISETA,
   "camiseta-tyer-red-rose": CAMISETA,
@@ -32,6 +36,11 @@ const POR_PRODUTO: Record<string, Medidas> = {
   "chaveiro-tyer-five-stars-only": CHAVEIRO,
   "chaveiro-tyer-logo": CHAVEIRO,
   "pulseira-tyer": PULSEIRA,
+  "camiseta-tyer-gang": PECA_PRE_VENDA,
+  "short-compressao-cacada": PECA_PRE_VENDA,
+  "calca-cacada": PECA_PRE_VENDA,
+  "regata-cacada": PECA_PRE_VENDA,
+  "pulseira-cacada": PULSEIRA_CACADA,
 };
 
 export default async function ajustarFreteProdutos({ container }: ExecArgs) {

@@ -5,6 +5,7 @@ import { getLangFromUrl, getPathForLang, t } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
 import { getProductListQueryString, resolveDefaultRegionId } from '../../lib/medusa-pricing';
 import { getMedusaStoreUrl, getPublishableKey } from '../../lib/medusa-env';
+import { isHiddenCollection } from '../../lib/collections';
 
 // Catálogo dinâmico: renderiza por requisição (ver index.astro).
 export const prerender = false;
@@ -82,7 +83,7 @@ try {
 
   let colList: any[] = [];
   if (cRes.ok) {
-    colList = (await cRes.json()).collections ?? [];
+    colList = ((await cRes.json()).collections ?? []).filter((c: any) => !isHiddenCollection(c));
   }
 
   const colWith = await Promise.all(
@@ -95,7 +96,7 @@ try {
         .then((d) => ({ ...c, products: d.products ?? [] }))
     )
   );
-  collections = colWith.map((c) => {
+  collections = colWith.filter((c) => c.products.length > 0).map((c) => {
     for (const p of c.products) {
       if (p?.id) knownIds.push(p.id);
     }

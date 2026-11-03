@@ -22,6 +22,7 @@ declare global {
   interface Window {
     __MEDUSA_PK__?: string;
     __MERCADOPAGO_PK__?: string;
+    __GOOGLE_MAPS_KEY__?: string;
     MercadoPago?: any;
   }
 }
@@ -60,41 +61,47 @@ function initCustomSelect(wrapId: string, btnId: string, listId: string, valueLa
   const list = qs<HTMLUListElement>(listId);
   const valueLabel = qs(valueLabelId);
   const hiddenInput = qs<HTMLInputElement>(hiddenInputId);
-  if (!wrap || !btn || !list || !valueLabel || !hiddenInput) return;
-  const options = Array.from(list.querySelectorAll<HTMLLIElement>('[role="option"]'));
+  if (!wrap || !btn || !list || !valueLabel || !hiddenInput) return null;
+  const getOptions = () => Array.from(list.querySelectorAll<HTMLLIElement>('[role="option"]'));
 
+  /** Lista solta sobre a página (fixed): não cria rolagem nem é cortada pela coluna do resumo. */
+  function place() {
+    const r = btn!.getBoundingClientRect();
+    const room = window.innerHeight - r.bottom - 12;
+    const h = Math.min(list!.scrollHeight, 260);
+    list!.style.position = 'fixed';
+    list!.style.left = `${r.left}px`;
+    list!.style.width = `${r.width}px`;
+    list!.style.right = 'auto';
+    list!.style.maxHeight = '260px';
+    list!.style.top = room >= h || r.top < h ? `${r.bottom + 4}px` : `${r.top - h - 4}px`;
+  }
   function close() {
     list!.hidden = true;
     btn!.setAttribute('aria-expanded', 'false');
   }
   function open() {
     list!.hidden = false;
+    place();
     btn!.setAttribute('aria-expanded', 'true');
-    options.find((o) => o.classList.contains('is-selected'))?.focus();
+    (getOptions().find((o) => o.classList.contains('is-selected')) ?? getOptions()[0])?.focus();
   }
   function select(opt: HTMLLIElement) {
-    options.forEach((o) => {
+    getOptions().forEach((o) => {
       o.classList.toggle('is-selected', o === opt);
       o.setAttribute('aria-selected', o === opt ? 'true' : 'false');
     });
-    valueLabel!.textContent = opt.textContent || '';
+    valueLabel!.textContent = opt.dataset.short || opt.textContent || '';
     hiddenInput!.value = opt.dataset.value || '';
     hiddenInput!.dispatchEvent(new Event('change', { bubbles: true }));
     close();
     btn!.focus();
   }
-
-  btn.addEventListener('click', () => (list.hidden ? open() : close()));
-  btn.addEventListener('keydown', (ev) => {
-    if (ev.key === 'ArrowDown' || ev.key === 'Enter' || ev.key === ' ') {
-      ev.preventDefault();
-      open();
-    }
-  });
-  options.forEach((opt) => {
+  function bind(opt: HTMLLIElement) {
     opt.tabIndex = -1;
     opt.addEventListener('click', () => select(opt));
     opt.addEventListener('keydown', (ev) => {
+      const options = getOptions();
       const idx = options.indexOf(opt);
       if (ev.key === 'ArrowDown') {
         ev.preventDefault();
@@ -117,10 +124,48 @@ function initCustomSelect(wrapId: string, btnId: string, listId: string, valueLa
         btn!.focus();
       }
     });
+  }
+
+  btn.addEventListener('click', () => (list.hidden ? open() : close()));
+  btn.addEventListener('keydown', (ev) => {
+    if (ev.key === 'ArrowDown' || ev.key === 'Enter' || ev.key === ' ') {
+      ev.preventDefault();
+      open();
+    }
   });
+  getOptions().forEach(bind);
   document.addEventListener('click', (ev) => {
     if (!wrap!.contains(ev.target as Node)) close();
   });
+  // A lista é fixed: acompanhar o botão (ou fechar) quando a página rola ou muda de tamanho.
+  window.addEventListener('resize', () => !list!.hidden && place());
+  window.addEventListener('scroll', (ev) => !list!.hidden && !list!.contains(ev.target as Node) && place(), true);
+
+  return {
+    /** Troca as opções (valor enviado, texto da lista e texto curto do botão) mantendo a escolha quando ainda existe. */
+    setOptions(items: { value: string; label: string; short?: string }[]) {
+      const keep = hiddenInput!.value;
+      list!.replaceChildren();
+      items.forEach((it) => {
+        const li = document.createElement('li');
+        li.setAttribute('role', 'option');
+        li.dataset.value = it.value;
+        if (it.short) li.dataset.short = it.short;
+        li.textContent = it.label;
+        list!.appendChild(li);
+        bind(li);
+      });
+      const chosen = getOptions().find((o) => o.dataset.value === keep) ?? getOptions()[0];
+      if (chosen) {
+        getOptions().forEach((o) => {
+          o.classList.toggle('is-selected', o === chosen);
+          o.setAttribute('aria-selected', o === chosen ? 'true' : 'false');
+        });
+        valueLabel!.textContent = chosen.dataset.short || chosen.textContent || '';
+        hiddenInput!.value = chosen.dataset.value || '1';
+      }
+    },
+  };
 }
 
 /** Setado depois do registro/login silencioso — associa carrinho/pedido ao customer. */
@@ -221,12 +266,46 @@ function init() {
     return;
   }
   renderSummary(items);
-  initCustomSelect('ck-installments-select', 'ck-installments-btn', 'ck-installments-list', 'ck-installments-value', 'ck-installments');
+  const installmentsSelect = initCustomSelect('ck-installments-select', 'ck-installments-btn', 'ck-installments-list', 'ck-installments-value', 'ck-installments');
+  let payableTotal = 0;
+
+  /** Parcelas do cartão, no formato do Mercado Livre: "3x de R$ 3,65 sem juros" ou "6x de R$ 2,00 (R$ 12,00)". */
+  function renderInstallments(costs?: { installments: number; installment_rate: number; installment_amount: number; total_amount: number }[]) {
+    if (!installmentsSelect) return;
+    if (!costs?.length) {
+      const label = payableTotal ? `1x de ${fmtBrl(payableTotal)} sem juros` : '1x';
+      installmentsSelect.setOptions([{ value: '1', label }]);
+      return;
+    }
+    installmentsSelect.setOptions(
+      costs.map((c) => {
+        const base = `${c.installments}x de ${fmtBrl(c.installment_amount)}`;
+        const label = Number(c.installment_rate) === 0 ? `${base} sem juros` : `${base} (${fmtBrl(c.total_amount)})`;
+        return { value: String(c.installments), label };
+      })
+    );
+  }
+  renderInstallments();
 
   // ---- Frete: opções (preço e prazo) calculadas no servidor para o CEP digitado ----
   let shipChoice: ShipOption | null = null;
   let shipFor = '';
   let shipTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Mostra o frete escolhido nos totais assim que ele é escolhido; o valor oficial vem do carrinho ao confirmar. */
+  function previewShippingTotals() {
+    const subtotalCents = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    if (!shipChoice) {
+      show('checkout-summary-shipping-row', false);
+      setText('checkout-summary-total', fmtBrl(subtotalCents / 100));
+      setText('checkout-summary-toggle-total', fmtBrl(subtotalCents / 100));
+      return;
+    }
+    setText('checkout-summary-shipping', fmtBrl(shipChoice.price));
+    show('checkout-summary-shipping-row', true);
+    setText('checkout-summary-total', fmtBrl(subtotalCents / 100 + shipChoice.price));
+    setText('checkout-summary-toggle-total', fmtBrl(subtotalCents / 100 + shipChoice.price));
+  }
 
   async function refreshShipping() {
     const zip = (qs<HTMLInputElement>('ck-zip')?.value || '').trim();
@@ -238,6 +317,7 @@ function init() {
       shipChoice = null;
       shipFor = '';
       box.hidden = true;
+      previewShippingTotals();
       return;
     }
     const lines = items.map((i) => ({ variant_id: i.variantId, quantity: i.quantity }));
@@ -253,17 +333,20 @@ function init() {
       shipChoice = quote.options.find((o) => o.id === (shipChoice?.id ?? savedId)) ?? quote.options[0] ?? null;
       shipFor = key;
       hint.textContent = shipChoice ? '' : 'Nenhum serviço de entrega atende este CEP.';
+      previewShippingTotals();
       renderShippingOptions(list, quote, {
         name: 'ck-ship',
         selectedId: shipChoice?.id,
         onSelect: (o) => {
           shipChoice = o;
           saveShipping({ cep: zip, id: o.id, name: o.name, price: o.price, signature: linesSignature(lines) });
+          previewShippingTotals();
         },
       });
     } catch (err) {
       shipChoice = null;
       shipFor = '';
+      previewShippingTotals();
       hint.textContent = err instanceof Error ? err.message : 'Não foi possível calcular o frete agora.';
     }
   }
@@ -272,6 +355,53 @@ function init() {
     if (shipTimer) clearTimeout(shipTimer);
     shipTimer = setTimeout(() => void refreshShipping(), 400);
   };
+  /**
+   * Autocompletar do Google (Places) no campo "Endereço": ao escolher uma sugestão, preenche endereço, número, bairro,
+   * cidade, UF e CEP. Sem chave configurada, ou se o Google não carregar, o cliente digita tudo à mão.
+   */
+  function initAddressAutocomplete() {
+    const key = (window.__GOOGLE_MAPS_KEY__ || '').trim();
+    const streetInput = qs<HTMLInputElement>('ck-street');
+    if (!key || !streetInput || document.getElementById('gmaps-sdk')) return;
+    const start = () => {
+      const g = (window as any).google;
+      if (!g?.maps?.places) return;
+      const auto = new g.maps.places.Autocomplete(streetInput, {
+        componentRestrictions: { country: 'br' },
+        fields: ['address_components'],
+        types: ['address'],
+      });
+      auto.addListener('place_changed', () => {
+        const parts: { long_name: string; short_name: string; types: string[] }[] = auto.getPlace()?.address_components ?? [];
+        const get = (type: string, short = false) => {
+          const p = parts.find((c) => c.types.includes(type));
+          return p ? (short ? p.short_name : p.long_name) : '';
+        };
+        const put = (id: string, value: string) => {
+          const el = qs<HTMLInputElement>(id);
+          if (el && value) el.value = value;
+        };
+        put('ck-street', get('route'));
+        put('ck-number', get('street_number'));
+        put('ck-neighborhood', get('sublocality_level_1') || get('sublocality') || get('neighborhood'));
+        put('ck-city', get('administrative_area_level_2') || get('locality'));
+        put('ck-province', get('administrative_area_level_1', true));
+        const zip = get('postal_code');
+        if (zip) {
+          put('ck-zip', zip);
+          scheduleShipping();
+        }
+        qs<HTMLInputElement>(get('street_number') ? 'ck-city' : 'ck-number')?.focus();
+      });
+    };
+    const script = document.createElement('script');
+    script.id = 'gmaps-sdk';
+    script.async = true;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&language=pt-BR&region=BR`;
+    script.addEventListener('load', start);
+    document.head.appendChild(script);
+  }
+  initAddressAutocomplete();
   zipField?.addEventListener('input', scheduleShipping);
   zipField?.addEventListener('change', scheduleShipping);
 
@@ -334,18 +464,19 @@ function init() {
   function isMobileWizard(): boolean {
     return window.matchMedia('(max-width: 860px)').matches;
   }
-  const MOBILE_STEP_ORDER: (typeof mobileStep)[] = ['contact', 'address', 'review', 'payment'];
   const MOBILE_STEP_LABELS: Record<typeof mobileStep, string> = {
-    contact: 'Passo 1 de 4 — Seus dados',
-    address: 'Passo 2 de 4 — Endereço de entrega',
-    review: 'Passo 3 de 4 — Revisão do pedido',
-    payment: 'Passo 4 de 4 — Pagamento',
+    contact: 'Passo 1 de 3 — Seus dados',
+    address: 'Passo 2 de 3 — Endereço e entrega',
+    review: 'Passo 3 de 3 — Revisão e pagamento',
+    payment: 'Passo 3 de 3 — Revisão e pagamento',
   };
   function setMobileStep(next: typeof mobileStep) {
     mobileStep = next;
     root.dataset.mobileStep = next;
     setText('checkout-mobile-step-label', MOBILE_STEP_LABELS[next]);
-    const pct = Math.round(((MOBILE_STEP_ORDER.indexOf(next) + 1) / MOBILE_STEP_ORDER.length) * 100);
+    // Revisão e pagamento são o mesmo passo para quem preenche: 3 passos (dados, endereço e entrega, pagamento).
+    const stepNumber = next === 'contact' ? 1 : next === 'address' ? 2 : 3;
+    const pct = Math.round((stepNumber / 3) * 100);
     const fill = qs('checkout-mobile-stepper-fill');
     if (fill) fill.style.width = `${pct}%`;
     setText('checkout-mobile-stepper-pct', `${pct}%`);
@@ -394,6 +525,29 @@ function init() {
       const spam = qs('checkout-success-spam');
       if (spam) spam.hidden = false;
     }
+  }
+
+  /** Aviso central animado (barra + bola) durante as etapas demoradas; as mensagens se revezam enquanto espera. */
+  let busyTimer: ReturnType<typeof setInterval> | null = null;
+  function startBusy(messages: string[]) {
+    const box = qs('checkout-busy');
+    if (!box) return;
+    let i = 0;
+    setText('checkout-busy-text', messages[0] ?? '');
+    box.hidden = false;
+    if (busyTimer) clearInterval(busyTimer);
+    if (messages.length > 1) {
+      busyTimer = setInterval(() => {
+        i = Math.min(i + 1, messages.length - 1);
+        setText('checkout-busy-text', messages[i]);
+      }, 2200);
+    }
+  }
+  function stopBusy() {
+    if (busyTimer) clearInterval(busyTimer);
+    busyTimer = null;
+    const box = qs('checkout-busy');
+    if (box) box.hidden = true;
   }
 
   async function completeCart() {
@@ -471,6 +625,12 @@ function init() {
   };
   let customerAddresses: SavedAddress[] = [];
 
+  /** Mesmo endereço digitado de formas diferentes (CEP com ou sem hífen, caixa, espaços) conta como um só. */
+  function addressKey(zip?: string | null, street?: string | null, number?: string | null) {
+    const norm = (v?: string | null) => String(v || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    return `${String(zip || '').replace(/\D/g, '')}|${norm(street)}|${norm(number)}`;
+  }
+
   function fillAddressFields(addr: SavedAddress) {
     const map: Record<string, string> = {
       'ck-zip': addr.postal_code || '',
@@ -495,7 +655,15 @@ function init() {
     const wrap = qs('checkout-address-cards');
     if (!wrap || !addresses.length) return;
     wrap.innerHTML = '';
-    const sorted = [...addresses].sort((a, b) => (b.is_default_shipping ? 1 : 0) - (a.is_default_shipping ? 1 : 0));
+    const seen = new Set<string>();
+    const sorted = [...addresses]
+      .sort((a, b) => (b.is_default_shipping ? 1 : 0) - (a.is_default_shipping ? 1 : 0))
+      .filter((a) => {
+        const key = addressKey(a.postal_code, a.address_1, a.address_2);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
     sorted.forEach((addr, i) => {
       const card = document.createElement('button');
       card.type = 'button';
@@ -566,13 +734,19 @@ function init() {
         /* localStorage indisponível — sessão em memória já basta pra esta page load */
       }
 
-      if (customer.email && customer.first_name && customer.last_name) {
-        setIfEmpty('ck-email', customer.email);
+      // O e-mail da conta é o que dá acesso à pré-venda: logado, ele vem preenchido e não pode ser trocado por outro.
+      if (customer.email) {
+        const emailInput = qs<HTMLInputElement>('ck-email');
+        if (emailInput) {
+          emailInput.value = customer.email;
+          emailInput.readOnly = true;
+          emailInput.setAttribute('aria-readonly', 'true');
+        }
         setIfEmpty('ck-first-name', customer.first_name);
         setIfEmpty('ck-last-name', customer.last_name);
         setIfEmpty('ck-phone', customer.phone);
         if (customer.metadata?.cpf) setIfEmpty('ck-cpf', String(customer.metadata.cpf));
-        renderContactSummary(customer);
+        if (customer.first_name && customer.last_name) renderContactSummary(customer);
       }
 
       customerAddresses = Array.isArray(customer.addresses) ? customer.addresses : [];
@@ -590,7 +764,7 @@ function init() {
   async function persistAddressToAccount(addr: ReturnType<typeof addressFromForm>, payer: ReturnType<typeof payerFromForm>) {
     if (!currentAuthToken) return;
     const alreadySaved = customerAddresses.some(
-      (a) => (a.postal_code || '') === addr.zip_code && (a.address_1 || '') === addr.street_name && (a.address_2 || '') === addr.street_number
+      (a) => addressKey(a.postal_code, a.address_1, a.address_2) === addressKey(addr.zip_code, addr.street_name, addr.street_number)
     );
     if (alreadySaved) return;
     try {
@@ -636,7 +810,7 @@ function init() {
     'ck-last-name': 'Digite seu sobrenome.',
     'ck-cpf': 'CPF inválido — precisa ter 11 dígitos.',
     'ck-zip': 'Digite o CEP.',
-    'ck-street': 'Digite a rua.',
+    'ck-street': 'Digite o endereço.',
     'ck-number': 'Digite o número.',
     'ck-city': 'Digite a cidade.',
     'ck-province': 'Digite o estado (UF).',
@@ -1003,6 +1177,7 @@ function init() {
       cta.disabled = true;
       cta.textContent = t('preparing');
     }
+    startBusy(['Confirmando seus dados…', 'Calculando o frete…', 'Preparando o pagamento…']);
     // Captura os dados AGORA (clique) e trava a edição por baixo enquanto a
     // cadeia de chamadas roda (pode levar vários segundos — registro, cart,
     // frete, payment session). Sem isso o usuário podia mexer nos campos
@@ -1061,6 +1236,8 @@ function init() {
       const discount = Number(cart.discount_total ?? 0);
       setText('checkout-summary-total', fmtBrl(total));
       setText('checkout-summary-toggle-total', fmtBrl(total));
+      payableTotal = total;
+      renderInstallments();
       if (shipping > 0) {
         setText('checkout-summary-shipping', fmtBrl(shipping));
         show('checkout-summary-shipping-row', true);
@@ -1091,6 +1268,7 @@ function init() {
       setText('checkout-contact-error', err instanceof Error ? err.message : t('errorGeneric'));
       show('checkout-contact-error', true);
     } finally {
+      stopBusy();
       if (cta) cta.disabled = false;
     }
   }
@@ -1150,8 +1328,13 @@ function init() {
         try {
           const methods = await mp.getPaymentMethods({ bin: data.bin });
           detectedPaymentMethodId = methods?.results?.[0]?.id || '';
+          if (payableTotal > 0) {
+            const options = await mp.getInstallments({ amount: String(payableTotal), bin: data.bin, paymentTypeId: 'credit_card' });
+            renderInstallments(options?.[0]?.payer_costs);
+          }
         } catch {
           detectedPaymentMethodId = '';
+          renderInstallments();
         }
       });
     };
@@ -1174,6 +1357,7 @@ function init() {
       cta.disabled = true;
       cta.textContent = t('processing');
     }
+    startBusy(['Enviando seu pagamento com segurança…', 'Confirmando a transação…', 'Quase lá, finalizando seu pedido…']);
     try {
       const payer = payerFromForm();
       const tokenResult = await mp.fields.createCardToken({
@@ -1200,6 +1384,7 @@ function init() {
       show('checkout-card-error', true);
       if (cta) cta.textContent = originalLabel;
     } finally {
+      stopBusy();
       if (cta) cta.disabled = false;
     }
   }
@@ -1213,6 +1398,7 @@ function init() {
     show('checkout-pix-error', false);
     const cta = qs<HTMLButtonElement>('checkout-summary-cta');
     if (cta) cta.disabled = true;
+    startBusy(['Gerando seu Pix…', 'Quase pronto…']);
     try {
       const payer = payerFromForm();
       const data = await medusaFetch('/store/checkout/mercadopago/pix', {
@@ -1234,6 +1420,8 @@ function init() {
       setText('checkout-pix-error', err instanceof Error ? err.message : t('errorGeneric'));
       show('checkout-pix-error', true);
       if (cta) cta.disabled = false;
+    } finally {
+      stopBusy();
     }
   }
 
@@ -1254,6 +1442,7 @@ function init() {
     show('checkout-boleto-error', false);
     const cta = qs<HTMLButtonElement>('checkout-summary-cta');
     if (cta) cta.disabled = true;
+    startBusy(['Gerando seu boleto…', 'Quase pronto…']);
     try {
       const payer = payerFromForm();
       const addr = addressFromForm();
@@ -1273,6 +1462,8 @@ function init() {
       setText('checkout-boleto-error', err instanceof Error ? err.message : t('errorGeneric'));
       show('checkout-boleto-error', true);
       if (cta) cta.disabled = false;
+    } finally {
+      stopBusy();
     }
   }
 
