@@ -1501,7 +1501,7 @@ function init() {
     else document.getElementById('mp-sdk')?.addEventListener('load', mount);
   }
 
-  /** Texto para o cliente a partir do `status_detail` do Mercado Pago; cartão emitido fora do Brasil costuma cair em "other_reason". */
+  /** Texto para o cliente a partir do `status_detail` do Mercado Pago. */
   function cardRejectionMessage(detail?: string) {
     switch (detail) {
       case 'cc_rejected_insufficient_amount':
@@ -1511,6 +1511,8 @@ function init() {
       case 'cc_rejected_bad_filled_security_code':
       case 'cc_rejected_bad_filled_other':
         return 'Confira os dados do cartão e tente novamente.';
+      case 'cc_rejected_high_risk':
+        return 'O pagamento não passou pela análise de segurança do Mercado Pago. Tente outro cartão ou pague com Pix.';
       case 'cc_rejected_call_for_authorize':
         return 'Seu banco pediu autorização para este pagamento. Fale com o banco ou use outro cartão.';
       default:
