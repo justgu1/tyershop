@@ -85,15 +85,14 @@ const groups = (sections.length ? sections : [{ key: 'all', title: drop.title, l
 
     {phase === 'presale' && (
       <>
-        <Countdown targetIso={drop.general_starts_at ?? drop.preorder_ends_at} label="Pré-venda termina em" />
         <p class="drop__text">
           Pré-venda exclusiva para convidados: até 2 peças de cada produto por pessoa. Produção em até {drop.production_days} dias,
           mais o prazo da transportadora.
         </p>
         {access === 'login' && (
           <>
-            <p class="drop__text drop__text--muted">Recebeu um convite? Digite seu e-mail para entrar ou criar sua senha.</p>
-            <AccessForm cta="Continuar" />
+            <p class="drop__text drop__text--muted">Digite seu e-mail e enviamos seu acesso à pré-venda. Já tem senha? Use "Já tenho senha".</p>
+            <AccessForm cta="Receber meu acesso" />
           </>
         )}
         {access === 'locked' && (
@@ -107,7 +106,6 @@ const groups = (sections.length ? sections : [{ key: 'all', title: drop.title, l
 
     {phase === 'general' && (
       <>
-        <Countdown targetIso={drop.general_ends_at} label="Venda geral termina em" />
         <p class="drop__text">
           Venda geral aberta para todos, enquanto durar o lote. Produção em até {drop.production_days} dias, mais o prazo da
           transportadora.
