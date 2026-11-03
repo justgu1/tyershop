@@ -3,67 +3,14 @@ import Layout from '../../layouts/Layout.astro';
 import ProductGalleryRow from '../../components/ProductGalleryRow.astro';
 import { getLangFromUrl, getPathForLang, t } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
-import { getProductListQueryString, resolveDefaultRegionId } from '../../lib/medusa-pricing';
-import { getMedusaStoreUrl, getPublishableKey } from '../../lib/medusa-env';
-import { isHiddenCollection } from '../../lib/collections';
+import { fetchCatalogSections } from '../../lib/catalog-sections';
 
 // Catálogo dinâmico: renderiza por requisição (ver index.astro).
 export const prerender = false;
 
 const lang: Lang = getLangFromUrl(Astro.url);
 const showEmptyCheckoutToast = Astro.url.searchParams.get('empty_checkout') === '1';
-const pk = getPublishableKey();
-const headers = { 'x-publishable-api-key': pk };
-const base = getMedusaStoreUrl();
-
-let regionId: string | null = null;
-let pulseiras: { id: string; title: string; handle: string; products: any[] } | null = null;
-let collections: { id: string; title: string; handle: string; products: any[] }[] = [];
-
-try {
-  regionId = await resolveDefaultRegionId(base, headers);
-  const q = getProductListQueryString(regionId);
-
-  const [cRes, catRes] = await Promise.all([
-    fetch(`${base}/store/collections?limit=50`, { headers, signal: AbortSignal.timeout(8000) }),
-    fetch(`${base}/store/product-categories?handle=pulseiras`, { headers, signal: AbortSignal.timeout(5000) }),
-  ]);
-
-  const collectionProductLimit = 20;
-  let colList: any[] = [];
-  if (cRes.ok) {
-    colList = ((await cRes.json()).collections ?? []).filter((c: any) => !isHiddenCollection(c));
-  }
-
-  const colWith = await Promise.all(
-    colList.map((c) =>
-      fetch(`${base}/store/products?${q}&collection_id[]=${c.id}&limit=${collectionProductLimit}`, {
-        headers,
-        signal: AbortSignal.timeout(8000),
-      })
-        .then((r) => (r.ok ? r.json() : { products: [] }))
-        .then((d) => ({ ...c, products: d.products ?? [] }))
-    )
-  );
-  collections = colWith.filter((c) => c.products.length > 0).map((c) => ({ id: c.id, title: c.title, handle: c.handle, products: c.products }));
-
-  const pulseirasCat = catRes.ok ? ((await catRes.json()).product_categories ?? [])[0] : null;
-  if (pulseirasCat?.id) {
-    const r = await fetch(`${base}/store/products?${q}&category_id[]=${pulseirasCat.id}&limit=20`, { headers, signal: AbortSignal.timeout(8000) });
-    const list = r.ok ? ((await r.json()).products ?? []) : [];
-    if (list.length > 0) pulseiras = { id: pulseirasCat.id, title: 'Pulseiras', handle: 'pulseiras', products: list };
-  }
-} catch { /* medusa off */ }
-
-// Mais recente primeiro: produtos dentro de cada seção e as seções pela peça mais nova de cada uma.
-const createdAt = (p: any) => new Date(p?.created_at ?? 0).getTime() || 0;
-const sections = [
-  ...collections.map((c) => ({ key: `col-${c.id}`, title: c.title, href: `/collections/${c.handle}`, products: c.products })),
-  ...(pulseiras ? [{ key: 'pulseiras', title: 'Pulseiras', href: null as string | null, products: pulseiras.products }] : []),
-]
-  .map((sec) => ({ ...sec, products: [...sec.products].sort((a, b) => createdAt(b) - createdAt(a)) }))
-  .sort((a, b) => createdAt(b.products[0]) - createdAt(a.products[0]));
-
+const sections = await fetchCatalogSections();
 ---
 
 <Layout
