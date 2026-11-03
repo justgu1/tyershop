@@ -574,6 +574,7 @@ function init() {
       const lock = qs('checkout-lock-indicator');
       if (lock) lock.hidden = true;
       fillSuccess(data.order);
+      root?.classList.add('is-done');
       show('checkout-success', true);
       return true;
     }

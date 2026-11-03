@@ -20,7 +20,7 @@
 2. MinIO: criar o bucket público `tyershop-prod` e o usuário `tyershop-prod`; no `infra-k8s`, rota `/cdn` de `api.tyershop.com` para esse bucket (mesmo padrão do `api.homolog`).
 3. Segredos: `cp k8s/prod/secrets.env.example k8s/prod/secrets.env`, preencher, `k8s/prod/selar-secrets.sh` e versionar o `sealed-secret.yaml`. `PUBLIC_MEDUSA_PUBLISHABLE_KEY` e `PUBLIC_MEDUSA_REGION_ID` só existem depois que o backend sobe e a região e a chave são criadas no admin: selar de novo depois.
 4. Melhor Envio: app de produção (client id/secret), redirect `https://tyershop.com/melhor-envio/callback`, e o id da agência em `prod/melhor-envio-config.yaml`.
-5. Mercado Pago: credenciais de produção e o webhook `https://medusa.tyershop.com/hooks/payment/mercadopago` (o segredo vai em `MERCADOPAGO_WEBHOOK_SECRET`).
+5. Mercado Pago: credenciais de produção e o webhook `https://medusa.tyershop.com/hooks/payment/mercadopago_mercadopago` (o segredo vai em `MERCADOPAGO_WEBHOOK_SECRET`).
 6. Migrações e dados: o backend de produção roda as migrações ao subir; depois criar o admin, a região, a chave publicável e o canal de vendas.
 7. DNS de `tyershop.com`, `www`, `medusa` e `api` para a VPS; certificado sai pelo `letsencrypt` do Traefik.
 8. `kubectl apply -f k8s/prod/argocd-application.yaml`. Só então faça o merge deste PR: sem a Application de produção, `tyershop.com` fica sem rota (a homologação deixou de responder por ele).

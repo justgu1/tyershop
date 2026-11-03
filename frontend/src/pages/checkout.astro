@@ -439,6 +439,14 @@ const c = (key: string) => t(lang, 'checkout', key);
     display: grid;
     grid-template-columns: 1fr 400px;
   }
+  /* Pedido confirmado: sem o resumo ao lado, a página vira uma coluna só e o aviso fica no centro. */
+  .checkout-shell.is-done .checkout-shell__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .checkout-shell.is-done .checkout-success {
+    max-width: 640px;
+    margin: 0 auto;
+  }
 
   /* Grid de 3 colunas em vez de flex + margin-inline:auto: a logo fica no
      centro de verdade da barra, não só no espaço livre entre os vizinhos
