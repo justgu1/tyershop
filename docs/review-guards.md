@@ -127,3 +127,6 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
 - **A tela Minha Conta não envia `email` ao atualizar o perfil.** O Medusa recusa o campo em `POST /store/customers/me` e o
   e-mail da conta é o que dá acesso à pré-venda. Falta teste de frontend (não há runner configurado).
   Origem: erro "Unrecognized fields: 'email'" ao salvar dados em produção.
+- **Pagamento com cartão recusado não segue para fechar o pedido.** O frontend ignorava o `status` da cobrança e o cliente via
+  o erro cru "was not authorized with the provider". Falta teste de frontend (não há runner configurado).
+  Origem: cartão emitido fora do Brasil recusado em produção, `submitCard`.
