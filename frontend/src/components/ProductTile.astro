@@ -18,7 +18,7 @@ const { stockReliable, normalizedVariants, defaultVariant } = getProductVariantD
 
 const variants = product.variants ?? [];
 const soldOut = variants.length
-  ? variants.every((v: any) => isVariantSoldOut(v, stockReliable))
+  ? variants.every((v: any) => isVariantSoldOut(v, stockReliable || v.manage_inventory === true))
   : isVariantSoldOut(defaultVariant, stockReliable);
 const info = normalizedVariants.find((n: any) => n.id === defaultVariant?.id) ?? normalizedVariants[0];
 const price = info?.priceDisplay ?? null;
@@ -53,8 +53,8 @@ const href = getPathForLang(`/product/${product.handle ?? ''}`, lang);
 <style>
   .ptile { min-width: 0; list-style: none; }
   .ptile__link { display: flex; flex-direction: column; gap: 6px; color: var(--tile-fg, inherit); text-decoration: none; }
-  .ptile__img { position: relative; display: block; aspect-ratio: 4 / 5; overflow: hidden; border-radius: 8px; background: rgba(128, 128, 128, 0.14); }
-  .ptile__img img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.35s ease; }
+  .ptile__img { position: relative; display: block; aspect-ratio: 4 / 5; overflow: hidden; border-radius: 8px; background: #fff; }
+  .ptile__img img { width: 100%; height: 100%; object-fit: contain; display: block; transition: transform 0.35s ease; }
   .ptile__link:hover .ptile__img img, .ptile__link:focus-visible .ptile__img img { transform: scale(1.04); }
   .ptile__tags { position: absolute; top: 6px; left: 6px; right: 6px; display: flex; flex-wrap: wrap; gap: 4px; pointer-events: none; }
   .ptile__tag { padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; background: rgba(10, 10, 10, 0.82); color: #fff; }

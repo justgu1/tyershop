@@ -1,6 +1,5 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import ProductGrid from '../../components/ProductGrid.astro';
 import ProductCarousel from '../../components/ProductCarousel.astro';
 import { getLangFromUrl, getPathForLang, t } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
@@ -18,72 +17,19 @@ const headers = { 'x-publishable-api-key': pk };
 const base = getMedusaStoreUrl();
 
 let regionId: string | null = null;
-let newProducts: any[] = [];
-let famousProducts: any[] = [];
-let allProducts: any[] = [];
+let pulseiras: { id: string; title: string; handle: string; products: any[] } | null = null;
 let collections: { id: string; title: string; handle: string; products: any[] }[] = [];
-let totalCatalogCount = 0;
-const knownIds: string[] = [];
-
-function createdAtScore(product: any): number {
-  return new Date(product?.created_at ?? 0).getTime() || 0;
-}
-
-function salesScore(product: any): number {
-  const md = product?.metadata ?? {};
-  const candidates = [
-    md.sales_count,
-    md.total_sales,
-    md.sold_count,
-    md.units_sold,
-    md.order_count,
-    md.orders,
-    product?.sales_count,
-    product?.total_sales,
-    product?.sold_count,
-  ];
-  for (const val of candidates) {
-    const num = Number(val);
-    if (Number.isFinite(num) && num > 0) return num;
-  }
-  return 0;
-}
 
 try {
   regionId = await resolveDefaultRegionId(base, headers);
   const q = getProductListQueryString(regionId);
 
-  const [cRes, mainRes, countRes] = await Promise.all([
+  const [cRes, catRes] = await Promise.all([
     fetch(`${base}/store/collections?limit=50`, { headers, signal: AbortSignal.timeout(8000) }),
-    fetch(`${base}/store/products?${q}&limit=100`, { headers, signal: AbortSignal.timeout(8000) }),
-    fetch(`${base}/store/products?${q}&limit=1&offset=0`, { headers, signal: AbortSignal.timeout(5000) }),
+    fetch(`${base}/store/product-categories?handle=pulseiras`, { headers, signal: AbortSignal.timeout(5000) }),
   ]);
 
-  if (countRes.ok) {
-    const d = await countRes.json();
-    totalCatalogCount = d.count ?? 0;
-  }
-
-  let mainList: any[] = [];
-  if (mainRes.ok) {
-    const d = await mainRes.json();
-    mainList = d.products ?? [];
-  }
-  const sortedByNewest = [...mainList].sort((a, b) => createdAtScore(b) - createdAtScore(a));
-  const sortedByPopularity = [...mainList].sort((a, b) => {
-    const scoreDiff = salesScore(b) - salesScore(a);
-    if (scoreDiff !== 0) return scoreDiff;
-    return createdAtScore(b) - createdAtScore(a);
-  });
-  allProducts = sortedByNewest;
-  newProducts = sortedByNewest.slice(0, 4);
-  famousProducts = sortedByPopularity.slice(0, 4);
   const collectionProductLimit = 20;
-
-  for (const p of [...newProducts, ...famousProducts]) {
-    if (p?.id) knownIds.push(p.id);
-  }
-
   let colList: any[] = [];
   if (cRes.ok) {
     colList = ((await cRes.json()).collections ?? []).filter((c: any) => !isHiddenCollection(c));
@@ -99,18 +45,16 @@ try {
         .then((d) => ({ ...c, products: d.products ?? [] }))
     )
   );
-  collections = colWith.filter((c) => c.products.length > 0).map((c) => {
-    for (const p of c.products) {
-      if (p?.id) knownIds.push(p.id);
-    }
-    return { id: c.id, title: c.title, handle: c.handle, products: c.products };
-  });
+  collections = colWith.filter((c) => c.products.length > 0).map((c) => ({ id: c.id, title: c.title, handle: c.handle, products: c.products }));
+
+  const pulseirasCat = catRes.ok ? ((await catRes.json()).product_categories ?? [])[0] : null;
+  if (pulseirasCat?.id) {
+    const r = await fetch(`${base}/store/products?${q}&category_id[]=${pulseirasCat.id}&limit=20`, { headers, signal: AbortSignal.timeout(8000) });
+    const list = r.ok ? ((await r.json()).products ?? []) : [];
+    if (list.length > 0) pulseiras = { id: pulseirasCat.id, title: 'Pulseiras', handle: 'pulseiras', products: list };
+  }
 } catch { /* medusa off */ }
 
-const productQuery = getProductListQueryString(regionId);
-const knownIdsUnique = [...new Set(knownIds)];
-const topNewIds = [...new Set(newProducts.map((p) => p?.id).filter(Boolean))].slice(0, 10);
-const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolean))].slice(0, 10);
 ---
 
 <Layout
@@ -158,16 +102,6 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
         <nav class="shop-toc" aria-label="Seções da loja">
           <p class="shop-toc__label" id="toc-nav-label">Navegação</p>
           <ul class="shop-toc__list" role="list" aria-labelledby="toc-nav-label">
-            <li>
-              <button type="button" class="shop-toc__btn" data-scroll-target="shop-novos">
-                {t(lang, 'shop', 'section_novos')}
-              </button>
-            </li>
-            <li>
-              <button type="button" class="shop-toc__btn" data-scroll-target="shop-populares">
-                {t(lang, 'shop', 'section_famosos')}
-              </button>
-            </li>
             {collections.map((c) => (
               <li>
                 <button
@@ -179,15 +113,13 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
                 </button>
               </li>
             ))}
-            <li>
-              <button type="button" class="shop-toc__btn" data-scroll-target="shop-infinite">
-                {t(lang, 'shop', 'more_products')}
-              </button>
-            </li>
+            {pulseiras && (
+              <li>
+                <button type="button" class="shop-toc__btn" data-scroll-target="shop-pulseiras">Pulseiras</button>
+              </li>
+            )}
           </ul>
         </nav>
-        <span class="shop-header__count" id="shop-count" aria-live="polite"
-          >{totalCatalogCount} {t(lang, 'shop', 'count_items')}</span>
       </div>
       </div>
     </aside>
@@ -199,23 +131,11 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
         </button>
       </div>
 
-      <section class="shop-block" id="shop-novos" aria-labelledby="shop-novos-carousel">
-        {newProducts.length > 0 ? (
-          <ProductCarousel products={newProducts} lang={lang} title={t(lang, 'shop', 'section_novos')} headingId="shop-novos-carousel" mobileGrid cardBadges={(p) => ({ isNew: topNewIds.includes(p?.id) })} />
-        ) : <p class="shop-block__empty">—</p>}
-      </section>
-
-      <section class="shop-block" id="shop-populares" aria-labelledby="shop-populares-carousel">
-        {famousProducts.length > 0 ? (
-          <ProductCarousel products={famousProducts} lang={lang} title={t(lang, 'shop', 'section_famosos')} headingId="shop-populares-carousel" mobileGrid cardBadges={(p) => ({ isPopular: topPopularIds.includes(p?.id) })} />
-        ) : <p class="shop-block__empty">—</p>}
-      </section>
-
       {collections.map((c) => (
         <section class="shop-block" id={`shop-col-${c.id}`} aria-labelledby={`shop-col-title-${c.id}`}>
           {c.products.length > 0 ? (
-            <ProductCarousel products={c.products} lang={lang} title={c.title} headingId={`shop-col-title-${c.id}`} mobileGrid>
-              <a slot="actions" href={getPathForLang(`/collections/${c.handle}`, lang)} class="shop-col__drop-link btn btn-outline btn-sm">Ver drop</a>
+            <ProductCarousel alwaysControls products={c.products} lang={lang} title={c.title} headingId={`shop-col-title-${c.id}`}>
+              <a slot="actions" href={getPathForLang(`/collections/${c.handle}`, lang)} class="shop-col__drop-link btn btn-outline btn-sm">Ver tudo</a>
             </ProductCarousel>
           ) : (
             <p class="shop-block__empty">—</p>
@@ -223,10 +143,11 @@ const topPopularIds = [...new Set(famousProducts.map((p) => p?.id).filter(Boolea
         </section>
       ))}
 
-      <section class="shop-block" id="shop-infinite" aria-labelledby="shop-infinite-title">
-        <h2 class="shop-block__title" id="shop-infinite-title">{t(lang, 'shop', 'more_products')}</h2>
-        <ProductGrid products={allProducts} lang={lang} label={t(lang, 'shop', 'more_products')} />
-      </section>
+      {pulseiras && (
+        <section class="shop-block" id="shop-pulseiras" aria-labelledby="shop-pulseiras-title">
+          <ProductCarousel alwaysControls products={pulseiras.products} lang={lang} title="Pulseiras" headingId="shop-pulseiras-title" />
+        </section>
+      )}
     </main>
   </div>
 </Layout>
