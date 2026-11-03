@@ -47,6 +47,7 @@ function resolveVariantQtyRaw(v: any): { qtyRaw: unknown; fromNested: boolean } 
 
 export function isVariantSoldOut(v: any, enforceQtyWhenPresent = false): boolean {
   if (!v) return true;
+  if (v.manage_inventory === false) return false;
   const { qtyRaw, fromNested } = resolveVariantQtyRaw(v);
   const qty = Number(qtyRaw);
   const hasQty = Number.isFinite(qty);
@@ -67,7 +68,7 @@ export function isVariantSoldOut(v: any, enforceQtyWhenPresent = false): boolean
 
 export function getVariantMaxQty(v: any): number | null {
   if (!v) return null;
-  if (v.allow_backorder === true) return null;
+  if (v.allow_backorder === true || v.manage_inventory === false) return null;
   const { qtyRaw } = resolveVariantQtyRaw(v);
   const qty = Number(qtyRaw);
   if (!Number.isFinite(qty)) return null;

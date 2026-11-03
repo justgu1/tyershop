@@ -117,3 +117,6 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   Origem: PR 40, `index.astro`.
 - **A carga devolve os limites normais mesmo se falhar ou for interrompida, e as esperas têm teto.** `run-homolog.sh` agora usa
   `trap` e prazos; falta um teste que simule a falha (hoje conferido só lendo o script e com `bash -n`).
+- **Produto sem controle de estoque (`manage_inventory: false`) nunca aparece como esgotado nem com limite de quantidade.** O
+  frontend lia o nível de estoque zerado e escondia a Tyer Gang. Falta teste de frontend (não há runner configurado).
+  Origem: Tyer Gang esgotada em produção, `isVariantSoldOut`.
