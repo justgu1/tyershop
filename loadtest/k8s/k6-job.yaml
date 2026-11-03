@@ -26,7 +26,6 @@ spec:
             - { name: STEP_SECONDS, value: "${STEP_SECONDS}" }
             - { name: LEVELS, value: "${LEVELS}" }
             - { name: I_UNDERSTAND_THIS_CREATES_ORDERS, value: "yes" }
-            - { name: ALLOW_TYERSHOP_HOST, value: "yes" }
           resources:
             requests: { cpu: 100m, memory: 256Mi }
             limits: { cpu: "2", memory: 3Gi }

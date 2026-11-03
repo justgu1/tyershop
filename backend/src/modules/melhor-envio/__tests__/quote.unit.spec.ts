@@ -1,4 +1,4 @@
-import { buildPackage } from "../quote"
+import { buildPackage, shippingOptionDataId, SERVICES } from "../quote"
 import { consumeState, signState, verifyState } from "../state"
 
 describe("buildPackage", () => {
@@ -47,5 +47,13 @@ describe("oauth state", () => {
     process.env.COOKIE_SECRET = "supersecret"
     expect(() => signState()).toThrow(/COOKIE_SECRET/)
     process.env.COOKIE_SECRET = prev
+  })
+})
+
+describe("shippingOptionDataId", () => {
+  it("o id do dado da opção de envio é melhorenvio-<serviço>, o formato que checkout e teste de carga procuram", () => {
+    expect(shippingOptionDataId(2)).toBe("melhorenvio-2")
+    expect(shippingOptionDataId("17")).toBe("melhorenvio-17")
+    for (const id of Object.keys(SERVICES)) expect(shippingOptionDataId(id)).toMatch(/^melhorenvio-\d+$/)
   })
 })
