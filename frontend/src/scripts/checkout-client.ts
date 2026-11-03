@@ -25,6 +25,7 @@ declare global {
     __MERCADOPAGO_PK__?: string;
     __GOOGLE_MAPS_KEY__?: string;
     MercadoPago?: any;
+    MP_DEVICE_SESSION_ID?: string;
   }
 }
 
@@ -1553,7 +1554,8 @@ function init() {
           // `binChanged` é só um bônus quando dispara a tempo, nunca bloqueia o envio.
           payment_method_id: detectedPaymentMethodId || undefined,
           installments,
-          payer: { email: payer.email, cpf: payer.cpf },
+          device_id: window.MP_DEVICE_SESSION_ID || undefined,
+          payer: { email: payer.email, first_name: payer.first_name, last_name: payer.last_name, cpf: payer.cpf },
         }),
       });
       if (charge?.status === 'rejected' || charge?.status === 'cancelled') {

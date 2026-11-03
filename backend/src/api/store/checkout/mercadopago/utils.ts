@@ -2,6 +2,7 @@ import type { MedusaRequest } from "@medusajs/framework/http";
 import { ContainerRegistrationKeys, MedusaError, Modules } from "@medusajs/framework/utils";
 import { assertShippingCurrent } from "../../../../modules/melhor-envio/quote";
 import { assertCartAllowed, loadCart, lotLockKey } from "../../../../modules/drop/access";
+import { buildAdditionalInfo, type AntifraudCart } from "../../../../modules/payment-mercadopago/additional-info";
 import { MercadoPagoClient, type MercadoPagoPayment } from "../../../../modules/payment-mercadopago/client";
 
 /**
@@ -48,6 +49,23 @@ async function cartOfSession(req: MedusaRequest, session: { payment_collection_i
   if (!cartId) return null;
   const { data } = await query.graph({ entity: "cart", fields: ["id", "customer_id"], filters: { id: cartId } });
   return ((data as any[])[0] as { id: string; customer_id: string | null } | undefined) ?? null;
+}
+
+/** Itens e endereço do carrinho da sessão, para o antifraude do Mercado Pago. */
+export async function loadAntifraudCart(req: MedusaRequest, session: { payment_collection_id?: string | null }) {
+  const cart = await cartOfSession(req, session);
+  if (!cart) return null;
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY);
+  const { data } = await query.graph({
+    entity: "cart",
+    fields: [
+      "items.product_id", "items.title", "items.quantity", "items.unit_price",
+      "shipping_address.first_name", "shipping_address.last_name", "shipping_address.phone",
+      "shipping_address.postal_code", "shipping_address.address_1", "shipping_address.city", "shipping_address.province",
+    ],
+    filters: { id: cart.id },
+  });
+  return ((data as any[])[0] as AntifraudCart | undefined) ?? null;
 }
 
 const OPEN_STATUSES = ["approved", "authorized", "pending", "in_process", "in_mediation"];

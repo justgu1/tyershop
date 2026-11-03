@@ -44,6 +44,9 @@ export type CreateCardPaymentInput = {
   paymentMethodId?: string;
   payer: { email: string; identification?: { type: string; number: string } };
   externalReference: string;
+  /** Device ID do SDK do Mercado Pago no browser, usado pelo antifraude. */
+  deviceId?: string;
+  additionalInfo?: Record<string, unknown>;
 };
 
 export type CreatePixPaymentInput = {
@@ -109,6 +112,7 @@ export class MercadoPagoClient {
     return this.request<MercadoPagoPayment>("/v1/payments", {
       method: "POST",
       idempotencyKey: input.idempotencyKey,
+      headers: input.deviceId ? { "X-meli-session-id": input.deviceId } : undefined,
       body: JSON.stringify({
         transaction_amount: input.transactionAmount,
         token: input.token,
@@ -119,6 +123,7 @@ export class MercadoPagoClient {
           email: input.payer.email,
           identification: input.payer.identification,
         },
+        additional_info: input.additionalInfo,
         external_reference: input.externalReference,
         notification_url: this.notificationUrl,
       }),
