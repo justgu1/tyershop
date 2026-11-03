@@ -13,7 +13,7 @@ const { cta = 'Continuar' } = Astro.props;
   <div class="access__pass" data-pass hidden>
     <input class="access__input" type="password" name="password" minlength="8" autocomplete="current-password" placeholder="Sua senha" aria-label="Senha" />
   </div>
-  <button class="access__link" type="button" data-toggle>Já tenho senha</button>
+  <button class="access__link" type="button" data-forgot hidden>Esqueci minha senha</button>
   <p class="access__msg" role="status" aria-live="polite"></p>
 </form>
 
@@ -55,10 +55,9 @@ const { cta = 'Continuar' } = Astro.props;
     const password = form.querySelector<HTMLInputElement>('input[name="password"]')!;
     const passBox = form.querySelector<HTMLElement>('[data-pass]')!;
     const btn = form.querySelector<HTMLButtonElement>('[data-submit]')!;
-    const toggle = form.querySelector<HTMLButtonElement>('[data-toggle]')!;
+    const forgot = form.querySelector<HTMLButtonElement>('[data-forgot]')!;
     const msg = form.querySelector<HTMLElement>('.access__msg')!;
-    const label = btn.textContent;
-    let mode: 'request' | 'login' = 'request';
+    let mode: 'identify' | 'login' = 'identify';
 
     const say = (text: string, error = true) => {
       msg.textContent = text;
@@ -80,14 +79,14 @@ const { cta = 'Continuar' } = Astro.props;
       return token as string;
     }
 
-    toggle.addEventListener('click', () => {
-      mode = mode === 'request' ? 'login' : 'request';
-      const login = mode === 'login';
-      passBox.hidden = !login;
-      btn.textContent = login ? 'Entrar' : label;
-      toggle.textContent = login ? 'Não tenho senha' : 'Já tenho senha';
-      say('', false);
-      (login ? password : email).focus();
+    forgot.addEventListener('click', async () => {
+      forgot.disabled = true;
+      try {
+        await post('/auth/customer/emailpass/reset-password', { identifier: email.value.trim() });
+        say('Se este e-mail tiver conta, enviamos o link para criar uma nova senha.', false);
+      } finally {
+        forgot.disabled = false;
+      }
     });
 
     form.addEventListener('submit', async (e) => {
@@ -98,9 +97,21 @@ const { cta = 'Continuar' } = Astro.props;
       btn.disabled = true;
       say('', false);
       try {
-        if (mode === 'request') {
-          const res = await post('/store/leads', { email: email.value.trim(), source: 'pedir_acesso' });
-          if (!res.ok) throw new Error('Não consegui registrar agora. Tente de novo.');
+        if (mode === 'identify') {
+          const res = await post('/store/drop/identify', { email: email.value.trim() });
+          if (!res.ok) throw new Error('Não consegui verificar agora. Tente de novo.');
+          if ((await res.json()).exists) {
+            mode = 'login';
+            passBox.hidden = false;
+            forgot.hidden = false;
+            email.readOnly = true;
+            btn.textContent = 'Entrar';
+            say('Digite sua senha. Se ainda não definiu uma, use o link do ingresso que enviamos ao seu e-mail ou "Esqueci minha senha".', false);
+            password.focus();
+            return;
+          }
+          const lead = await post('/store/leads', { email: email.value.trim(), source: 'pedir_acesso' });
+          if (!lead.ok) throw new Error('Não consegui registrar agora. Tente de novo.');
           location.assign('/drop/obrigado');
           return;
         }

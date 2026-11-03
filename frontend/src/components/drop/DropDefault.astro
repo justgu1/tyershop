@@ -91,8 +91,8 @@ const groups = (sections.length ? sections : [{ key: 'all', title: drop.title, l
         </p>
         {access === 'login' && (
           <>
-            <p class="drop__text drop__text--muted">Digite seu e-mail e enviamos seu acesso à pré-venda. Já tem senha? Use "Já tenho senha".</p>
-            <AccessForm cta="Receber meu acesso" />
+            <p class="drop__text drop__text--muted">Digite seu e-mail: se já tiver conta, pedimos a senha; se não, enviamos seu acesso à pré-venda.</p>
+            <AccessForm cta="Continuar" />
           </>
         )}
         {access === 'locked' && (
