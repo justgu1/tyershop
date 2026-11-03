@@ -139,3 +139,10 @@ export const DELIVERED = ["delivered"]
 export const NEEDS_AGENCY = [3, 4]
 
 export const agencyFromEnv = (env: Record<string, string | undefined>) => Number(env.MELHOR_ENVIO_AGENCY_ID) || null
+
+/** CPF de quem pagou, como o Mercado Pago devolve no pagamento (pedidos antigos não guardaram o CPF no cadastro). */
+export function cpfFromPayer(payment: { payer?: { identification?: { type?: string; number?: string } } } | null | undefined): string {
+  const id = payment?.payer?.identification
+  const digits = String(id?.number ?? "").replace(/\D/g, "")
+  return (!id?.type || id.type.toUpperCase() === "CPF") && digits.length === 11 ? digits : ""
+}
