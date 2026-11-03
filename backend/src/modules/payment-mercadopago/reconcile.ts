@@ -2,11 +2,9 @@ import { MedusaContainer } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { capturePaymentWorkflow, completeCartWorkflow } from "@medusajs/medusa/core-flows"
 import { getMercadoPagoClient } from "../../api/store/checkout/mercadopago/utils"
+import { shouldComplete } from "./reconcile-rules"
 
 const DAY_MS = 24 * 3600 * 1000
-
-/** Só um pagamento aprovado vira pedido: pendente espera, recusado, cancelado e vencido não. */
-export const shouldComplete = (mpStatus?: string | null) => mpStatus === "approved"
 
 export type ReconcileResult = { completed: string[]; captured: string[]; errors: string[] }
 

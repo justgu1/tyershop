@@ -1,4 +1,4 @@
-import { shouldComplete } from "../reconcile"
+import { shouldComplete } from "../reconcile-rules"
 
 describe("shouldComplete", () => {
   it("só um pagamento aprovado vira pedido", () => {
