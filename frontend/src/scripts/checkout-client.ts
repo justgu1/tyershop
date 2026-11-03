@@ -22,6 +22,7 @@ declare global {
   interface Window {
     __MEDUSA_PK__?: string;
     __MERCADOPAGO_PK__?: string;
+    __GOOGLE_MAPS_KEY__?: string;
     MercadoPago?: any;
   }
 }
@@ -293,6 +294,7 @@ function init() {
 
   /** Mostra o frete escolhido nos totais assim que ele é escolhido; o valor oficial vem do carrinho ao confirmar. */
   function previewShippingTotals() {
+    const subtotalCents = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
     if (!shipChoice) {
       show('checkout-summary-shipping-row', false);
       setText('checkout-summary-total', fmtBrl(subtotalCents / 100));
@@ -353,6 +355,53 @@ function init() {
     if (shipTimer) clearTimeout(shipTimer);
     shipTimer = setTimeout(() => void refreshShipping(), 400);
   };
+  /**
+   * Autocompletar do Google (Places) no campo "Endereço": ao escolher uma sugestão, preenche endereço, número, bairro,
+   * cidade, UF e CEP. Sem chave configurada, ou se o Google não carregar, o cliente digita tudo à mão.
+   */
+  function initAddressAutocomplete() {
+    const key = (window.__GOOGLE_MAPS_KEY__ || '').trim();
+    const streetInput = qs<HTMLInputElement>('ck-street');
+    if (!key || !streetInput || document.getElementById('gmaps-sdk')) return;
+    const start = () => {
+      const g = (window as any).google;
+      if (!g?.maps?.places) return;
+      const auto = new g.maps.places.Autocomplete(streetInput, {
+        componentRestrictions: { country: 'br' },
+        fields: ['address_components'],
+        types: ['address'],
+      });
+      auto.addListener('place_changed', () => {
+        const parts: { long_name: string; short_name: string; types: string[] }[] = auto.getPlace()?.address_components ?? [];
+        const get = (type: string, short = false) => {
+          const p = parts.find((c) => c.types.includes(type));
+          return p ? (short ? p.short_name : p.long_name) : '';
+        };
+        const put = (id: string, value: string) => {
+          const el = qs<HTMLInputElement>(id);
+          if (el && value) el.value = value;
+        };
+        put('ck-street', get('route'));
+        put('ck-number', get('street_number'));
+        put('ck-neighborhood', get('sublocality_level_1') || get('sublocality') || get('neighborhood'));
+        put('ck-city', get('administrative_area_level_2') || get('locality'));
+        put('ck-province', get('administrative_area_level_1', true));
+        const zip = get('postal_code');
+        if (zip) {
+          put('ck-zip', zip);
+          scheduleShipping();
+        }
+        qs<HTMLInputElement>(get('street_number') ? 'ck-city' : 'ck-number')?.focus();
+      });
+    };
+    const script = document.createElement('script');
+    script.id = 'gmaps-sdk';
+    script.async = true;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&language=pt-BR&region=BR`;
+    script.addEventListener('load', start);
+    document.head.appendChild(script);
+  }
+  initAddressAutocomplete();
   zipField?.addEventListener('input', scheduleShipping);
   zipField?.addEventListener('change', scheduleShipping);
 
@@ -576,6 +625,12 @@ function init() {
   };
   let customerAddresses: SavedAddress[] = [];
 
+  /** Mesmo endereço digitado de formas diferentes (CEP com ou sem hífen, caixa, espaços) conta como um só. */
+  function addressKey(zip?: string | null, street?: string | null, number?: string | null) {
+    const norm = (v?: string | null) => String(v || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    return `${String(zip || '').replace(/\D/g, '')}|${norm(street)}|${norm(number)}`;
+  }
+
   function fillAddressFields(addr: SavedAddress) {
     const map: Record<string, string> = {
       'ck-zip': addr.postal_code || '',
@@ -600,7 +655,15 @@ function init() {
     const wrap = qs('checkout-address-cards');
     if (!wrap || !addresses.length) return;
     wrap.innerHTML = '';
-    const sorted = [...addresses].sort((a, b) => (b.is_default_shipping ? 1 : 0) - (a.is_default_shipping ? 1 : 0));
+    const seen = new Set<string>();
+    const sorted = [...addresses]
+      .sort((a, b) => (b.is_default_shipping ? 1 : 0) - (a.is_default_shipping ? 1 : 0))
+      .filter((a) => {
+        const key = addressKey(a.postal_code, a.address_1, a.address_2);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
     sorted.forEach((addr, i) => {
       const card = document.createElement('button');
       card.type = 'button';
@@ -701,7 +764,7 @@ function init() {
   async function persistAddressToAccount(addr: ReturnType<typeof addressFromForm>, payer: ReturnType<typeof payerFromForm>) {
     if (!currentAuthToken) return;
     const alreadySaved = customerAddresses.some(
-      (a) => (a.postal_code || '') === addr.zip_code && (a.address_1 || '') === addr.street_name && (a.address_2 || '') === addr.street_number
+      (a) => addressKey(a.postal_code, a.address_1, a.address_2) === addressKey(addr.zip_code, addr.street_name, addr.street_number)
     );
     if (alreadySaved) return;
     try {
@@ -747,7 +810,7 @@ function init() {
     'ck-last-name': 'Digite seu sobrenome.',
     'ck-cpf': 'CPF inválido — precisa ter 11 dígitos.',
     'ck-zip': 'Digite o CEP.',
-    'ck-street': 'Digite a rua.',
+    'ck-street': 'Digite o endereço.',
     'ck-number': 'Digite o número.',
     'ck-city': 'Digite a cidade.',
     'ck-province': 'Digite o estado (UF).',

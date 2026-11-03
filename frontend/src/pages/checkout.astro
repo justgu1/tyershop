@@ -153,7 +153,7 @@ const c = (key: string) => t(lang, 'checkout', key);
                     </label>
                     <label class="checkout-field">
                       <span>{c('province')} <em class="checkout-field__required">*</em></span>
-                      <input id="ck-province" name="address-level1" type="text" maxlength="2" placeholder="SP" required autocomplete="address-level1" />
+                      <select id="ck-province" name="address-level1" required autocomplete="address-level1"><option value="">UF</option><option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option><option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option><option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option><option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option><option value="PR">PR</option><option value="PE">PE</option><option value="PI">PI</option><option value="RJ">RJ</option><option value="RN">RN</option><option value="RS">RS</option><option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option><option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option></select>
                       <span class="checkout-field__error" data-error-for="ck-province" hidden></span>
                     </label>
                   </div>
@@ -777,14 +777,18 @@ const c = (key: string) => t(lang, 'checkout', key);
     color: #b8b8b8;
     margin: 0;
   }
-  .checkout-address-cards {
+  :global(.checkout-address-card)s {
     display: flex;
     flex-direction: column;
     gap: 10px;
     margin-bottom: 14px;
   }
-  .checkout-address-card {
+  :global(.checkout-address-card) {
     position: relative;
+    display: block;
+    width: 100%;
+    color: #fff;
+    font-family: inherit;
     text-align: left;
     padding: 14px 16px;
     background: #1c1c1c;
@@ -793,14 +797,14 @@ const c = (key: string) => t(lang, 'checkout', key);
     cursor: pointer;
     transition: border-color var(--ease);
   }
-  .checkout-address-card:hover {
+  :global(.checkout-address-card):hover {
     border-color: rgba(255, 255, 255, 0.32);
   }
-  .checkout-address-card.is-selected {
+  :global(.checkout-address-card).is-selected {
     border-color: var(--c-accent);
     background: rgba(231, 126, 35, 0.08);
   }
-  .checkout-address-card__badge {
+  :global(.checkout-address-card__badge) {
     position: absolute;
     top: 12px;
     right: 14px;
@@ -813,13 +817,17 @@ const c = (key: string) => t(lang, 'checkout', key);
     padding: 3px 8px;
     border-radius: 999px;
   }
-  .checkout-address-card__name {
+  :global(.checkout-address-card__name),
+  :global(.checkout-address-card__lines) {
+    text-align: left;
+  }
+  :global(.checkout-address-card__name) {
     font-size: 13px;
     font-weight: 700;
     color: #fff;
     margin: 0 0 4px;
   }
-  .checkout-address-card__lines {
+  :global(.checkout-address-card__lines) {
     font-size: 12px;
     color: #b8b8b8;
     margin: 0;
@@ -893,6 +901,24 @@ const c = (key: string) => t(lang, 'checkout', key);
     font-size: 13px;
     font-family: monospace;
     word-break: break-all;
+    color: #fff;
+  }
+  :global(.pac-container) {
+    background: #1c1c1c;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 8px;
+    font-family: inherit;
+    z-index: 300;
+  }
+  :global(.pac-item) {
+    color: #bbb;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 8px 10px;
+  }
+  :global(.pac-item:hover), :global(.pac-item-selected) {
+    background: rgba(255, 255, 255, 0.06);
+  }
+  :global(.pac-item-query) {
     color: #fff;
   }
   #ck-email[readonly] {
