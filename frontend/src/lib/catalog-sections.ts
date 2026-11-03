@@ -14,7 +14,7 @@ export async function fetchCatalogSections(): Promise<CatalogSection[]> {
   try {
     const q = getProductListQueryString(await resolveDefaultRegionId(base, headers));
     const [cRes, catRes] = await Promise.all([
-      fetch(`${base}/store/collections?limit=50`, { headers, signal: AbortSignal.timeout(8000) }),
+      fetch(`${base}/store/collections?limit=50&fields=id,title,handle,metadata`, { headers, signal: AbortSignal.timeout(8000) }),
       fetch(`${base}/store/product-categories?handle=pulseiras`, { headers, signal: AbortSignal.timeout(5000) }),
     ]);
     const collections: any[] = cRes.ok ? ((await cRes.json()).collections ?? []).filter((c: any) => !isHiddenCollection(c)) : [];

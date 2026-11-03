@@ -24,7 +24,7 @@ try {
   const regionId = await resolveDefaultRegionId(base, headers);
   const q = getProductListQueryString(regionId);
 
-  const listRes = await fetch(`${base}/store/collections?limit=100`, {
+  const listRes = await fetch(`${base}/store/collections?limit=100&fields=id,title,handle,metadata`, {
     headers,
     signal: AbortSignal.timeout(8000),
   });
