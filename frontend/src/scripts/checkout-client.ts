@@ -4,8 +4,8 @@
  *     payment collection/session) — igual ao resto do site.
  *  2. Mercado Pago SDK v2 (Secure Fields) SÓ pra tokenizar o cartão no browser
  *     — número/CVV nunca tocam nosso backend.
- *  3. Nossas 3 rotas store/checkout/mercadopago/{card,pix,boleto} — que fazem
- *     a cobrança de verdade — e a rota de status (polling p/ Pix/boleto).
+ *  3. Nossas 3 rotas store/checkout/mercadopago/{card,pix} — que fazem
+ *     a cobrança de verdade — e a rota de status (polling do Pix).
  *
  * Layout: esquerda = endereço (trava depois de confirmado, vira resumo +
  * "Editar"), direita = resumo do pedido (dropdown) + pagamento, com um único
@@ -460,7 +460,7 @@ function init() {
   let detectedPaymentMethodId = '';
   /** 'address' = ainda editando endereço · 'payment' = travado, pagamento liberado. */
   let stage: 'address' | 'payment' = 'address';
-  let paymentDone = false; // Pix/boleto gerados: espera confirmação, CTA fica desativado
+  let paymentDone = false; // Pix gerado: espera confirmação, CTA fica desativado
   let needsLogin = false; // e-mail já tem conta — pede senha em vez de criar de novo
 
   /**
@@ -1110,14 +1110,13 @@ function init() {
     /* Wizard mobile: endereço já travou (`stage` virou 'payment' de verdade
        assim que a sessão de pagamento existe), mas visualmente ainda tá no
        passo 2 (revisão) — o CTA só deve avançar de passo, não tentar cobrar
-       cartão/Pix/boleto que a pessoa nem viu ainda. */
+       cartão/Pix que a pessoa nem viu ainda. */
     if (isMobileWizard() && mobileStep === 'review') {
       cta.textContent = t('continueToPayment');
       return;
     }
     const tab = activePaymentTab();
     if (tab === 'pix') cta.textContent = t('pixGenerate') || 'Gerar Pix';
-    else if (tab === 'boleto') cta.textContent = t('boletoGenerate') || 'Gerar boleto';
     else cta.textContent = cachedPayLabel || cta.textContent || '';
   }
 
@@ -1281,7 +1280,7 @@ function init() {
   ].forEach((id) => qs(id)?.addEventListener('input', scheduleDraftSave));
 
   // Wizard mobile — "Voltar" dentro do bloco de pagamento (passo 3 → 2).
-  // Nada é desmontado, só escondido: campos de cartão/Pix/boleto já
+  // Nada é desmontado, só escondido: campos de cartão/Pix já
   // preenchidos continuam lá quando a pessoa avançar de novo.
   qs('checkout-payment-back')?.addEventListener('click', () => {
     setMobileStep('review');
@@ -1604,36 +1603,6 @@ function init() {
     }
   });
 
-  // ---- Boleto ----
-  async function generateBoleto() {
-    show('checkout-boleto-error', false);
-    const cta = qs<HTMLButtonElement>('checkout-summary-cta');
-    if (cta) cta.disabled = true;
-    startBusy(['Gerando seu boleto…', 'Quase pronto…']);
-    try {
-      const payer = payerFromForm();
-      const addr = addressFromForm();
-      const data = await medusaFetch('/store/checkout/mercadopago/boleto', {
-        method: 'POST',
-        body: JSON.stringify({ payment_session_id: paymentSessionId, payer: { ...payer, address: addr } }),
-      });
-      const link = qs<HTMLAnchorElement>('checkout-boleto-link');
-      if (link) link.href = data.boleto_url || '#';
-      setText('checkout-boleto-barcode', data.barcode || '');
-      show('checkout-boleto-form', false);
-      show('checkout-boleto-result', true);
-      paymentDone = true;
-      syncCta();
-      startPolling(() => void completeCart());
-    } catch (err) {
-      setText('checkout-boleto-error', err instanceof Error ? err.message : t('errorGeneric'));
-      show('checkout-boleto-error', true);
-      if (cta) cta.disabled = false;
-    } finally {
-      stopBusy();
-    }
-  }
-
   // ---- Botão único: decide a ação pela etapa/aba atual ----
   qs('checkout-summary-cta')?.addEventListener('click', () => {
     if (paymentDone) return;
@@ -1653,7 +1622,6 @@ function init() {
     const tab = activePaymentTab();
     if (tab === 'card') void submitCard();
     else if (tab === 'pix') void generatePix();
-    else if (tab === 'boleto') void generateBoleto();
   });
 
   syncCta();
