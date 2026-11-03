@@ -231,7 +231,7 @@ export const translations = {
       phone: 'Telefone',
       address_title: 'Endereço de entrega',
       zip_code: 'CEP',
-      street_name: 'Rua',
+      street_name: 'Endereço',
       street_number: 'Número',
       neighborhood: 'Bairro',
       city: 'Cidade',

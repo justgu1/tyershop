@@ -45,6 +45,13 @@ spec:
                 secretKeyRef:
                   name: tyershop-secrets
                   key: PUBLIC_MERCADOPAGO_PUBLIC_KEY
+            # Opcional: sem a chave o checkout não autocompleta o endereço (o cliente digita).
+            - name: PUBLIC_GOOGLE_MAPS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: PUBLIC_GOOGLE_MAPS_KEY
+                  optional: true
           readinessProbe:
             tcpSocket:
               port: http
