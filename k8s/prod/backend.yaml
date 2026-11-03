@@ -12,7 +12,7 @@ spec:
             - name: SITE_URL
               value: "https://tyershop.com"
             - name: MERCADOPAGO_NOTIFICATION_URL
-              value: "https://medusa.tyershop.com/hooks/payment/mercadopago"
+              value: "https://medusa.tyershop.com/hooks/payment/mercadopago_mercadopago"
             - name: EMAIL_TEST_MODE
               value: "false"
             - name: MELHOR_ENVIO_ENV

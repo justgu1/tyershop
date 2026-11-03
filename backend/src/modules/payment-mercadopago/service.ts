@@ -47,7 +47,7 @@ export function isValidMpSignature(secret: string, headers: Record<string, any> 
 type Options = {
   accessToken: string;
   publicKey: string;
-  /** URL pública do backend p/ o webhook, ex.: https://api.tyershop.com/hooks/payment/mercadopago */
+  /** URL pública do backend p/ o webhook, ex.: https://medusa.tyershop.com/hooks/payment/mercadopago_mercadopago (o final é o id do provider, sem "pp_") */
   notificationUrl?: string;
   /** Segredo de assinatura das notificações (painel do Mercado Pago). Com ele, notificação sem assinatura válida é ignorada. */
   webhookSecret?: string;

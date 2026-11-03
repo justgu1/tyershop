@@ -59,7 +59,7 @@ spec:
                   name: tyershop-secrets
                   key: PUBLIC_MERCADOPAGO_PUBLIC_KEY
             - name: MERCADOPAGO_NOTIFICATION_URL
-              value: "https://medusa.homolog.tyershop.com/hooks/payment/mercadopago"
+              value: "https://medusa.homolog.tyershop.com/hooks/payment/mercadopago_mercadopago"
             - name: SMTP_HOST
               valueFrom:
                 secretKeyRef:
