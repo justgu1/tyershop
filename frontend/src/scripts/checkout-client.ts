@@ -60,41 +60,47 @@ function initCustomSelect(wrapId: string, btnId: string, listId: string, valueLa
   const list = qs<HTMLUListElement>(listId);
   const valueLabel = qs(valueLabelId);
   const hiddenInput = qs<HTMLInputElement>(hiddenInputId);
-  if (!wrap || !btn || !list || !valueLabel || !hiddenInput) return;
-  const options = Array.from(list.querySelectorAll<HTMLLIElement>('[role="option"]'));
+  if (!wrap || !btn || !list || !valueLabel || !hiddenInput) return null;
+  const getOptions = () => Array.from(list.querySelectorAll<HTMLLIElement>('[role="option"]'));
 
+  /** Lista solta sobre a página (fixed): não cria rolagem nem é cortada pela coluna do resumo. */
+  function place() {
+    const r = btn!.getBoundingClientRect();
+    const room = window.innerHeight - r.bottom - 12;
+    const h = Math.min(list!.scrollHeight, 260);
+    list!.style.position = 'fixed';
+    list!.style.left = `${r.left}px`;
+    list!.style.width = `${r.width}px`;
+    list!.style.right = 'auto';
+    list!.style.maxHeight = '260px';
+    list!.style.top = room >= h || r.top < h ? `${r.bottom + 4}px` : `${r.top - h - 4}px`;
+  }
   function close() {
     list!.hidden = true;
     btn!.setAttribute('aria-expanded', 'false');
   }
   function open() {
     list!.hidden = false;
+    place();
     btn!.setAttribute('aria-expanded', 'true');
-    options.find((o) => o.classList.contains('is-selected'))?.focus();
+    (getOptions().find((o) => o.classList.contains('is-selected')) ?? getOptions()[0])?.focus();
   }
   function select(opt: HTMLLIElement) {
-    options.forEach((o) => {
+    getOptions().forEach((o) => {
       o.classList.toggle('is-selected', o === opt);
       o.setAttribute('aria-selected', o === opt ? 'true' : 'false');
     });
-    valueLabel!.textContent = opt.textContent || '';
+    valueLabel!.textContent = opt.dataset.short || opt.textContent || '';
     hiddenInput!.value = opt.dataset.value || '';
     hiddenInput!.dispatchEvent(new Event('change', { bubbles: true }));
     close();
     btn!.focus();
   }
-
-  btn.addEventListener('click', () => (list.hidden ? open() : close()));
-  btn.addEventListener('keydown', (ev) => {
-    if (ev.key === 'ArrowDown' || ev.key === 'Enter' || ev.key === ' ') {
-      ev.preventDefault();
-      open();
-    }
-  });
-  options.forEach((opt) => {
+  function bind(opt: HTMLLIElement) {
     opt.tabIndex = -1;
     opt.addEventListener('click', () => select(opt));
     opt.addEventListener('keydown', (ev) => {
+      const options = getOptions();
       const idx = options.indexOf(opt);
       if (ev.key === 'ArrowDown') {
         ev.preventDefault();
@@ -117,10 +123,48 @@ function initCustomSelect(wrapId: string, btnId: string, listId: string, valueLa
         btn!.focus();
       }
     });
+  }
+
+  btn.addEventListener('click', () => (list.hidden ? open() : close()));
+  btn.addEventListener('keydown', (ev) => {
+    if (ev.key === 'ArrowDown' || ev.key === 'Enter' || ev.key === ' ') {
+      ev.preventDefault();
+      open();
+    }
   });
+  getOptions().forEach(bind);
   document.addEventListener('click', (ev) => {
     if (!wrap!.contains(ev.target as Node)) close();
   });
+  // A lista é fixed: acompanhar o botão (ou fechar) quando a página rola ou muda de tamanho.
+  window.addEventListener('resize', () => !list!.hidden && place());
+  window.addEventListener('scroll', (ev) => !list!.hidden && !list!.contains(ev.target as Node) && place(), true);
+
+  return {
+    /** Troca as opções (valor enviado, texto da lista e texto curto do botão) mantendo a escolha quando ainda existe. */
+    setOptions(items: { value: string; label: string; short?: string }[]) {
+      const keep = hiddenInput!.value;
+      list!.replaceChildren();
+      items.forEach((it) => {
+        const li = document.createElement('li');
+        li.setAttribute('role', 'option');
+        li.dataset.value = it.value;
+        if (it.short) li.dataset.short = it.short;
+        li.textContent = it.label;
+        list!.appendChild(li);
+        bind(li);
+      });
+      const chosen = getOptions().find((o) => o.dataset.value === keep) ?? getOptions()[0];
+      if (chosen) {
+        getOptions().forEach((o) => {
+          o.classList.toggle('is-selected', o === chosen);
+          o.setAttribute('aria-selected', o === chosen ? 'true' : 'false');
+        });
+        valueLabel!.textContent = chosen.dataset.short || chosen.textContent || '';
+        hiddenInput!.value = chosen.dataset.value || '1';
+      }
+    },
+  };
 }
 
 /** Setado depois do registro/login silencioso — associa carrinho/pedido ao customer. */
@@ -221,7 +265,26 @@ function init() {
     return;
   }
   renderSummary(items);
-  initCustomSelect('ck-installments-select', 'ck-installments-btn', 'ck-installments-list', 'ck-installments-value', 'ck-installments');
+  const installmentsSelect = initCustomSelect('ck-installments-select', 'ck-installments-btn', 'ck-installments-list', 'ck-installments-value', 'ck-installments');
+  let payableTotal = 0;
+
+  /** Parcelas do cartão, no formato do Mercado Livre: "3x de R$ 3,65 sem juros" ou "6x de R$ 2,00 (R$ 12,00)". */
+  function renderInstallments(costs?: { installments: number; installment_rate: number; installment_amount: number; total_amount: number }[]) {
+    if (!installmentsSelect) return;
+    if (!costs?.length) {
+      const label = payableTotal ? `1x de ${fmtBrl(payableTotal)} sem juros` : '1x';
+      installmentsSelect.setOptions([{ value: '1', label }]);
+      return;
+    }
+    installmentsSelect.setOptions(
+      costs.map((c) => {
+        const base = `${c.installments}x de ${fmtBrl(c.installment_amount)}`;
+        const label = Number(c.installment_rate) === 0 ? `${base} sem juros` : `${base} (${fmtBrl(c.total_amount)})`;
+        return { value: String(c.installments), label };
+      })
+    );
+  }
+  renderInstallments();
 
   // ---- Frete: opções (preço e prazo) calculadas no servidor para o CEP digitado ----
   let shipChoice: ShipOption | null = null;
@@ -1086,6 +1149,8 @@ function init() {
       const discount = Number(cart.discount_total ?? 0);
       setText('checkout-summary-total', fmtBrl(total));
       setText('checkout-summary-toggle-total', fmtBrl(total));
+      payableTotal = total;
+      renderInstallments();
       if (shipping > 0) {
         setText('checkout-summary-shipping', fmtBrl(shipping));
         show('checkout-summary-shipping-row', true);
@@ -1175,8 +1240,13 @@ function init() {
         try {
           const methods = await mp.getPaymentMethods({ bin: data.bin });
           detectedPaymentMethodId = methods?.results?.[0]?.id || '';
+          if (payableTotal > 0) {
+            const options = await mp.getInstallments({ amount: String(payableTotal), bin: data.bin, paymentTypeId: 'credit_card' });
+            renderInstallments(options?.[0]?.payer_costs);
+          }
         } catch {
           detectedPaymentMethodId = '';
+          renderInstallments();
         }
       });
     };
