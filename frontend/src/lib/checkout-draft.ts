@@ -14,6 +14,7 @@ export interface CheckoutDraft {
   street_name: string;
   street_number: string;
   neighborhood: string;
+  complement?: string;
   city: string;
   federal_unit: string;
 }
