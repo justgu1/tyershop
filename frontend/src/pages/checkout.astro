@@ -102,9 +102,6 @@ const c = (key: string) => t(lang, 'checkout', key);
                   </div>
                   <p id="checkout-personal-error" class="checkout-error" hidden></p>
                 </div>
-                <button type="button" id="checkout-contact-continue" class="checkout-step__continue">
-                  Continuar
-                </button>
               </section>
 
               <section id="checkout-address-section" class="checkout-step">
@@ -508,11 +505,8 @@ const c = (key: string) => t(lang, 'checkout', key);
   .checkout-step__title:not(:first-child) {
     margin-top: 24px;
   }
-  /* "Continuar"/"Voltar" entre os passos de dados/endereço só existem no
-     wizard mobile — no desktop as 2 seções ficam sempre visíveis juntas. */
-  .checkout-step__continue {
-    display: none;
-  }
+  /* "Voltar" entre os passos de dados/endereço só existe no wizard mobile —
+     no desktop as 2 seções ficam sempre visíveis juntas. */
   .checkout-step__back {
     display: none;
   }
@@ -1338,28 +1332,13 @@ const c = (key: string) => t(lang, 'checkout', key);
       padding: 2px 8px;
       border-radius: 999px;
     }
-    /* Passo 1 — Seus dados: só o form de contato + "Continuar". */
+    /* Passo 1 — Seus dados: só o form de contato; o avanço é o botão do resumo. */
     #checkout-root[data-mobile-step="contact"] #checkout-address-section,
     #checkout-root[data-mobile-step="contact"] .checkout-summary__toggle,
     #checkout-root[data-mobile-step="contact"] #checkout-summary-body,
     #checkout-root[data-mobile-step="contact"] .checkout-summary__totals,
     #checkout-root[data-mobile-step="contact"] #checkout-payment-block {
       display: none;
-    }
-    #checkout-root[data-mobile-step="contact"] .checkout-step__continue {
-      display: block;
-      width: 100%;
-      margin-top: 20px;
-      padding: 14px;
-      border: 1px solid var(--c-accent);
-      border-radius: var(--r-md, 8px);
-      background: transparent;
-      color: var(--c-accent);
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      cursor: pointer;
     }
 
     /* Passo 2 — Endereço: só o form de endereço + "Voltar". */
