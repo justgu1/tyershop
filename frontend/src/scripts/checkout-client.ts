@@ -981,6 +981,10 @@ function init() {
       errorEl.textContent = message || '';
     }
   }
+  const HIDEABLE_FIELD_GROUPS = [
+    { summary: 'checkout-contact-summary', fields: 'checkout-contact-fields', ids: ['ck-email', 'ck-first-name', 'ck-last-name', 'ck-cpf'] },
+    { summary: 'checkout-address-summary', fields: 'checkout-address-fields', ids: ['ck-zip', 'ck-street', 'ck-number', 'ck-city', 'ck-province'] },
+  ];
   function fieldIsValid(id: string): boolean {
     const value = (qs<HTMLInputElement>(id)?.value || '').trim();
     if (id === 'ck-cpf') return isValidCpf(value);
@@ -995,7 +999,17 @@ function init() {
       setFieldError(id, valid ? null : REQUIRED_FIELD_MESSAGES[id] || 'Campo obrigatório.');
       if (!valid && !firstInvalidId) firstInvalidId = id;
     });
-    if (firstInvalidId) qs<HTMLInputElement>(firstInvalidId)?.focus();
+    if (firstInvalidId) {
+      // Com o cartão-resumo no lugar do form, o erro e o foco caíam num campo escondido e o clique parecia não fazer nada.
+      for (const group of HIDEABLE_FIELD_GROUPS) {
+        const firstInGroup = ids.find((id) => group.ids.includes(id) && !fieldIsValid(id));
+        if (!firstInGroup || !qs(group.fields)?.hidden) continue;
+        show(group.summary, false);
+        show(group.fields, true);
+        if (group.ids.includes(firstInvalidId)) firstInvalidId = firstInGroup;
+      }
+      qs<HTMLInputElement>(firstInvalidId)?.focus();
+    }
     return !firstInvalidId;
   }
   // Erro individual some assim que a pessoa começa a corrigir o campo.
@@ -1200,8 +1214,8 @@ function init() {
     qs<HTMLInputElement>('ck-zip')?.focus();
   });
 
-  // Wizard mobile — passo 1 → 2 ("Continuar" dedicado no form e a mesma
-  // ação replicada pelo CTA da sidebar quando `mobileStep==='contact'`).
+  // Wizard mobile — passo 1 → 2 (o CTA do resumo avança quando
+  // `mobileStep==='contact'`).
   function advanceFromContact() {
     const valid = validateRequiredFields(['ck-email', 'ck-first-name', 'ck-last-name', 'ck-cpf']);
     if (!valid) {
@@ -1213,7 +1227,6 @@ function init() {
     setMobileStep('address');
     qs<HTMLInputElement>('ck-zip')?.focus();
   }
-  qs('checkout-contact-continue')?.addEventListener('click', advanceFromContact);
 
   // Wizard mobile — "Voltar" do passo 2 (endereço) pro passo 1 (dados).
   qs('checkout-address-back')?.addEventListener('click', () => {

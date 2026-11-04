@@ -141,3 +141,7 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
 - **Pagamento com cartão recusado não segue para fechar o pedido.** O frontend ignorava o `status` da cobrança e o cliente via
   o erro cru "was not authorized with the provider". Falta teste de frontend (não há runner configurado).
   Origem: cartão emitido fora do Brasil recusado em produção, `submitCard`.
+- **Erro de campo obrigatório nunca fica atrás de um bloco escondido (dados ou endereço), e cada passo do checkout mobile tem um só botão de avançar.**
+  Cliente logado sem CPF salvo via o cartão-resumo no lugar do form: "Continuar" falhava a validação num campo invisível e
+  parecia não fazer nada; havia dois "Continuar". Falta teste de frontend (não há runner configurado).
+  Origem: checkout mobile travado no passo "Seus dados", `validateRequiredFields`.
