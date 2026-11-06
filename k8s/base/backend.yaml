@@ -60,6 +60,18 @@ spec:
                   key: PUBLIC_MERCADOPAGO_PUBLIC_KEY
             - name: MERCADOPAGO_NOTIFICATION_URL
               value: "https://medusa.homolog.tyershop.com/hooks/payment/mercadopago_mercadopago"
+            - name: GOOGLE_SHEETS_SPREADSHEET_ID
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: GOOGLE_SHEETS_SPREADSHEET_ID
+                  optional: true
+            - name: GOOGLE_SERVICE_ACCOUNT_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: tyershop-secrets
+                  key: GOOGLE_SERVICE_ACCOUNT_JSON
+                  optional: true
             - name: SMTP_HOST
               valueFrom:
                 secretKeyRef:
