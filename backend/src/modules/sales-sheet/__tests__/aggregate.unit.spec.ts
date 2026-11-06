@@ -1,6 +1,6 @@
 import { BASE_COLUMNS, buildBase, dropNumber, DropInfo, SaleLine, sheetSerial } from "../aggregate"
 import { allocateRefund } from "../collect"
-import { baseValues, renderTab } from "../render"
+import { argumentSeparator, baseValues, localizeFormulas, renderTab } from "../render"
 
 const drop6: DropInfo = { id: "d6", handle: "drop-6", title: "Drop 6", salesStart: new Date("2026-11-06T15:00:00Z") }
 const teste: DropInfo = { id: "dt", handle: "drop-teste", title: "Teste", salesStart: new Date("2026-11-03T03:00:00Z") }
@@ -82,7 +82,7 @@ describe("renderTab", () => {
   it("todo número do resumo e do detalhe é fórmula sobre a Base de dados", () => {
     const formulas = rows.flat().filter((c) => typeof c === "string" && c.startsWith("="))
     expect(formulas.length).toBeGreaterThan(20)
-    expect(formulas.filter((f) => /SUMIFS|COUNTUNIQUE/.test(f as string)).every((f) => (f as string).includes("'Base de dados'!"))).toBe(true)
+    expect(formulas.filter((f) => /SUMIFS|ROWS\(UNIQUE/.test(f as string)).every((f) => (f as string).includes("'Base de dados'!"))).toBe(true)
   })
 
   it("o detalhe diário traz o dia como valor e acumula o líquido por fase", () => {
@@ -90,5 +90,27 @@ describe("renderTab", () => {
     expect(first[0]).toBe(tabs[1].days[0])
     expect(first[7]).toBe("=SUM(D$11:D11)")
     expect(first[9]).toBe("=H11+I11")
+  })
+})
+
+describe("separador de fórmula por idioma da planilha", () => {
+  it("pt_BR usa ponto e vírgula, en_US usa vírgula", () => {
+    expect(argumentSeparator("pt_BR")).toBe(";")
+    expect(argumentSeparator("en_US")).toBe(",")
+  })
+
+  it("em pt_BR nenhuma fórmula sai com vírgula e o texto comum fica intacto", () => {
+    const { tabs } = buildBase([line({})], [drop6])
+    const rows = localizeFormulas(renderTab(tabs[1], "agora, 10:00"), ";")
+    expect(rows.flat().filter((c) => typeof c === "string" && c.startsWith("=")).some((f) => (f as string).includes(","))).toBe(false)
+    expect(rows[1][0]).toContain("agora, 10:00")
+    expect(rows.flat().some((c) => typeof c === "string" && c.includes("SUMIFS('Base de dados'!$H$2:$H;"))).toBe(true)
+  })
+})
+
+describe("contagem de pedidos", () => {
+  it("não usa COUNTUNIQUE, que conta o erro do FILTER vazio como 1 pedido", () => {
+    const { tabs } = buildBase([line({})], [drop6])
+    expect(JSON.stringify(renderTab(tabs[1], "agora"))).not.toContain("COUNTUNIQUE")
   })
 })

@@ -3,7 +3,7 @@ import { Modules } from "@medusajs/framework/utils"
 import { BASE_COLUMNS, BASE_TAB, buildBase, TabInfo } from "./aggregate"
 import { collectDrops, collectSaleLines } from "./collect"
 import { parseServiceAccount, SheetsClient } from "./google"
-import { baseValues, DAILY_HEADER_ROW, dailyColumns, renderTab } from "./render"
+import { argumentSeparator, baseValues, DAILY_HEADER_ROW, dailyColumns, localizeFormulas, renderTab } from "./render"
 
 type Sheet = { sheetId: number; title: string; chartIds: number[] }
 
@@ -104,6 +104,7 @@ export async function syncSalesSheet(scope: MedusaContainer, client: SheetsClien
   const { rows, tabs } = buildBase(await collectSaleLines(scope, dropOfProduct), drops)
   const updatedAt = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date())
 
+  const sep = argumentSeparator(await client.getLocale())
   const existing = new Map<string, Sheet>(
     (await client.getSheets()).sheets.map((s) => [s.properties.title, { sheetId: s.properties.sheetId, title: s.properties.title, chartIds: (s.charts ?? []).map((c) => c.chartId) }])
   )
@@ -121,7 +122,7 @@ export async function syncSalesSheet(scope: MedusaContainer, client: SheetsClien
   for (const tab of tabs) {
     const sheet = existing.get(tab.name)!
     await client.clear(`'${tab.name}'`)
-    await client.write(`'${tab.name}'!A1`, renderTab(tab, updatedAt))
+    await client.write(`'${tab.name}'!A1`, localizeFormulas(renderTab(tab, updatedAt), sep))
     await client.batchUpdate([
       ...sheet.chartIds.map((chartId) => ({ deleteEmbeddedObject: { objectId: chartId } })),
       ...tabFormat(tab, sheet.sheetId),
