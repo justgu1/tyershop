@@ -4,7 +4,7 @@ import ProductCarousel from '../components/ProductCarousel.astro';
 import { t, getPathForLang, type Lang } from '../i18n/utils';
 import Countdown from '../components/drop/Countdown.astro';
 import { getMedusaStoreUrl, getPublishableKey } from '../lib/medusa-env';
-import { fetchDrops, fetchProductsByIds, dropCountdown, PHASE_LABEL } from '../lib/drop';
+import { fetchDrops, fetchProductsByIds, fetchStarterProducts, dropCountdown, PHASE_LABEL } from '../lib/drop';
 import { fetchCollectionsWithCounts } from '../lib/collections';
 import { cached } from '../lib/ssr-cache';
 
@@ -45,6 +45,12 @@ const dropCd = drop ? dropCountdown(drop) : null;
 // Em venda geral o drop sai do hero e vira vitrine: produtos acima do carousel de drops e um card dentro dele.
 const generalDrop = drop?.phase === 'general' ? drop : null;
 const dropProducts = generalDrop ? await fetchProductsByIds(product_ids) : [];
+// Peças que acompanham o drop sem fazer parte dele (vendem o ano todo): entram no mesmo carousel, depois das do drop.
+const OUTROS_HANDLES = ['camiseta-tyer-starter-dry-fit', 'pulseira-cacada'];
+const inDrop = new Set(dropProducts.map((p: any) => p.id));
+const outros = generalDrop && dropProducts.length > 0
+  ? (await fetchStarterProducts(OUTROS_HANDLES)).filter((p: any) => !inDrop.has(p.id))
+  : [];
 const dropCard = generalDrop && dropProducts.length > 0
   ? { handle: generalDrop.handle, title: generalDrop.title, href: '/shop#shop-drop', count: dropProducts.length }
   : null;
@@ -151,7 +157,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
   <section id="drop-atual" class="section drop-now-section" aria-label={generalDrop?.title}>
     <div class="section-content drop-now-wrap">
       <ProductCarousel
-        products={dropProducts}
+        products={[...dropProducts, ...outros]}
         lang={lang}
         title={dropCard.title}
         headingId="drop-atual-title"
