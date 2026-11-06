@@ -49,9 +49,27 @@ if (document.documentElement.dataset.carouselInitDone === 'true') {
       });
     };
 
+    const posOf = (cell: Element) => (cell as HTMLElement).offsetLeft - track.offsetLeft;
+    // Os cards começam a poucos px do início e o snap tem scroll-padding: o card da borda conta como alinhado até aqui.
+    const ALIGN_TOLERANCE = 8;
+    const maxScroll = () => Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+
+    /* A posição vem sempre do scroll real (clique, arrasto, momentum, teclado): o card ativo é o mais próximo da borda
+       esquerda, ou o último quando o scroll chegou ao fim. Prev/next andam a partir dali, nunca de um índice guardado. */
+    const activeIndex = () => {
+      const x = viewport.scrollLeft;
+      if (x >= maxScroll() - 1 && x > 1) return cells.length - 1;
+      let best = 0;
+      cells.forEach((c, i) => {
+        if (Math.abs(posOf(c) - x) < Math.abs(posOf(cells[best]) - x)) best = i;
+      });
+      return best;
+    };
+
     const updateNav = () => {
-      prevBtn.disabled = currentIndex <= 0;
-      nextBtn.disabled = currentIndex >= cells.length - 1;
+      currentIndex = activeIndex();
+      prevBtn.disabled = viewport.scrollLeft <= 1;
+      nextBtn.disabled = viewport.scrollLeft >= maxScroll() - 1;
       Array.from(pager.children).forEach((el, i) => {
         el.classList.toggle('is-active', i === currentIndex);
         el.setAttribute('aria-selected', i === currentIndex ? 'true' : 'false');
@@ -59,32 +77,38 @@ if (document.documentElement.dataset.carouselInitDone === 'true') {
       if (live instanceof HTMLElement) live.textContent = `Produto ${currentIndex + 1} de ${cells.length}`;
     };
 
+    function scrollToX(x: number) {
+      viewport!.scrollTo({ left: Math.max(0, Math.min(x, maxScroll())), behavior: 'smooth' });
+    }
+
     function goTo(i: number) {
-      const clamped = Math.max(0, Math.min(i, cells.length - 1));
-      const cell = cells[clamped];
-      if (!(cell instanceof HTMLElement)) return;
-      viewport!.scrollTo({ left: cell.offsetLeft - track!.offsetLeft, behavior: 'smooth' });
+      const cell = cells[Math.max(0, Math.min(i, cells.length - 1))];
+      if (cell) scrollToX(posOf(cell));
     }
 
-    prevBtn.addEventListener('click', () => goTo(currentIndex - 1));
-    nextBtn.addEventListener('click', () => goTo(currentIndex + 1));
+    prevBtn.addEventListener('click', () => {
+      const x = viewport.scrollLeft;
+      const target = [...cells].reverse().find((c) => posOf(c) < x - ALIGN_TOLERANCE);
+      scrollToX(target ? posOf(target) : 0);
+    });
+    nextBtn.addEventListener('click', () => {
+      const x = viewport.scrollLeft;
+      const target = cells.find((c) => posOf(c) > x + ALIGN_TOLERANCE);
+      scrollToX(target ? posOf(target) : maxScroll());
+    });
 
-    /* Posição ativa por scroll real (arrasto manual, momentum, teclado no
-       viewport com tabindex) — não só clique nas setas/paginação. */
-    if ('IntersectionObserver' in window) {
-      const io = new IntersectionObserver(
-        (entries) => {
-          const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-          if (!visible) return;
-          const idx = cells.indexOf(visible.target as HTMLElement);
-          if (idx === -1 || idx === currentIndex) return;
-          currentIndex = idx;
+    let frame = 0;
+    viewport.addEventListener(
+      'scroll',
+      () => {
+        if (frame) return;
+        frame = requestAnimationFrame(() => {
+          frame = 0;
           updateNav();
-        },
-        { root: viewport, threshold: 0.6 }
-      );
-      cells.forEach((c) => io.observe(c));
-    }
+        });
+      },
+      { passive: true }
+    );
 
     /* Cabe tudo sem precisar de scroll (ex.: Home com só 4 produtos numa
        tela larga) — barra de controle inteira some, não faz sentido setas
@@ -105,6 +129,7 @@ if (document.documentElement.dataset.carouselInitDone === 'true') {
       // e PDP (align="left", padrão) ficam grudados na esquerda mesmo
       // quando cabe tudo, por pedido explícito.
       track.classList.toggle('is-centered', shouldCenter && !scrollable);
+      updateNav();
     };
     syncControlbarVisibility();
     if ('ResizeObserver' in window) {

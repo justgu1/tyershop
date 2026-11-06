@@ -127,6 +127,20 @@ async function fetchStarterUncached(handles: string[]): Promise<any[]> {
   }
 }
 
+/**
+ * Link «Drop» do menu e do rodapé: nome do drop em vigor, ou do mais recente se não há nenhum em vigor. Sem nome nenhum
+ * o link some, em vez de aparecer como «Drop» fixo.
+ */
+export function navDropLink(
+  countdown?: { title: string } | null,
+  latest?: { title: string; handle: string } | null
+): { label: string | null; href: string } {
+  return {
+    label: countdown?.title ?? latest?.title ?? null,
+    href: !countdown && latest ? `/collections/${latest.handle}` : '/drop',
+  };
+}
+
 export const PHASE_LABEL: Record<DropPhase, string> = {
   coming_soon: 'Em breve',
   presale: 'Pré-venda',

@@ -1,13 +1,17 @@
 ---
 import { t, getPathForLang, type Lang } from '../i18n/utils';
+import { navDropLink } from '../lib/drop';
 
 interface Props {
   lang?: Lang;
   /** Exibir link “Coleções” para #collection; só se existirem drops no Medusa. */
   showCollectionsLink?: boolean;
+  countdown?: { title: string } | null;
+  latest?: { title: string; handle: string } | null;
 }
 const lang: Lang = Astro.props.lang ?? 'pt';
 const showCollectionsLink = Astro.props.showCollectionsLink !== false;
+const dropLink = navDropLink(Astro.props.countdown, Astro.props.latest);
 const year = new Date().getFullYear();
 const copyrightFull = t(lang, 'footer', 'copyright_full').replace('{year}', String(year));
 
@@ -41,9 +45,11 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
           <li>
             <a href={getPathForLang('/collections/pulseiras', lang)} class="footer__col-link">Pulseiras</a>
           </li>
-          <li>
-            <a href={getPathForLang('/drop', lang)} class="footer__col-link">Drop</a>
-          </li>
+          {dropLink.label && (
+            <li>
+              <a href={getPathForLang(dropLink.href, lang)} class="footer__col-link">{dropLink.label}</a>
+            </li>
+          )}
           <li>
             <a href={WHATSAPP_GROUP_URL} class="footer__col-link" target="_blank" rel="noopener noreferrer"
               >{t(lang, 'footer', 'comunidade')}</a

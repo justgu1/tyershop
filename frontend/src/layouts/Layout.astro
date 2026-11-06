@@ -141,7 +141,7 @@ const schemas: object[] = [
     <main id="main-content" tabindex="-1">
       <slot />
     </main>
-    {!bare && <Footer lang={lang} showCollectionsLink={showCollectionsInNav} />}
+    {!bare && <Footer lang={lang} showCollectionsLink={showCollectionsInNav} countdown={navCountdown} latest={navLatest} />}
     <script>
       import "../scripts/product-card-client";
       import "../scripts/product-carousel-client";

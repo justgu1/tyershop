@@ -2,6 +2,7 @@
 import { t, getPathForLang, type Lang } from "../i18n/utils";
 import { getMedusaStoreUrl, getPublishableKey } from "../lib/medusa-env";
 import Countdown from "./drop/Countdown.astro";
+import { navDropLink } from "../lib/drop";
 
 interface NavDrop {
   handle: string;
@@ -30,10 +31,10 @@ const countdown = Astro.props.countdown ?? null;
 const latest = Astro.props.latest ?? null;
 // Sem drop ativo, o link leva o nome do drop mais recente em vez de "Drop" ao lado de "Drops".
 // Sem drop ativo nem anterior não há nome para mostrar: o link some em vez de aparecer como "Drop" ao lado de "Drops".
-const dropLabel = countdown?.title ?? latest?.title ?? null;
+const { label: dropLabel, href: dropPath } = navDropLink(countdown, latest);
 // Drop prestes a abrir ou em pré-venda vem antes dos outros nas listas (menu de drops e menu do celular).
 const featuredDrop = countdown && (countdown.phase === "coming_soon" || countdown.phase === "presale") ? countdown : null;
-const dropHref = !countdown && latest ? getPathForLang(`/collections/${latest.handle}`, lang) : getPathForLang("/drop", lang);
+const dropHref = getPathForLang(dropPath, lang);
 
 const url = getMedusaStoreUrl();
 const medusaBase = (

@@ -4,13 +4,24 @@ import ProductGalleryRow from '../../components/ProductGalleryRow.astro';
 import { getLangFromUrl, getPathForLang, t } from '../../i18n/utils';
 import type { Lang } from '../../i18n/utils';
 import { fetchCatalogSections } from '../../lib/catalog-sections';
+import { fetchDrops, fetchProductsByIds } from '../../lib/drop';
 
 // Catálogo dinâmico: renderiza por requisição (ver index.astro).
 export const prerender = false;
 
 const lang: Lang = getLangFromUrl(Astro.url);
 const showEmptyCheckoutToast = Astro.url.searchParams.get('empty_checkout') === '1';
-const sections = await fetchCatalogSections();
+const [catalog, { drop, product_ids }] = await Promise.all([fetchCatalogSections(), fetchDrops()]);
+
+// Drop em venda geral abre a loja: seção própria, primeira, e as peças dele saem das demais para não repetir.
+const dropProducts = drop?.phase === 'general' ? await fetchProductsByIds(product_ids) : [];
+const inDrop = new Set(dropProducts.map((p: any) => p.id));
+const sections = [
+  ...(drop && dropProducts.length ? [{ key: 'drop', title: drop.title, href: '/drop', products: dropProducts }] : []),
+  ...catalog
+    .map((sec) => ({ ...sec, products: sec.products.filter((p: any) => !inDrop.has(p.id)) }))
+    .filter((sec) => sec.products.length > 0),
+];
 ---
 
 <Layout
