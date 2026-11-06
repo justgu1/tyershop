@@ -107,7 +107,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
       {generalDrop && dropCard && (
         <a class="hero__drop hero__drop--general" href="#drop-atual">
           <h2 class="hero__drop-title">{generalDrop.title}</h2>
-          <span class="hero__drop-cta">Ver o drop →</span>
+          <span class="hero__drop-cta">Ver loja →</span>
         </a>
       )}
       {drop && !(generalDrop && dropCard) && (
@@ -155,6 +155,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
         lang={lang}
         title={dropCard.title}
         headingId="drop-atual-title"
+        align="center"
         alwaysControls
       />
     </div>
@@ -195,7 +196,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
                 <div class="col-card__content">
                   <h3 class="col-card__name">{col.title}</h3>
                   <p class="col-card__count">{col.count} itens disponíveis</p>
-                  <span class="col-card__cta">{col.isDrop ? 'Ver o drop →' : 'Ver coleção →'}</span>
+                  <span class="col-card__cta">{col.isDrop ? 'Ver loja →' : 'Ver coleção →'}</span>
                 </div>
               </a>
             </article>
@@ -561,6 +562,9 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
 .collections-wrap { padding-inline: 0; }
 .drop-now-section { min-height: 0; }
 .drop-now-wrap { padding-inline: clamp(20px, 4vw, 40px); }
+/* Mesmo título das demais seções da home (ver .section__title e .collections-title). */
+.drop-now-section :global(.product-carousel__head) { margin-bottom: 56px; }
+.drop-now-section :global(.product-carousel__title) { font-size: clamp(36px, 5vw, 64px); letter-spacing: normal; text-align: center; }
 .collections-title { text-align: center; margin-bottom: 56px; padding-inline: 40px; }
 
 /* Stage: clips the sides, shows 5 cards */
