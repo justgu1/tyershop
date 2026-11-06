@@ -15,10 +15,10 @@ const conditions = ({ tab, phase, status, day }: Filter) =>
 
 const sumifs = (sumCol: string, f: Filter) => `SUMIFS(${col(sumCol)},${conditions(f)})`
 
-/** Pedidos distintos: a base tem uma linha por item, então um pedido com vários itens aparece mais de uma vez. */
+/** Pedidos distintos: a base tem uma linha por item. Sem linhas, o FILTER dá erro e vira 0; COUNTUNIQUE contaria esse erro como 1. */
 const orders = (f: Omit<Filter, "status">) => {
   const checks = [`${col("D")}="${f.tab}"`, f.phase ? `${col("E")}="${f.phase}"` : "", `${col("J")}="${STATUS_ACTIVE}"`, f.day ? `${col("C")}=${f.day}` : ""].filter(Boolean)
-  return `=IFERROR(COUNTUNIQUE(FILTER(${col("A")},${checks.join(",")})),0)`
+  return `=IFERROR(ROWS(UNIQUE(FILTER(${col("A")},${checks.join(",")}))),0)`
 }
 
 export const dailyColumns = (split: boolean) =>
@@ -27,6 +27,16 @@ export const dailyColumns = (split: boolean) =>
     : ["Dia", "Pedidos", "Bruto", "Líquido", "Acumulado"]
 
 /** Toda célula numérica da aba é fórmula sobre a Base de dados: corrigir ou filtrar a base reflete aqui sem passar pelo backend. */
+export function argumentSeparator(locale: string): "," | ";" {
+  return new Intl.NumberFormat(locale.replace("_", "-")).format(1.5).includes(",") ? ";" : ","
+}
+
+/** A planilha lê a fórmula no idioma dela: em pt_BR o separador de argumentos é `;`. Nenhum trecho das fórmulas tem vírgula além dos separadores. */
+export function localizeFormulas(rows: (string | number)[][], sep: "," | ";"): (string | number)[][] {
+  if (sep === ",") return rows
+  return rows.map((row) => row.map((c) => (typeof c === "string" && c.startsWith("=") ? c.replaceAll(",", sep) : c)))
+}
+
 export function renderTab(tab: TabInfo, updatedAt: string): (string | number)[][] {
   const phases = tab.split ? [PHASE_PRESALE, PHASE_GENERAL] : [PHASE_STARTER]
   const rows: (string | number)[][] = [

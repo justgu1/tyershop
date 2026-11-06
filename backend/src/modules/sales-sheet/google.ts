@@ -50,6 +50,10 @@ export class SheetsClient {
     return body
   }
 
+  async getLocale(): Promise<string> {
+    return (await this.call("?fields=properties(locale)")).properties?.locale ?? "en_US"
+  }
+
   getSheets(): Promise<{ sheets: { properties: { sheetId: number; title: string }; charts?: { chartId: number }[] }[] }> {
     return this.call("?fields=sheets(properties(sheetId,title),charts(chartId))")
   }

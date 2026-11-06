@@ -125,6 +125,15 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
 - **O ID da planilha e a conta de serviço vêm só de Secret.** O repositório é público e o link da planilha também.
   Origem: pedido de integração com o Google Sheets, `sheetsFromEnv`.
   Guard: `segredos-ignorados.test.mjs` ("o ID da planilha não aparece em arquivo versionado").
+- **As fórmulas da planilha usam o separador de argumentos do idioma da planilha.** Em `pt_BR` a vírgula dava `#ERROR!` em
+  toda célula de resumo e de detalhe.
+  Origem: primeira execução em produção, `renderTab`.
+  Guard: `aggregate.unit.spec.ts` ("pt_BR usa ponto e vírgula, en_US usa vírgula") e `aggregate.unit.spec.ts` ("em pt_BR
+  nenhuma fórmula sai com vírgula e o texto comum fica intacto").
+- **A contagem de pedidos da planilha dá 0, e não 1, quando não há venda.** `COUNTUNIQUE` conta o erro do `FILTER` vazio como
+  um pedido.
+  Origem: primeira execução em produção, aba Drop 6 sem venda global.
+  Guard: `aggregate.unit.spec.ts` ("não usa COUNTUNIQUE, que conta o erro do FILTER vazio como 1 pedido").
 
 ## Pendentes de guard
 
