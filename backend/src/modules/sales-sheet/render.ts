@@ -21,6 +21,15 @@ const orders = (f: Omit<Filter, "status">) => {
   return `=IFERROR(ROWS(UNIQUE(FILTER(${col("A")},${checks.join(",")}))),0)`
 }
 
+export const ORDER_LIST_COLUMNS = ["Pedido", "Data e hora", "Fase", "Peça", "Variação (cor / tamanho)", "Qtd", "Bruto", "Status"]
+
+/** Linha (1 = primeira) do cabeçalho da lista de pedidos: dois espaços depois do último dia do detalhe diário. */
+export const orderListHeaderRow = (tab: TabInfo) => DAILY_HEADER_ROW + tab.days.length + 3
+
+/** Sem chaves de array literal, porque o separador de colunas delas também muda com o idioma da planilha. */
+const orderList = (tab: string) =>
+  `=IFERROR(SORT(CHOOSECOLS(FILTER('${BASE_TAB}'!$A$2:$K,${col("D")}="${tab}"),1,2,5,6,11,7,8,10),2,FALSE),"")`
+
 export const dailyColumns = (split: boolean) =>
   split
     ? ["Dia", "Pré-venda: pedidos", "Pré-venda: bruto", "Pré-venda: líquido", "Venda global: pedidos", "Venda global: bruto", "Venda global: líquido", "Acumulado pré-venda", "Acumulado venda global", "Acumulado total"]
@@ -84,5 +93,7 @@ export function renderTab(tab: TabInfo, updatedAt: string): (string | number)[][
       rows.push([day, orders({ tab: tab.name, phase: null, day: d }), gross(null), net(null), `=SUM(D$${FIRST_DAILY}:D${r})`])
     }
   })
+
+  rows.push([], [`Vendas por pedido — ${tab.name}`], ORDER_LIST_COLUMNS, [orderList(tab.name)])
   return rows
 }

@@ -1,6 +1,6 @@
 import { BASE_COLUMNS, buildBase, dropNumber, DropInfo, SaleLine, sheetSerial } from "../aggregate"
 import { allocateRefund } from "../collect"
-import { argumentSeparator, baseValues, localizeFormulas, renderTab } from "../render"
+import { argumentSeparator, baseValues, localizeFormulas, orderListHeaderRow, renderTab } from "../render"
 
 const drop6: DropInfo = { id: "d6", handle: "drop-6", title: "Drop 6", salesStart: new Date("2026-11-06T15:00:00Z") }
 const teste: DropInfo = { id: "dt", handle: "drop-teste", title: "Teste", salesStart: new Date("2026-11-03T03:00:00Z") }
@@ -10,6 +10,7 @@ const line = (o: Partial<SaleLine>): SaleLine => ({
   createdAt: new Date("2026-11-05T12:00:00Z"),
   canceled: false,
   title: "Camiseta",
+  variantTitle: "Branca / M",
   amount: 100,
   quantity: 1,
   refunded: 0,
@@ -42,7 +43,7 @@ describe("buildBase", () => {
   })
 
   it("a base só tem as colunas permitidas, sem dado de cliente", () => {
-    expect(BASE_COLUMNS).toEqual(["Pedido", "Data e hora", "Dia", "Aba", "Fase", "Produto", "Quantidade", "Bruto", "Reembolsado", "Status"])
+    expect(BASE_COLUMNS).toEqual(["Pedido", "Data e hora", "Dia", "Aba", "Fase", "Produto", "Quantidade", "Bruto", "Reembolsado", "Status", "Variação"])
     const { rows } = buildBase([line({})], [drop6])
     expect(rows[0]).toHaveLength(BASE_COLUMNS.length)
     expect(baseValues(rows)[0]).toHaveLength(BASE_COLUMNS.length)
@@ -112,5 +113,26 @@ describe("contagem de pedidos", () => {
   it("não usa COUNTUNIQUE, que conta o erro do FILTER vazio como 1 pedido", () => {
     const { tabs } = buildBase([line({})], [drop6])
     expect(JSON.stringify(renderTab(tabs[1], "agora"))).not.toContain("COUNTUNIQUE")
+  })
+})
+
+describe("lista de pedidos da aba", () => {
+  const { rows, tabs } = buildBase([line({}), line({ displayId: 2, variantTitle: "G" })], [drop6])
+  const out = renderTab(tabs[1], "agora")
+
+  it("a base guarda a variação (cor e tamanho) de cada item", () => {
+    expect(rows.map((r) => r[10])).toEqual(["Branca / M", "G"])
+  })
+
+  it("cada aba lista pedido, peça e variação por fórmula sobre a base, sem chaves de array", () => {
+    const formula = out.flat().find((c) => typeof c === "string" && c.includes("CHOOSECOLS")) as string
+    expect(formula).toContain("FILTER('Base de dados'!$A$2:$K")
+    expect(formula).toContain('"Drop 6"')
+    expect(formula).not.toMatch(/[{}]/)
+    expect(out.flat()).toEqual(expect.arrayContaining(["Pedido", "Peça", "Variação (cor / tamanho)"]))
+  })
+
+  it("o cabeçalho da lista fica na linha que a formatação espera", () => {
+    expect(out[orderListHeaderRow(tabs[1]) - 1][0]).toBe("Pedido")
   })
 })

@@ -134,6 +134,11 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   um pedido.
   Origem: primeira execução em produção, aba Drop 6 sem venda global.
   Guard: `aggregate.unit.spec.ts` ("não usa COUNTUNIQUE, que conta o erro do FILTER vazio como 1 pedido").
+- **Toda aba de venda lista, por pedido, o número, a peça e a variação (cor e tamanho).** Só com totais por dia não dava para
+  saber o que produzir ou separar para cada pedido.
+  Origem: pedido ao ver as abas da planilha, `renderTab`.
+  Guard: `aggregate.unit.spec.ts` ("cada aba lista pedido, peça e variação por fórmula sobre a base, sem chaves de array") e
+  `aggregate.unit.spec.ts` ("a base guarda a variação (cor e tamanho) de cada item").
 
 ## Pendentes de guard
 

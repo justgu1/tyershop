@@ -3,7 +3,7 @@ import { Modules } from "@medusajs/framework/utils"
 import { BASE_COLUMNS, BASE_TAB, buildBase, TabInfo } from "./aggregate"
 import { collectDrops, collectSaleLines } from "./collect"
 import { parseServiceAccount, SheetsClient } from "./google"
-import { argumentSeparator, baseValues, DAILY_HEADER_ROW, dailyColumns, localizeFormulas, renderTab } from "./render"
+import { argumentSeparator, baseValues, DAILY_HEADER_ROW, dailyColumns, localizeFormulas, ORDER_LIST_COLUMNS, orderListHeaderRow, renderTab } from "./render"
 
 type Sheet = { sheetId: number; title: string; chartIds: number[] }
 
@@ -54,8 +54,8 @@ export function chartRequests(tab: TabInfo, sheetId: number) {
         chartRequest(sheetId, "Venda diária (bruto) por fase", "COLUMN", first, last, [{ col: 2, color: PRESALE }, { col: 5, color: GENERAL }], 20, true),
       ]
     : [
-        chartRequest(sheetId, "Acumulado líquido", "LINE", first, last, [{ col: 4, color: TOTAL }], 6),
-        chartRequest(sheetId, "Venda diária (bruto)", "COLUMN", first, last, [{ col: 2, color: GENERAL }], 15),
+        chartRequest(sheetId, "Acumulado líquido", "LINE", first, last, [{ col: 4, color: TOTAL }], 8),
+        chartRequest(sheetId, "Venda diária (bruto)", "COLUMN", first, last, [{ col: 2, color: GENERAL }], 17),
       ]
 }
 
@@ -63,6 +63,7 @@ function tabFormat(tab: TabInfo, sheetId: number) {
   const moneyCols = tab.split ? [2, 3, 5, 6, 7, 8, 9] : [2, 3, 4]
   const summaryRows = tab.split ? 3 : 1
   const dayEnd = DAILY_HEADER_ROW + Math.max(tab.days.length, 1)
+  const listHeader = orderListHeaderRow(tab)
   return [
     cells(sheetId, 0, 1, 0, 1, { textFormat: { bold: true, fontSize: 14 } }, "textFormat"),
     cells(sheetId, 3, 4, 0, 7, BOLD, "textFormat"),
@@ -71,6 +72,10 @@ function tabFormat(tab: TabInfo, sheetId: number) {
     cells(sheetId, DAILY_HEADER_ROW - 1, DAILY_HEADER_ROW, 0, dailyColumns(tab.split).length, BOLD, "textFormat"),
     cells(sheetId, DAILY_HEADER_ROW, dayEnd, 0, 1, DATE, "numberFormat"),
     ...moneyCols.map((c) => cells(sheetId, DAILY_HEADER_ROW, dayEnd, c, c + 1, MONEY, "numberFormat")),
+    cells(sheetId, listHeader - 2, listHeader - 1, 0, 1, { textFormat: { bold: true, fontSize: 12 } }, "textFormat"),
+    cells(sheetId, listHeader - 1, listHeader, 0, ORDER_LIST_COLUMNS.length, BOLD, "textFormat"),
+    cells(sheetId, listHeader, listHeader + Math.max(tab.lines, 1), 1, 2, DATETIME, "numberFormat"),
+    cells(sheetId, listHeader, listHeader + Math.max(tab.lines, 1), 6, 7, MONEY, "numberFormat"),
     { autoResizeDimensions: { dimensions: { sheetId, dimension: "COLUMNS", startIndex: 0, endIndex: 10 } } },
   ]
 }
