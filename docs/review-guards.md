@@ -106,6 +106,17 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   Origem: mesma revisão, `k8s/prod/secrets.env`.
   Guard: `segredos-ignorados.test.mjs` ("o secrets.env de produção é ignorado pelo git").
 
+## Planilha de vendas
+
+- **A Base de dados da planilha só leva pedido, momento, produto e valores.** Nome, e-mail, CPF, endereço e dados de pagamento
+  não entram, e as outras abas só leem a base por fórmula.
+  Origem: pedido de integração com o Google Sheets, `buildBase`.
+  Guard: `aggregate.unit.spec.ts` ("a base só tem as colunas permitidas, sem dado de cliente") e `aggregate.unit.spec.ts`
+  ("todo número do resumo e do detalhe é fórmula sobre a Base de dados").
+- **O ID da planilha e a conta de serviço vêm só de Secret.** O repositório é público e o link da planilha também.
+  Origem: pedido de integração com o Google Sheets, `sheetsFromEnv`.
+  Guard: `segredos-ignorados.test.mjs` ("o ID da planilha não aparece em arquivo versionado").
+
 ## Pendentes de guard
 
 - **Reservas do e-mail de confirmação expiram, para um envio interrompido ser refeito.** Falta teste de integração com banco.
