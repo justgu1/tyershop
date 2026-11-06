@@ -46,7 +46,7 @@ const dropCd = drop ? dropCountdown(drop) : null;
 const generalDrop = drop?.phase === 'general' ? drop : null;
 const dropProducts = generalDrop ? await fetchProductsByIds(product_ids) : [];
 const dropCard = generalDrop && dropProducts.length > 0
-  ? { handle: generalDrop.handle, title: generalDrop.title, href: '/drop', count: dropProducts.length }
+  ? { handle: generalDrop.handle, title: generalDrop.title, href: '/shop', count: dropProducts.length }
   : null;
 const dropCards = [
   ...(dropCard ? [{ ...dropCard, isDrop: true }] : []),
@@ -105,7 +105,7 @@ const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/JI022Gqv3szBEKCcNBMEwN';
     <div class="hero__overlay" aria-hidden="true"></div>
     <div class="hero__bottom-stack">
       {generalDrop && dropCard && (
-        <a class="hero__drop hero__drop--general" href="#drop-atual">
+        <a class="hero__drop hero__drop--general" href="/shop">
           <h2 class="hero__drop-title">{generalDrop.title}</h2>
           <span class="hero__drop-cta">Ver loja →</span>
         </a>
