@@ -41,7 +41,7 @@ export async function collectDrops(scope: MedusaContainer): Promise<DropCatalog>
 export async function collectSaleLines(scope: MedusaContainer, dropOfProduct: Map<string, string>): Promise<SaleLine[]> {
   const db = pg(scope)
   const items = await db.raw(
-    `select o.id as order_id, o.display_id, o.created_at, li.title, (o.status = 'canceled') as canceled, oi.quantity::float as quantity,
+    `select o.id as order_id, o.display_id, o.created_at, li.title, li.variant_title, (o.status = 'canceled') as canceled, oi.quantity::float as quantity,
             (li.unit_price * oi.quantity)::float as amount, li.product_id
        from order_item oi
        join order_line_item li on li.id = oi.item_id
@@ -65,6 +65,7 @@ export async function collectSaleLines(scope: MedusaContainer, dropOfProduct: Ma
         orderId,
         displayId: Number(rows[0].display_id),
         title: String(r.title ?? ""),
+        variantTitle: String(r.variant_title ?? ""),
         createdAt: new Date(r.created_at),
         canceled: !!r.canceled,
         amount: Number(r.amount),

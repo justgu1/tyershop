@@ -4,6 +4,8 @@ export type SaleLine = {
   createdAt: Date
   canceled: boolean
   title: string
+  /** Cor e tamanho como o produto os nomeia ("Branca / M", "M"). */
+  variantTitle: string
   /** Valor da linha em reais, antes de reembolso. */
   amount: number
   quantity: number
@@ -24,11 +26,11 @@ export const STATUS_ACTIVE = "Ativo"
 export const STATUS_CANCELED = "Cancelado"
 
 /** Única origem das colunas da Base de dados: só pedido, momento, produto e valores. Nada de cliente, contato, endereço ou pagamento. */
-export const BASE_COLUMNS = ["Pedido", "Data e hora", "Dia", "Aba", "Fase", "Produto", "Quantidade", "Bruto", "Reembolsado", "Status"] as const
+export const BASE_COLUMNS = ["Pedido", "Data e hora", "Dia", "Aba", "Fase", "Produto", "Quantidade", "Bruto", "Reembolsado", "Status", "Variação"] as const
 
-export type BaseRow = [number, number, number, string, string, string, number, number, number, string]
+export type BaseRow = [number, number, number, string, string, string, number, number, number, string, string]
 
-export type TabInfo = { name: string; split: boolean; days: number[] }
+export type TabInfo = { name: string; split: boolean; days: number[]; lines: number }
 
 /** Número do drop a partir do handle `drop-N`; qualquer outro handle (drop-teste) não tem aba. */
 export function dropNumber(handle: string): number | null {
@@ -71,12 +73,12 @@ export function buildBase(lines: SaleLine[], drops: DropInfo[]): { rows: BaseRow
     const serial = sheetSerial(l.createdAt)
     const day = Math.floor(serial)
     days.set(tab, (days.get(tab) ?? new Set()).add(day))
-    rows.push([l.displayId, serial, day, tab, phase, l.title, l.quantity, round(l.amount), round(l.refunded), l.canceled ? STATUS_CANCELED : STATUS_ACTIVE])
+    rows.push([l.displayId, serial, day, tab, phase, l.title, l.quantity, round(l.amount), round(l.refunded), l.canceled ? STATUS_CANCELED : STATUS_ACTIVE, l.variantTitle])
   }
 
   const tabs: TabInfo[] = [
-    { name: STARTER_TAB, split: false, days: [...(days.get(STARTER_TAB) ?? [])].sort((a, b) => a - b) },
-    ...eligible.map((d) => ({ name: tabName(d), split: true, days: [...(days.get(tabName(d)) ?? [])].sort((a, b) => a - b) })),
+    { name: STARTER_TAB, split: false, days: [...(days.get(STARTER_TAB) ?? [])].sort((a, b) => a - b), lines: rows.filter((r) => r[3] === STARTER_TAB).length },
+    ...eligible.map((d) => ({ name: tabName(d), split: true, days: [...(days.get(tabName(d)) ?? [])].sort((a, b) => a - b), lines: rows.filter((r) => r[3] === tabName(d)).length })),
   ]
   return { rows, tabs }
 }
