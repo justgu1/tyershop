@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import { isMedidas, medidasPorUltimo, NOVAS, renomear, RENOMEADAS } from "../medidas-galeria"
+import { isMedidas, medidasPorUltimo, NOVAS, renomear, RENOMEADAS } from "../medidas-galeria-regras"
 
 const publico = join(__dirname, "../../../../frontend/public/produtos")
 
