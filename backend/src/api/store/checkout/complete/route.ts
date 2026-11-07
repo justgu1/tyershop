@@ -4,11 +4,21 @@ import { completeCartWorkflow } from "@medusajs/medusa/core-flows"
 import { completeCartLockKey } from "../../../../modules/payment-mercadopago/complete-lock"
 
 const WAIT_MS = 25_000
-const LOCK_WAIT_S = 30
+const LOCK_WAIT_S = 1
 const POLL_MS = 200
 /** Se o fluxo já terminou e o pedido ainda não apareceu, não há por que esperar o prazo todo. */
 const AFTER_FINISH_MS = 3_000
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+async function waitForOrder(orderOf: () => Promise<string | null>, ms: number) {
+  const deadline = Date.now() + ms
+  let orderId = await orderOf()
+  while (!orderId && Date.now() < deadline) {
+    await sleep(POLL_MS)
+    orderId = await orderOf()
+  }
+  return orderId
+}
 
 /** Erros em que o carrinho segue válido e o cliente pode tentar de novo (mesma regra da rota original do Medusa). */
 const RETRYABLE = [MedusaError.Types.PAYMENT_AUTHORIZATION_ERROR, MedusaError.Types.PAYMENT_REQUIRES_MORE_ERROR]
@@ -57,16 +67,28 @@ export async function POST(req: AuthenticatedMedusaRequest<{ cart_id?: string }>
   if (existing) return respondWithOrder(existing)
 
   // Uma execução por carrinho: duas em paralelo faziam a perdedora falhar e desfazer (reembolsar) o pagamento da vencedora.
+  // Quem não pega a trava não espera nela (cada espera prende uma conexão do banco): só aguarda o pedido aparecer.
   const locking = req.scope.resolve(Modules.LOCKING) as any
-  const run = await locking.execute(
-    completeCartLockKey(cartId),
-    async () => {
-      const created = await orderOf()
-      if (created) return { created }
-      return { result: await completeCartWorkflow(req.scope).run({ input: { id: cartId }, throwOnError: false }) }
-    },
-    { timeout: LOCK_WAIT_S }
-  )
+  let run: { created?: string; result?: any } | null
+  try {
+    run = await locking.execute(
+      completeCartLockKey(cartId),
+      async () => {
+        const created = await orderOf()
+        if (created) return { created }
+        return { result: await completeCartWorkflow(req.scope).run({ input: { id: cartId }, throwOnError: false }) }
+      },
+      { timeout: LOCK_WAIT_S }
+    )
+  } catch (err) {
+    if (!/acquiring lock/i.test(String((err as Error)?.message))) throw err
+    run = null
+  }
+  if (!run) {
+    const orderId = await waitForOrder(orderOf, WAIT_MS)
+    if (!orderId) throw new MedusaError(MedusaError.Types.CONFLICT, "O pedido ainda está sendo concluído. Tente de novo em instantes.")
+    return respondWithOrder(orderId)
+  }
   if (run.created) return respondWithOrder(run.created)
   const { errors, transaction } = run.result
 
