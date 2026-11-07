@@ -5,10 +5,39 @@ import { completeCartLockKey } from "../../../../modules/payment-mercadopago/com
 
 const WAIT_MS = 25_000
 const LOCK_WAIT_S = 1
-const POLL_MS = 200
+/** Conclusões rodando ao mesmo tempo neste processo: cada uma usa várias conexões, e o pool (15) esgotava com poucas dezenas de chamadas. */
+const MAX_RUNS = 3
+const SLOT_WAIT_MS = 20_000
+const POLL_MS = 500
 /** Se o fluxo já terminou e o pedido ainda não apareceu, não há por que esperar o prazo todo. */
 const AFTER_FINISH_MS = 3_000
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+let activeRuns = 0
+const slotQueue: (() => void)[] = []
+
+/** Vaga para rodar a conclusão; a fila espera em memória (sem conexão). Devolve null se a vaga não abriu a tempo. */
+async function runInSlot<T>(fn: () => Promise<T>): Promise<T | null> {
+  if (activeRuns >= MAX_RUNS) {
+    const got = await new Promise<boolean>((resolve) => {
+      const turn = () => { clearTimeout(timer); resolve(true) }
+      const timer = setTimeout(() => {
+        const at = slotQueue.indexOf(turn)
+        if (at >= 0) slotQueue.splice(at, 1)
+        resolve(false)
+      }, SLOT_WAIT_MS)
+      slotQueue.push(turn)
+    })
+    if (!got) return null
+  }
+  activeRuns++
+  try {
+    return await fn()
+  } finally {
+    activeRuns--
+    slotQueue.shift()?.()
+  }
+}
 
 async function waitForOrder(orderOf: () => Promise<string | null>, ms: number) {
   const deadline = Date.now() + ms
@@ -71,14 +100,16 @@ export async function POST(req: AuthenticatedMedusaRequest<{ cart_id?: string }>
   const locking = req.scope.resolve(Modules.LOCKING) as any
   let run: { created?: string; result?: any } | null
   try {
-    run = await locking.execute(
-      completeCartLockKey(cartId),
-      async () => {
-        const created = await orderOf()
-        if (created) return { created }
-        return { result: await completeCartWorkflow(req.scope).run({ input: { id: cartId }, throwOnError: false }) }
-      },
-      { timeout: LOCK_WAIT_S }
+    run = await runInSlot(() =>
+      locking.execute(
+        completeCartLockKey(cartId),
+        async () => {
+          const created = await orderOf()
+          if (created) return { created }
+          return { result: await completeCartWorkflow(req.scope).run({ input: { id: cartId }, throwOnError: false }) }
+        },
+        { timeout: LOCK_WAIT_S }
+      )
     )
   } catch (err) {
     if (!/acquiring lock/i.test(String((err as Error)?.message))) throw err

@@ -62,6 +62,10 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   faziam a perdedora falhar e o Medusa reembolsar o Pix da vencedora: o pedido existia, pendente, e o cliente era reembolsado.
   Origem: pedidos 1216, 1238, 1246, 1257 e 1261 em produção.
   Guard: `complete-lock.unit.spec.ts` ("uma execução por carrinho: a rota do checkout e a conciliação usam a mesma trava").
+- **Poucas conclusões de carrinho rodam ao mesmo tempo por processo.** Cada uma usa várias conexões do banco: 20 chamadas
+  simultâneas na homologação esgotaram o pool (15) mesmo sem esperar na trava, derrubando também a conciliação e o job de ingressos.
+  Origem: segundo teste de corrida na homologação.
+  Guard: `complete-lock.unit.spec.ts` ("poucas conclusões rodam ao mesmo tempo por processo: o resto espera em memória, sem conexão do banco").
 - **A conclusão do carrinho não espera na trava.** Cada espera prende uma conexão do banco: 24 chamadas simultâneas na homologação
   esgotaram o pool e deixaram pedidos órfãos (sem carrinho nem pagamento), como o 1240 em produção. Quem não pega a trava só
   aguarda o pedido aparecer.

@@ -14,4 +14,8 @@ describe("conclusão do carrinho", () => {
   it("quem não pega a trava não espera nela: cada espera prenderia uma conexão do banco e esgotaria o pool", () => {
     expect(read("api/store/checkout/complete/route.ts")).toContain("const LOCK_WAIT_S = 1")
   })
+
+  it("poucas conclusões rodam ao mesmo tempo por processo: o resto espera em memória, sem conexão do banco", () => {
+    expect(read("api/store/checkout/complete/route.ts")).toContain("const MAX_RUNS = 3")
+  })
 })

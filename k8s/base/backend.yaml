@@ -215,7 +215,7 @@ spec:
             # Conexões por réplica. Réplicas x este valor precisa ficar abaixo do max_connections do PostgreSQL menos o que os
             # outros apps usam (hoje ~20); o ajuste do banco no repo de infra sobe o limite para 150.
             - name: DB_POOL_MAX
-              value: "15"
+              value: "30"
             - name: STORE_CORS
               value: "https://homolog.tyershop.com"
             - name: ADMIN_CORS
