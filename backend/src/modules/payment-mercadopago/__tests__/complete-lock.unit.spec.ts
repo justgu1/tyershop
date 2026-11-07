@@ -10,4 +10,8 @@ describe("conclusão do carrinho", () => {
     expect(read("api/store/checkout/complete/route.ts")).toContain("completeCartLockKey(cartId)")
     expect(read("modules/payment-mercadopago/reconcile.ts")).toContain("completeCartLockKey(cart.id)")
   })
+
+  it("quem não pega a trava não espera nela: cada espera prenderia uma conexão do banco e esgotaria o pool", () => {
+    expect(read("api/store/checkout/complete/route.ts")).toContain("const LOCK_WAIT_S = 1")
+  })
 })
