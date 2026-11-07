@@ -4,6 +4,7 @@ import {
   isDefined,
   MedusaError,
 } from "@medusajs/framework/utils";
+import { webhookActionFor } from "./webhook-action";
 import type {
   AuthorizePaymentInput,
   AuthorizePaymentOutput,
@@ -265,16 +266,7 @@ class MercadoPagoProviderService extends AbstractPaymentProvider<Options> {
       const sessionId = String(payment.external_reference ?? "");
       const amount = new BigNumber(payment.transaction_amount);
 
-      switch (payment.status) {
-        case "approved":
-        case "authorized":
-          return { action: "captured", data: { session_id: sessionId, amount } };
-        case "rejected":
-        case "cancelled":
-          return { action: "failed", data: { session_id: sessionId, amount } };
-        default:
-          return { action: "not_supported", data: { session_id: sessionId, amount } };
-      }
+      return { action: webhookActionFor(payment.status), data: { session_id: sessionId, amount } };
     } catch (err) {
       this.logger_.error(`[mercadopago] falha ao processar webhook: ${(err as Error).message}`);
       return { action: "not_supported", data: { session_id: "", amount: new BigNumber(0) } };

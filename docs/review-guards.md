@@ -56,6 +56,10 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   faziam a perdedora falhar e o Medusa reembolsar o Pix da vencedora: o pedido existia, pendente, e o cliente era reembolsado.
   Origem: pedidos 1216, 1238, 1246, 1257 e 1261 em produção.
   Guard: `complete-lock.unit.spec.ts` ("uma execução por carrinho: a rota do checkout e a conciliação usam a mesma trava").
+- **O webhook do Mercado Pago não conclui o carrinho.** Com ele concluindo em paralelo ao checkout, a execução perdedora
+  desfazia o pagamento da vencedora e criava pedido duplicado sem cobrança (1240, cópia do 1238).
+  Origem: pedidos 1216, 1238, 1240, 1246, 1257 e 1261 em produção.
+  Guard: `webhook-action.unit.spec.ts` ("pagamento aprovado não conclui o carrinho: quem conclui é o checkout e a conciliação, sob a mesma trava").
 - **O e-mail do checkout é conferido: formato, domínio de provedor digitado errado (gamail.com) e domínio sem servidor de e-mail.**
   O formulário só exigia `type="email"` e a compra saía com e-mail que nunca receberia a confirmação.
   Origem: pedido real com e-mail @gamail.com.
