@@ -47,8 +47,8 @@ const PRODUCT_IMAGES: Record<string, ImageEntry> = {
   },
   "regata-savage-mode": {
     byColor: {
-      Preta: range("exclusivos/tyer-savage-mode/regata-preta", 8),
-      Branca: range("exclusivos/tyer-savage-mode/regata-branca", 7),
+      Preta: [...range("exclusivos/tyer-savage-mode/regata-preta", 7), one("exclusivos/tyer-savage-mode/regata-preta/medidas.webp")],
+      Branca: [...range("exclusivos/tyer-savage-mode/regata-branca", 6), one("exclusivos/tyer-savage-mode/regata-branca/medidas.webp")],
     },
   },
   "shorts-tyer-day-2k25-mbqip": { images: range("exclusivos/tyer-day/shorts", 5) },
@@ -66,11 +66,11 @@ const PRODUCT_IMAGES: Record<string, ImageEntry> = {
   },
   "shorts-tyer-pro": { images: range("tyer-pro/shorts", 5) },
   "tyer-savage-mode-2-dry-fit": { images: range("exclusivos/tyer-savage-mode/mode-2", 3) },
-  tyertech: { images: range("tyer-tech/jaqueta", 7) },
-  "camiseta-tyer-gang": { images: range("exclusivos/tyer-gang/camiseta", 2) },
-  "short-compressao-cacada": { images: range("exclusivos/tyer-cacada/short-compressao", 2) },
-  "calca-cacada": { images: range("exclusivos/tyer-cacada/calca", 2) },
-  "regata-cacada": { images: range("exclusivos/tyer-cacada/regata", 2) },
+  tyertech: { images: [...range("tyer-tech/jaqueta", 6), one("tyer-tech/jaqueta/medidas.webp")] },
+  "camiseta-tyer-gang": { images: [...range("exclusivos/tyer-gang/camiseta", 2), one("exclusivos/tyer-gang/camiseta/medidas.webp")] },
+  "short-compressao-cacada": { images: [...range("exclusivos/tyer-cacada/short-compressao", 2), one("exclusivos/tyer-cacada/short-compressao/medidas.webp")] },
+  "calca-cacada": { images: [...range("exclusivos/tyer-cacada/calca", 2), one("exclusivos/tyer-cacada/calca/medidas.webp")] },
+  "regata-cacada": { images: [...range("exclusivos/tyer-cacada/regata", 2), one("exclusivos/tyer-cacada/regata/medidas.webp")] },
   "pulseira-cacada": {
     byColor: {
       Preto: range("exclusivos/tyer-cacada/pulseira-preta", 1),
@@ -87,8 +87,8 @@ const PRODUCT_IMAGES: Record<string, ImageEntry> = {
   // localmente -> vira produto com opcao Cor (Preta/Branca) neste script.
   "camiseta-tyer-starter-dry-fit": {
     byColor: {
-      Preta: range("tyer-starter/camiseta-preta", 6),
-      Branca: range("tyer-starter/camiseta-branca", 6),
+      Preta: [...range("tyer-starter/camiseta-preta", 5), one("tyer-starter/camiseta-preta/medidas.webp")],
+      Branca: [...range("tyer-starter/camiseta-branca", 5), one("tyer-starter/camiseta-branca/medidas.webp")],
     },
   },
   "shorts-tyer-starter-dry-fit": { images: range("tyer-starter/shorts", 5) },
