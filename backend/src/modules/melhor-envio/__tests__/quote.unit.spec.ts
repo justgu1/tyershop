@@ -60,8 +60,9 @@ describe("shippingOptionDataId", () => {
 
 describe("serviços de frete por ambiente", () => {
   it("produção oferece só Correios; o sandbox soma a Jadlog, a única que a conta de teste cota", () => {
-    expect(Object.keys(servicesFor("production"))).toEqual(["1", "2", "17"])
-    expect(Object.keys(servicesFor(undefined))).toEqual(["1", "2", "17"])
-    expect(Object.keys(servicesFor("sandbox"))).toEqual(["1", "2", "17", "3", "4"])
+    const ids = (env?: string) => Object.keys(servicesFor(env)).sort((a, b) => Number(a) - Number(b))
+    expect(ids("production")).toEqual(["1", "2", "17"])
+    expect(ids(undefined)).toEqual(["1", "2", "17"])
+    expect(ids("sandbox")).toEqual(["1", "2", "3", "4", "17"])
   })
 })
