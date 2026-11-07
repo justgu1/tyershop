@@ -52,6 +52,15 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   risco sobe e compras legítimas voltam como `cc_rejected_high_risk`.
   Origem: pagamento recusado por análise de segurança em produção, `createCardPayment`.
   Guard: `additional-info.unit.spec.ts` ("leva itens, telefone separado em DDD e número e o endereço de entrega").
+- **Um carrinho só é concluído por uma execução de cada vez.** Chamadas paralelas de `/store/checkout/complete` (e a conciliação)
+  faziam a perdedora falhar e o Medusa reembolsar o Pix da vencedora: o pedido existia, pendente, e o cliente era reembolsado.
+  Origem: pedidos 1216, 1238, 1246, 1257 e 1261 em produção.
+  Guard: `complete-lock.unit.spec.ts` ("uma execução por carrinho: a rota do checkout e a conciliação usam a mesma trava").
+- **O e-mail do checkout é conferido: formato, domínio de provedor digitado errado (gamail.com) e domínio sem servidor de e-mail.**
+  O formulário só exigia `type="email"` e a compra saía com e-mail que nunca receberia a confirmação.
+  Origem: pedido real com e-mail @gamail.com.
+  Guard: `email.unit.spec.ts` ("recusa domínio de provedor conhecido escrito errado e sugere o certo") e `email.unit.spec.ts`
+  ("recusa formato inválido").
 
 ## Leads, convites e e-mails
 

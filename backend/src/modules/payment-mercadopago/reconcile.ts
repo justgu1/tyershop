@@ -3,6 +3,7 @@ import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { capturePaymentWorkflow, completeCartWorkflow } from "@medusajs/medusa/core-flows"
 import { getMercadoPagoClient } from "../../api/store/checkout/mercadopago/utils"
 import { shouldComplete } from "./reconcile-rules"
+import { completeCartLockKey } from "./complete-lock"
 
 const DAY_MS = 24 * 3600 * 1000
 
@@ -33,7 +34,7 @@ export async function reconcilePayments(scope: MedusaContainer, days = 3): Promi
     try {
       const payment = await client.getPayment(session.data.mp_payment_id)
       if (!shouldComplete(payment.status)) continue
-      await locking.execute(`reconcile:${cart.id}`, async () => {
+      await locking.execute(completeCartLockKey(cart.id), async () => {
         const { errors } = await completeCartWorkflow(scope).run({ input: { id: cart.id }, throwOnError: false })
         if (errors?.length) out.errors.push(`${cart.id}: ${errors[0].error?.message}`)
         else out.completed.push(cart.id)

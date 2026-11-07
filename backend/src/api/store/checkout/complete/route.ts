@@ -1,8 +1,10 @@
 import { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, MedusaError, Modules } from "@medusajs/framework/utils"
 import { completeCartWorkflow } from "@medusajs/medusa/core-flows"
+import { completeCartLockKey } from "../../../../modules/payment-mercadopago/complete-lock"
 
 const WAIT_MS = 25_000
+const LOCK_WAIT_S = 30
 const POLL_MS = 200
 /** Se o fluxo já terminou e o pedido ainda não apareceu, não há por que esperar o prazo todo. */
 const AFTER_FINISH_MS = 3_000
@@ -54,7 +56,19 @@ export async function POST(req: AuthenticatedMedusaRequest<{ cart_id?: string }>
   const existing = await orderOf()
   if (existing) return respondWithOrder(existing)
 
-  const { errors, transaction } = await completeCartWorkflow(req.scope).run({ input: { id: cartId }, throwOnError: false })
+  // Uma execução por carrinho: duas em paralelo faziam a perdedora falhar e desfazer (reembolsar) o pagamento da vencedora.
+  const locking = req.scope.resolve(Modules.LOCKING) as any
+  const run = await locking.execute(
+    completeCartLockKey(cartId),
+    async () => {
+      const created = await orderOf()
+      if (created) return { created }
+      return { result: await completeCartWorkflow(req.scope).run({ input: { id: cartId }, throwOnError: false }) }
+    },
+    { timeout: LOCK_WAIT_S }
+  )
+  if (run.created) return respondWithOrder(run.created)
+  const { errors, transaction } = run.result
 
   const failure = errors?.[0]?.error
   if (failure) {
