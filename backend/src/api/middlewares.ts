@@ -94,6 +94,11 @@ export default defineMiddlewares({
       middlewares: [rateLimit("register", { windowMs: 3_600_000, max: 10 })],
     },
     {
+      matcher: "/store/checkout/email-check",
+      method: ["POST"],
+      middlewares: [rateLimit("checkout-email-check", { windowMs: 600_000, max: 60 })],
+    },
+    {
       // Cobrança sempre em nome da conta logada, dona do carrinho.
       matcher: "/store/checkout/mercadopago/*",
       middlewares: [rateLimit("checkout", { windowMs: 600_000, max: 60 }), requiredCustomer],

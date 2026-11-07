@@ -1,5 +1,6 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
 import { isValidCpf } from "../../../../../utils/cpf";
+import { emailProblem } from "../../../../../utils/email";
 import { getMercadoPagoClient, getMercadoPagoPaymentSession, guardedPayment, toAmount } from "../utils";
 
 type Body = {
@@ -22,6 +23,8 @@ export async function POST(req: MedusaRequest<Body>, res: MedusaResponse) {
     return res.status(400).json({ message: "payment_session_id e payer.email são obrigatórios." });
   }
 
+  const emailError = emailProblem(payer.email);
+  if (emailError) return res.status(400).json({ message: emailError });
   if (!isValidCpf(payer.cpf)) {
     return res.status(400).json({ message: "Informe um CPF válido: sem ele não conseguimos emitir a etiqueta de envio." });
   }

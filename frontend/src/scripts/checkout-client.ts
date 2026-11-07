@@ -15,6 +15,7 @@
  * as páginas em volta.
  */
 import { isValidCpf } from '../lib/cpf';
+import { emailProblem } from '../lib/email';
 import { getCart, clearCart, type CartItem } from '../lib/cart';
 import { fetchShippingQuote, isCep, linesSignature, readSavedShipping, renderShippingOptions, saveShipping, type ShipOption } from '../lib/shipping';
 import { saveCheckoutDraft, loadCheckoutDraft, clearCheckoutDraft } from '../lib/checkout-draft';
@@ -563,7 +564,16 @@ function init() {
     if (box) box.hidden = true;
   }
 
-  async function completeCart() {
+  let completing: Promise<boolean> | null = null;
+  // Uma conclusão por vez: o aviso de pagamento pode chegar de ticks do polling que se sobrepõem.
+  function completeCart(): Promise<boolean> {
+    completing ??= completeCartOnce().finally(() => {
+      completing = null;
+    });
+    return completing;
+  }
+
+  async function completeCartOnce() {
     // Rota própria: a original responde 409 enquanto o pedido ainda está sendo concluído em compras simultâneas.
     const data = await medusaFetch('/store/checkout/complete', { method: 'POST', body: JSON.stringify({ cart_id: cartId }) });
     if (data?.type === 'order') {
@@ -988,6 +998,7 @@ function init() {
   function fieldIsValid(id: string): boolean {
     const value = (qs<HTMLInputElement>(id)?.value || '').trim();
     if (id === 'ck-cpf') return isValidCpf(value);
+    if (id === 'ck-email') return emailProblem(value) === null;
     return value.length > 0;
   }
   /** Marca cada campo obrigatório vazio/inválido com erro próprio, foca o
@@ -996,7 +1007,8 @@ function init() {
     let firstInvalidId: string | null = null;
     ids.forEach((id) => {
       const valid = fieldIsValid(id);
-      setFieldError(id, valid ? null : REQUIRED_FIELD_MESSAGES[id] || 'Campo obrigatório.');
+      const emailMsg = id === 'ck-email' && qs<HTMLInputElement>(id)?.value.trim() ? emailProblem(qs<HTMLInputElement>(id)!.value) : null;
+      setFieldError(id, valid ? null : emailMsg || REQUIRED_FIELD_MESSAGES[id] || 'Campo obrigatório.');
       if (!valid && !firstInvalidId) firstInvalidId = id;
     });
     if (firstInvalidId) {
@@ -1323,6 +1335,16 @@ function init() {
     qs<HTMLButtonElement>('checkout-edit-address')?.focus();
   });
 
+  // O servidor confere se o domínio existe; se a checagem não responder, o checkout segue.
+  async function remoteEmailProblem(email: string): Promise<string | null> {
+    try {
+      const res = await medusaFetch('/store/checkout/email-check', { method: 'POST', body: JSON.stringify({ email }) });
+      return res?.ok === false ? String(res.message || 'Digite um e-mail válido.') : null;
+    } catch {
+      return null;
+    }
+  }
+
   // ---- Passo 1: dados + endereço → cria cart Medusa real, frete, payment session ----
   async function submitAddress() {
     const valid = validateRequiredFields([
@@ -1355,6 +1377,19 @@ function init() {
     const addr = addressFromForm();
     lockStepWrap();
     try {
+      const emailMsg = await remoteEmailProblem(payer.email);
+      if (emailMsg) {
+        setFieldError('ck-email', emailMsg);
+        show('checkout-contact-fields', true);
+        show('checkout-contact-summary', false);
+        qs<HTMLInputElement>('ck-email')?.focus();
+        unlockStepWrap();
+        if (cta) {
+          cta.disabled = false;
+          cta.textContent = t('continueToPayment');
+        }
+        return;
+      }
       const accountOk = await ensureAccount();
       if (!accountOk) {
         if (cta) {

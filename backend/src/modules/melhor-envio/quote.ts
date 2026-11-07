@@ -9,12 +9,19 @@ import { presentDrop } from "../drop/present"
 /** Identificador da opção de envio de um serviço (`data.id`): o checkout, o teste de carga e a etiqueta casam a opção por ele. */
 export const shippingOptionDataId = (serviceId: string | number) => `melhorenvio-${serviceId}`
 
-/** Serviços oferecidos na loja (ids do Melhor Envio): só Correios. */
-export const SERVICES: Record<string, string> = {
+const CORREIOS: Record<string, string> = {
   "1": "PAC",
   "2": "SEDEX",
   "17": "Mini Envios",
 }
+
+// A conta de sandbox do Melhor Envio só cota Jadlog; sem isso a homologação não tem frete e ninguém chega ao pagamento.
+const SANDBOX_ONLY: Record<string, string> = { "3": ".Package", "4": ".Com" }
+
+/** Serviços oferecidos na loja (ids do Melhor Envio): só Correios; o sandbox soma a Jadlog para testes. */
+export const servicesFor = (env?: string): Record<string, string> => (env === "sandbox" ? { ...CORREIOS, ...SANDBOX_ONLY } : CORREIOS)
+
+export const SERVICES = servicesFor(process.env.MELHOR_ENVIO_ENV)
 
 export type Shipment = { variant_id: string; quantity: number; weight?: number | null; length?: number | null; width?: number | null; height?: number | null }
 
