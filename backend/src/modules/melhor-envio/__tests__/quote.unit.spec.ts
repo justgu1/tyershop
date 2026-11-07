@@ -1,4 +1,4 @@
-import { buildPackage, shippingOptionDataId, SERVICES } from "../quote"
+import { buildPackage, servicesFor, shippingOptionDataId, SERVICES } from "../quote"
 import { consumeState, signState, verifyState } from "../state"
 
 describe("buildPackage", () => {
@@ -55,5 +55,13 @@ describe("shippingOptionDataId", () => {
     expect(shippingOptionDataId(2)).toBe("melhorenvio-2")
     expect(shippingOptionDataId("17")).toBe("melhorenvio-17")
     for (const id of Object.keys(SERVICES)) expect(shippingOptionDataId(id)).toMatch(/^melhorenvio-\d+$/)
+  })
+})
+
+describe("serviços de frete por ambiente", () => {
+  it("produção oferece só Correios; o sandbox soma a Jadlog, a única que a conta de teste cota", () => {
+    expect(Object.keys(servicesFor("production"))).toEqual(["1", "2", "17"])
+    expect(Object.keys(servicesFor(undefined))).toEqual(["1", "2", "17"])
+    expect(Object.keys(servicesFor("sandbox"))).toEqual(["1", "2", "17", "3", "4"])
   })
 })

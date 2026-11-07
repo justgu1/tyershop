@@ -41,6 +41,12 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   Guard: `label.unit.spec.ts` ("etiqueta viva ou sem resposta não é perdida: não se cobra de novo às cegas") e `label.unit.spec.ts`
   ("cancelada e expirada contam como perdidas, nas duas grafias").
 
+## Homologação
+- **O sandbox do Melhor Envio soma a Jadlog aos serviços; produção segue só com Correios.** A conta de teste só cota `.Package` e
+  `.Com`; sem isso a homologação não oferecia frete e nenhum teste de pagamento chegava ao Pix.
+  Origem: validação do Pix em homologação.
+  Guard: `quote.unit.spec.ts` ("produção oferece só Correios; o sandbox soma a Jadlog, a única que a conta de teste cota").
+
 ## Checkout e pagamento
 
 - **Erro do Mercado Pago volta ao cliente em português, nunca o texto cru.** Um e-mail recusado virava 500 "An unknown error
