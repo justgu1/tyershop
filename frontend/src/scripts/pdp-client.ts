@@ -710,6 +710,17 @@ if (root) {
     });
   });
 
+  /* "Ver medidas": delegado no documento porque a barra fixa clona as variantes. */
+  document.addEventListener('click', (e) => {
+    if (!(e.target instanceof Element) || !e.target.closest('[data-open-measures]')) return;
+    const at = slides.findIndex((u) => /\/medidas\.[a-z0-9]+(\?|$)/i.test(u));
+    if (!lightbox || at < 0) return;
+    autoplayPaused = true;
+    goToSlide(at);
+    fillLightboxImage();
+    if (!lightbox.open) lightbox.showModal();
+  });
+
   mainImgWrap?.addEventListener('click', () => {
     if (!lightbox || !slides.length) return;
     refreshLightboxNavVisibility();

@@ -226,6 +226,8 @@ if (productDetailBlocks.length === 0 && productDescriptionPlain) {
   productDetailBlocks = [{ title: t(lang, 'pdp', 'about_product_fallback'), body: productDescriptionPlain }];
 }
 
+// A tabela de medidas é a última imagem da galeria (arquivo `medidas`); o link abre a galeria direto nela.
+const hasMeasuresImage = galleryImages.some((i: { url?: string }) => /\/medidas\.[a-z0-9]+(\?|$)/i.test(String(i?.url ?? '')));
 const sizeGuideOpensNewTab = sizeGuideUrl ? /^https?:\/\//i.test(sizeGuideUrl) : false;
 
 const imgUrl = (i: number) => galleryImages[i]?.url ?? null;
@@ -382,7 +384,14 @@ const jsonLd = productFound
                   <>
                     {showDivider && <div class="pdp-variants-divider" role="presentation" aria-hidden="true" />}
                     <div class="pdp-variant-row">
-                      <p class="pdp-label">{row.title}</p>
+                      <div class="pdp-label-line">
+                        <p class="pdp-label">{row.title}</p>
+                        {hasMeasuresImage && optionRowKind(row.title) === 'size' && (
+                          <button type="button" class="pdp-measures-link" data-open-measures>
+                            {t(lang, 'pdp', 'view_measures')}
+                          </button>
+                        )}
+                      </div>
                       <div
                         class:list={['pdp-variant-values', { 'pdp-variant-values--swatch': colorRow }]}
                         role="radiogroup"
@@ -1314,6 +1323,35 @@ const jsonLd = productFound
 
   .pdp-variant-row {
     margin-top: 4px;
+  }
+  .pdp-label-line {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+  .pdp-label-line .pdp-label {
+    margin-bottom: 0;
+  }
+  .pdp-measures-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--c-accent, #e77e23);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    transition: color 0.15s ease, text-shadow 0.15s ease;
+  }
+  .pdp-measures-link:hover,
+  .pdp-measures-link:focus-visible {
+    color: #ffa24d;
+    text-shadow: 0 0 10px rgba(231, 126, 35, 0.65);
   }
   .pdp-label {
     font-size: 10px;

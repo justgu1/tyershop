@@ -145,6 +145,7 @@ export const translations = {
       next_slide: 'Próxima imagem',
       size_guide: 'Guia de medidas',
       size_chart: 'Tabela de tamanhos',
+      view_measures: 'Ver medidas',
       variation_label: 'Variação:',
       buy_now: 'Comprar agora',
       drop_section_title: 'Colecione o drop',
