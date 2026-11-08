@@ -43,6 +43,7 @@ module.exports = defineConfig({
     melhorEnvio: { resolve: "./src/modules/melhor-envio" },
     lead: { resolve: "./src/modules/lead" },
     ticket: { resolve: "./src/modules/ticket" },
+    emailView: { resolve: "./src/modules/email-view" },
     // Sem SMTP configurado o provider não é registrado (a validação das opções derrubaria o boot).
     ...(process.env.SMTP_HOST
       ? {
