@@ -3,6 +3,8 @@ import type { Logger, ProviderSendNotificationDTO, ProviderSendNotificationResul
 import nodemailer, { Transporter } from "nodemailer"
 import { LOGO_PNG_BASE64 } from "./logo"
 import { LOGO_CID, renderTemplate } from "./templates"
+import { viewUrlFor } from "../email-view/token"
+import { copyOptions } from "./copy"
 import { applyTestModeNote, envelopeFor, isUndeliverable, readTestMode } from "./test-mode"
 
 type Options = {
@@ -58,7 +60,8 @@ class SmtpNotificationProviderService extends AbstractNotificationProviderServic
       this.logger_.info(`[smtp] ${notification.template} → ${notification.to} ignorado (endereço .invalid)`)
       return { id: "ignored-invalid" }
     }
-    const rendered = renderTemplate(notification.template, (notification.data ?? {}) as Record<string, any>)
+    const view_url = viewUrlFor(notification.template, (notification as { id?: string }).id)
+    const rendered = renderTemplate(notification.template, { ...((notification.data ?? {}) as Record<string, any>), ...(view_url ? { view_url } : {}) })
     // Redefinição de senha é a única que sempre vai ao destinatário real: quem pediu precisa receber.
     const { to, subject, redirectedFrom } = envelopeFor(notification.template, notification.to, rendered.subject, readTestMode(process.env))
     const { html, text } = applyTestModeNote(rendered, redirectedFrom)
@@ -69,6 +72,7 @@ class SmtpNotificationProviderService extends AbstractNotificationProviderServic
       subject,
       html,
       text,
+      ...copyOptions(notification.template, to, process.env),
       // O cabeçalho deixa ver, em "mostrar original", que o e-mail foi redirecionado pelo modo de teste.
       headers: { ...listHeaders(notification.template, (notification.data ?? {}) as Record<string, any>), ...(redirectedFrom ? { "X-Tyer-Teste": "redirecionado" } : {}) },
       attachments: [

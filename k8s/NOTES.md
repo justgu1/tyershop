@@ -24,3 +24,9 @@
 6. Migrações e dados: o backend de produção roda as migrações ao subir; depois criar o admin, a região, a chave publicável e o canal de vendas.
 7. DNS de `tyershop.com`, `www`, `medusa` e `api` para a VPS; certificado sai pelo `letsencrypt` do Traefik.
 8. `kubectl apply -f k8s/prod/argocd-application.yaml`. Só então faça o merge deste PR: sem a Application de produção, `tyershop.com` fica sem rota (a homologação deixou de responder por ele).
+
+## E-mail: cópia, reply e rastreio
+
+- `SMTP_BCC` (cópia oculta de todo e-mail, menos redefinição de senha) e `SMTP_REPLY_TO` ficam em `base/backend.yaml`. O SMTP da Hostinger não grava em "Enviados"; a cópia é o que aparece na caixa `suporte@`.
+- O link "Abra no navegador" (`/email/<id>?t=<token>`) registra a visualização em `email_view`. O local vem dos cabeçalhos `cf-ipcountry` e `cf-ipcity` da Cloudflare; a cidade só chega com a regra "Add visitor location headers" ligada.
+- DNS (painel da Hostinger, fora do repositório): o DMARC de `tyershop.com` está `v=DMARC1; p=none` sem relatório. Para receber os relatórios agregados use `v=DMARC1; p=none; rua=mailto:suporte@tyershop.com` e só suba para `quarantine` depois de semanas de relatórios limpos.

@@ -1,4 +1,4 @@
-import { LOGO_HEIGHT, LOGO_WIDTH } from "./logo"
+import { LOGO_HEIGHT, LOGO_PNG_BASE64, LOGO_WIDTH } from "./logo"
 
 export type RenderedEmail = { subject: string; html: string; text: string }
 
@@ -327,5 +327,22 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
 export function renderTemplate(template: string, data: TemplateData): RenderedEmail {
   const render = TEMPLATES[template]
   if (!render) throw new Error(`Template de e-mail desconhecido: ${template}`)
-  return render(data)
+  const mail = render(data)
+  return typeof data.view_url === "string" && data.view_url ? addViewLink(mail, data.view_url) : mail
+}
+
+const VIEW_LABEL = "Problemas para ver este e-mail? Abra no navegador"
+
+/** Faixa no topo, logo depois do texto de pré-visualização (que precisa continuar sendo o primeiro texto do e-mail). */
+function addViewLink(mail: RenderedEmail, url: string): RenderedEmail {
+  const strip = `<div style="text-align:center;padding:10px 12px;font:12px ${FONT};color:#6b6b6b"><a href="${esc(url)}" style="color:#6b6b6b">${VIEW_LABEL}</a></div>`
+  const afterPreheader = /(display:none[^>]*>[^<]*<\/div>)/i
+  const afterBody = /(<body[^>]*>)/i
+  const pattern = afterPreheader.test(mail.html) ? afterPreheader : afterBody
+  return { ...mail, html: mail.html.replace(pattern, (m) => `${m}${strip}`), text: `${mail.text}\n\n${VIEW_LABEL}: ${url}` }
+}
+
+/** O mesmo e-mail para a página pública: o logo embutido (`cid:`) só existe dentro do e-mail, então vira imagem na própria página. */
+export function renderForBrowser(template: string, data: TemplateData): string {
+  return renderTemplate(template, data).html.replaceAll(`cid:${LOGO_CID}`, `data:image/png;base64,${LOGO_PNG_BASE64}`)
 }
