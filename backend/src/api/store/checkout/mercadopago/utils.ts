@@ -59,7 +59,7 @@ export async function loadAntifraudCart(req: MedusaRequest, session: { payment_c
   const { data } = await query.graph({
     entity: "cart",
     fields: [
-      "items.product_id", "items.title", "items.quantity", "items.unit_price",
+      "items.product_id", "items.title", "items.variant_title", "items.quantity", "items.unit_price",
       "shipping_address.first_name", "shipping_address.last_name", "shipping_address.phone",
       "shipping_address.postal_code", "shipping_address.address_1", "shipping_address.city", "shipping_address.province",
     ],

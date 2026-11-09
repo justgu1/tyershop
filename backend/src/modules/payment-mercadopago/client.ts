@@ -31,6 +31,9 @@ export type MercadoPagoClientOptions = {
   notificationUrl?: string;
 };
 
+/** Nome na fatura do cartão (máx. 16 caracteres no Mercado Pago). */
+export const STATEMENT_DESCRIPTOR = "TYERSHOP"
+
 export type CreateCardPaymentInput = {
   /** Idempotência: usar o id da payment session do Medusa. */
   idempotencyKey: string;
@@ -124,6 +127,7 @@ export class MercadoPagoClient {
           identification: input.payer.identification,
         },
         additional_info: input.additionalInfo,
+        statement_descriptor: STATEMENT_DESCRIPTOR,
         external_reference: input.externalReference,
         notification_url: this.notificationUrl,
       }),
