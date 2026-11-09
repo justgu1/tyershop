@@ -461,6 +461,7 @@ function init() {
   let mp: any = null;
   let cardFields: { number: any; expiration: any; cvv: any } | null = null;
   let detectedPaymentMethodId = '';
+  let detectedIssuerId = '';
   /** 'address' = ainda editando endereço · 'payment' = travado, pagamento liberado. */
   let stage: 'address' | 'payment' = 'address';
   let paymentDone = false; // Pix gerado: espera confirmação, CTA fica desativado
@@ -1536,12 +1537,14 @@ function init() {
         try {
           const methods = await mp.getPaymentMethods({ bin: data.bin });
           detectedPaymentMethodId = methods?.results?.[0]?.id || '';
+          detectedIssuerId = String(methods?.results?.[0]?.issuer?.id ?? '');
           if (payableTotal > 0) {
             const options = await mp.getInstallments({ amount: String(payableTotal), bin: data.bin, paymentTypeId: 'credit_card' });
             renderInstallments(options?.[0]?.payer_costs);
           }
         } catch {
           detectedPaymentMethodId = '';
+          detectedIssuerId = '';
           renderInstallments();
         }
       });
@@ -1601,6 +1604,7 @@ function init() {
           // Opcional — o Mercado Pago infere a bandeira do token sozinho.
           // `binChanged` é só um bônus quando dispara a tempo, nunca bloqueia o envio.
           payment_method_id: detectedPaymentMethodId || undefined,
+          issuer_id: detectedIssuerId || undefined,
           installments,
           device_id: window.MP_DEVICE_SESSION_ID || undefined,
           payer: { email: payer.email, first_name: payer.first_name, last_name: payer.last_name, cpf: payer.cpf },

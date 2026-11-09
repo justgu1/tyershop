@@ -45,7 +45,9 @@ export type CreateCardPaymentInput = {
   installments: number;
   /** Opcional — o Mercado Pago infere a bandeira a partir do token sozinho. */
   paymentMethodId?: string;
-  payer: { email: string; identification?: { type: string; number: string } };
+  /** Emissor do cartão (vem do SDK pelo bin); o painel de qualidade cobra o campo. */
+  issuerId?: string;
+  payer: { email: string; firstName?: string; lastName?: string; identification?: { type: string; number: string } };
   externalReference: string;
   /** Device ID do SDK do Mercado Pago no browser, usado pelo antifraude. */
   deviceId?: string;
@@ -58,6 +60,7 @@ export type CreatePixPaymentInput = {
   description: string;
   payer: { email: string; firstName?: string; lastName?: string; identification?: { type: string; number: string } };
   externalReference: string;
+  additionalInfo?: Record<string, unknown>;
 };
 
 
@@ -122,8 +125,11 @@ export class MercadoPagoClient {
         description: input.description,
         installments: input.installments,
         payment_method_id: input.paymentMethodId,
+        issuer_id: input.issuerId,
         payer: {
           email: input.payer.email,
+          first_name: input.payer.firstName,
+          last_name: input.payer.lastName,
           identification: input.payer.identification,
         },
         additional_info: input.additionalInfo,
@@ -149,6 +155,7 @@ export class MercadoPagoClient {
           last_name: input.payer.lastName,
           identification: input.payer.identification,
         },
+        additional_info: input.additionalInfo,
         external_reference: input.externalReference,
         notification_url: this.notificationUrl,
       }),

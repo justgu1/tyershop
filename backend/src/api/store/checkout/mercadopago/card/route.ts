@@ -10,6 +10,8 @@ type Body = {
   token: string;
   /** Opcional — o Mercado Pago infere a bandeira a partir do token. */
   payment_method_id?: string;
+  /** Emissor do cartão, detectado pelo SDK a partir do bin. */
+  issuer_id?: string | number;
   installments: number;
   /** `MP_DEVICE_SESSION_ID` do SDK do Mercado Pago; melhora a aprovação no antifraude. */
   device_id?: string;
@@ -26,7 +28,7 @@ type Body = {
  * em análise devolve o pagamento existente em vez de cobrar de novo; só uma recusa libera nova tentativa.
  */
 export async function POST(req: MedusaRequest<Body>, res: MedusaResponse) {
-  const { payment_session_id, token, payment_method_id, installments, payer, device_id } = req.body ?? ({} as Body);
+  const { payment_session_id, token, payment_method_id, issuer_id, installments, payer, device_id } = req.body ?? ({} as Body);
   if (!payment_session_id || !token || !payer?.email) {
     return res.status(400).json({ message: "payment_session_id, token e payer.email são obrigatórios." });
   }
@@ -60,8 +62,11 @@ export async function POST(req: MedusaRequest<Body>, res: MedusaResponse) {
         token,
         installments: parcels,
         paymentMethodId: payment_method_id,
+        issuerId: issuer_id ? String(issuer_id) : undefined,
         payer: {
           email: payer.email,
+          firstName: payer.first_name,
+          lastName: payer.last_name,
           identification: payer.cpf ? { type: "CPF", number: payer.cpf } : undefined,
         },
         externalReference: session.id,

@@ -85,6 +85,11 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   Origem: painel de qualidade da integração do Mercado Pago, `buildAdditionalInfo` e `createCardPayment`.
   Guard: `additional-info.unit.spec.ts` ("todo item leva categoria e descrição (pedidos do painel de qualidade do Mercado Pago)") e
   `additional-info.unit.spec.ts` ("o nome na fatura cabe nos 16 caracteres do Mercado Pago").
+- **Pix e cartão enviam os mesmos dados de antifraude ao Mercado Pago.** O Pix ia sem `additional_info` e a medição de qualidade,
+  feita sobre um Pix, cobrou código, descrição e categoria dos itens; o cartão ia sem nome e sobrenome do pagador e sem `issuer_id`.
+  Origem: painel de qualidade da integração (nota 51), `createPixPayment` e `createCardPayment`.
+  Guard: `client-payload.unit.spec.ts` ("o Pix leva additional_info com os itens, como o cartão") e `client-payload.unit.spec.ts`
+  ("o cartão leva nome e sobrenome do pagador, emissor e nome na fatura").
 
 ## Leads, convites e e-mails
 
