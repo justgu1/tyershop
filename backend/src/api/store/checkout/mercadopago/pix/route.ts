@@ -6,6 +6,8 @@ import { getMercadoPagoClient, getMercadoPagoPaymentSession, guardedPayment, loa
 
 type Body = {
   payment_session_id: string;
+  /** `MP_DEVICE_SESSION_ID` do SDK do Mercado Pago. */
+  device_id?: string;
   payer: {
     email: string;
     first_name?: string;
@@ -19,7 +21,7 @@ type Body = {
  * para a conta dona do carrinho, uma vez por sessão (ver `guardedPayment`).
  */
 export async function POST(req: MedusaRequest<Body>, res: MedusaResponse) {
-  const { payment_session_id, payer } = req.body ?? ({} as Body);
+  const { payment_session_id, payer, device_id } = req.body ?? ({} as Body);
   if (!payment_session_id || !payer?.email) {
     return res.status(400).json({ message: "payment_session_id e payer.email são obrigatórios." });
   }
@@ -53,6 +55,7 @@ export async function POST(req: MedusaRequest<Body>, res: MedusaResponse) {
           identification: payer.cpf ? { type: "CPF", number: payer.cpf } : undefined,
         },
         externalReference: session.id,
+        deviceId: typeof device_id === "string" && device_id ? device_id : undefined,
         additionalInfo,
       }),
     async (created, attempt) => {

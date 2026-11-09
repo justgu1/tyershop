@@ -1669,7 +1669,7 @@ function init() {
       const payer = payerFromForm();
       const data = await medusaFetch('/store/checkout/mercadopago/pix', {
         method: 'POST',
-        body: JSON.stringify({ payment_session_id: paymentSessionId, payer }),
+        body: JSON.stringify({ payment_session_id: paymentSessionId, payer, device_id: window.MP_DEVICE_SESSION_ID || undefined }),
       });
       if (data.qr_code_base64) {
         const img = qs<HTMLImageElement>('checkout-pix-qr');
