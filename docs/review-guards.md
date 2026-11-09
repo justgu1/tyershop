@@ -80,6 +80,11 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   Origem: pedido real com e-mail @gamail.com.
   Guard: `email.unit.spec.ts` ("recusa domínio de provedor conhecido escrito errado e sugere o certo") e `email.unit.spec.ts`
   ("recusa formato inválido").
+- **Todo item enviado ao Mercado Pago leva `category_id` e `description`, e o cartão leva `statement_descriptor`.** O painel de
+  qualidade da integração pede os três para o antifraude aprovar mais e para reduzir contestação.
+  Origem: painel de qualidade da integração do Mercado Pago, `buildAdditionalInfo` e `createCardPayment`.
+  Guard: `additional-info.unit.spec.ts` ("todo item leva categoria e descrição (pedidos do painel de qualidade do Mercado Pago)") e
+  `additional-info.unit.spec.ts` ("o nome na fatura cabe nos 16 caracteres do Mercado Pago").
 
 ## Leads, convites e e-mails
 
