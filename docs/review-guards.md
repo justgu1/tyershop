@@ -172,6 +172,15 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   Origem: pedido ao ver as abas da planilha, `renderTab`.
   Guard: `aggregate.unit.spec.ts` ("cada aba lista pedido, peça e variação por fórmula sobre a base, sem chaves de array") e
   `aggregate.unit.spec.ts` ("a base guarda a variação (cor e tamanho) de cada item").
+- **Starter e pulseira vendidas durante um drop contam nesse drop, e não numa aba Starter separada.** A venda das peças fixas no
+  drop 6 aparecia só na aba Starter e o drop ficava com o número errado.
+  Origem: pedido ao ver a planilha, `buildBase`.
+  Guard: `aggregate.unit.spec.ts` ("Starter e pulseira vendidas na janela do drop entram nele, sem aba própria") e
+  `aggregate.unit.spec.ts` ("Starter vendido antes do primeiro drop da planilha fica de fora; depois de um drop novo, vai para ele").
+- **Cada drop tem uma aba de confecção que se manda ao fornecedor: peça, cor e grade de tamanhos, sem valor nem cliente.**
+  Origem: pedido ao ver a planilha, `renderConfeccao`.
+  Guard: `aggregate.unit.spec.ts` ("não leva valor em reais nem dado de cliente, e a quantidade é fórmula sobre a base") e
+  `aggregate.unit.spec.ts` ("lista drop, Starter e pulseira nessa ordem, com a grade de tamanhos e sem peça cancelada").
 
 ## Pendentes de guard
 
