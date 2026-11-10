@@ -78,6 +78,16 @@ function tabFormat(tab: TabInfo, sheetId: number) {
   ]
 }
 
+/** `clear` só limpa valores: sem zerar a formatação, o formato de moeda do layout anterior ficaria em colunas que agora são contagem. */
+export const resetFormat = (sheetId: number) => ({ repeatCell: { range: { sheetId }, cell: {}, fields: "userEnteredFormat" } })
+
+export const tabRequests = (tab: TabInfo, sheetId: number, chartIds: number[]) => [
+  ...chartIds.map((chartId) => ({ deleteEmbeddedObject: { objectId: chartId } })),
+  resetFormat(sheetId),
+  ...tabFormat(tab, sheetId),
+  ...chartRequests(tab, sheetId),
+]
+
 function confeccaoFormat(tab: TabInfo, sheetId: number) {
   const width = 4 + tab.sizes.length
   const end = CONFECCAO_HEADER_ROW + tab.grade.length + 1
@@ -134,22 +144,18 @@ export async function syncSalesSheet(scope: MedusaContainer, client: SheetsClien
   const base = existing.get(BASE_TAB)!
   await client.clear(`'${BASE_TAB}'`)
   await client.write(`'${BASE_TAB}'!A1`, baseValues(rows))
-  await client.batchUpdate(baseFormat(base.sheetId, rows.length + 1))
+  await client.batchUpdate([resetFormat(base.sheetId), ...baseFormat(base.sheetId, rows.length + 1)])
 
   for (const tab of tabs) {
     const sheet = existing.get(tab.name)!
     await client.clear(`'${tab.name}'`)
     await client.write(`'${tab.name}'!A1`, localizeFormulas(renderTab(tab, updatedAt), sep))
-    await client.batchUpdate([
-      ...sheet.chartIds.map((chartId) => ({ deleteEmbeddedObject: { objectId: chartId } })),
-      ...tabFormat(tab, sheet.sheetId),
-      ...chartRequests(tab, sheet.sheetId),
-    ])
+    await client.batchUpdate(tabRequests(tab, sheet.sheetId, sheet.chartIds))
 
     const confeccao = existing.get(tabConfeccao(tab.name))!
     await client.clear(`'${confeccao.title}'`)
     await client.write(`'${confeccao.title}'!A1`, localizeFormulas(renderConfeccao(tab, updatedAt), sep))
-    await client.batchUpdate(confeccaoFormat(tab, confeccao.sheetId))
+    await client.batchUpdate([resetFormat(confeccao.sheetId), ...confeccaoFormat(tab, confeccao.sheetId)])
   }
   return { tabs: tabs.flatMap((t) => [t.name, tabConfeccao(t.name)]), rows: rows.length }
 }
