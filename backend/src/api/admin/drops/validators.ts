@@ -15,6 +15,7 @@ const dropFields = {
   general_starts_at: date.nullable().optional(),
   general_ends_at: date,
   general_lot: z.number().int().positive().nullable().optional(),
+  sell_until_sold_out: z.boolean().optional(),
   closed_at: date.nullable().optional(),
   production_days: z.number().int().positive().optional(),
   release_leads_in_presale: z.boolean().optional(),
