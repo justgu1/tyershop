@@ -1,5 +1,6 @@
 import { BASE_COLUMNS, buildBase, dropNumber, DropInfo, SaleLine, sheetSerial, splitVariant } from "../aggregate"
 import { allocateRefund } from "../collect"
+import { resetFormat, tabRequests } from "../sync"
 import { argumentSeparator, baseValues, DAILY_HEADER_ROW, localizeFormulas, orderListHeaderRow, renderConfeccao, renderTab } from "../render"
 
 const drop6: DropInfo = { id: "d6", handle: "drop-6", title: "Drop 6", startsAt: new Date("2026-11-04T15:00:00Z"), salesStart: new Date("2026-11-06T15:00:00Z") }
@@ -200,5 +201,16 @@ describe("aba de confecção", () => {
     const text = JSON.stringify(out)
     expect(text).not.toMatch(/Bruto|R\$ |Reembols/)
     expect(String(out[4][4])).toContain("SUMIFS('Base de dados'!$G$2:$G")
+  })
+})
+
+describe("formatação da aba", () => {
+  it("zera a formatação antes de aplicar a nova, para não sobrar formato de moeda de layout antigo em coluna de contagem", () => {
+    const { tabs } = buildBase([line({})], [drop6])
+    const requests = tabRequests(tabs[0], 7, [1])
+    const reset = requests.findIndex((r) => JSON.stringify(r) === JSON.stringify(resetFormat(7)))
+    const firstFormat = requests.findIndex((r: any) => r.repeatCell && r !== requests[reset])
+    expect(reset).toBeGreaterThanOrEqual(0)
+    expect(reset).toBeLessThan(firstFormat)
   })
 })

@@ -188,6 +188,10 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   Origem: pedido ao ver a planilha, `renderConfeccao`.
   Guard: `aggregate.unit.spec.ts` ("não leva valor em reais nem dado de cliente, e a quantidade é fórmula sobre a base") e
   `aggregate.unit.spec.ts` ("lista drop, Starter e pulseira nessa ordem, com a grade de tamanhos e sem peça cancelada").
+- **A sincronização zera a formatação de cada aba antes de aplicar a nova.** `clear` só limpa valores, então a mudança de layout
+  deixou formato de moeda em Qtd e em pedidos por origem.
+  Origem: conferência da planilha de produção depois do deploy, `tabRequests`.
+  Guard: `aggregate.unit.spec.ts` ("zera a formatação antes de aplicar a nova, para não sobrar formato de moeda de layout antigo em coluna de contagem").
 
 ## Pendentes de guard
 
