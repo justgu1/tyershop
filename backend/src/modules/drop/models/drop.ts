@@ -11,6 +11,7 @@ const Drop = model.define("drop", {
   general_starts_at: model.dateTime().nullable(),
   general_ends_at: model.dateTime(),
   general_lot: model.number().nullable(),
+  sell_until_sold_out: model.boolean().default(false),
   closed_at: model.dateTime().nullable(),
   production_days: model.number().default(21),
   release_leads_in_presale: model.boolean().default(false),

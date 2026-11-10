@@ -6,6 +6,7 @@ export type DropSchedule = {
   general_starts_at?: Date | string | null
   general_ends_at: Date | string
   general_lot?: number | null
+  sell_until_sold_out?: boolean | null
   closed_at?: Date | string | null
 }
 
@@ -27,7 +28,8 @@ export function resolveDropPhase(
   const generalStart = ts(drop.general_starts_at ?? drop.preorder_ends_at)
   if (t < generalStart) return "presale"
 
-  if (t >= ts(drop.general_ends_at)) return "ended"
+  // Com a venda até durar o estoque, a data final não encerra: quem fecha é o estoque de cada variante (ou closed_at).
+  if (!drop.sell_until_sold_out && t >= ts(drop.general_ends_at)) return "ended"
   if (drop.general_lot != null && generalSold >= drop.general_lot) return "ended"
   return "general"
 }
@@ -39,7 +41,7 @@ export function nextPhaseChange(drop: DropSchedule, phase: DropPhase): Date | nu
     case "presale":
       return new Date(drop.general_starts_at ?? drop.preorder_ends_at)
     case "general":
-      return new Date(drop.general_ends_at)
+      return drop.sell_until_sold_out ? null : new Date(drop.general_ends_at)
     default:
       return null
   }

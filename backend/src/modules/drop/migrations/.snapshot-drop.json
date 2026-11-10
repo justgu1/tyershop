@@ -101,6 +101,16 @@
           "nullable": true,
           "mappedType": "integer"
         },
+        "sell_until_sold_out": {
+          "name": "sell_until_sold_out",
+          "type": "boolean",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "false",
+          "mappedType": "boolean"
+        },
         "closed_at": {
           "name": "closed_at",
           "type": "timestamptz",

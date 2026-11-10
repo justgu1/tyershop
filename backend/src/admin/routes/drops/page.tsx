@@ -16,6 +16,7 @@ type Drop = {
   general_starts_at: string | null
   general_ends_at: string
   general_lot: number | null
+  sell_until_sold_out?: boolean
   closed_at: string | null
   production_days: number
   release_leads_in_presale?: boolean
@@ -164,6 +165,14 @@ const DropsPage = () => {
             value={editing.general_lot ?? ""}
             onChange={(e) => set({ general_lot: e.target.value ? Number(e.target.value) : null })}
           />
+          <label style={ui.label}>
+            <input
+              type="checkbox"
+              checked={!!editing.sell_until_sold_out}
+              onChange={(e) => set({ sell_until_sold_out: e.target.checked })}
+            />{" "}
+            Vender enquanto durar o estoque (a data final não encerra a venda geral)
+          </label>
           <label style={ui.label}>Prazo de produção (dias)</label>
           <input
             style={ui.input}

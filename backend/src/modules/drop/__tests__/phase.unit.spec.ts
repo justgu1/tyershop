@@ -37,6 +37,18 @@ describe("resolveDropPhase", () => {
     expect(resolveDropPhase(drop, at("2026-11-10T12:00:00Z"), 0)).toBe("ended")
   })
 
+  it("keeps selling past the final date while sell_until_sold_out is on", () => {
+    const d = { ...drop, general_lot: null, sell_until_sold_out: true }
+    expect(resolveDropPhase(d, at("2026-11-30T00:00:00Z"))).toBe("general")
+    expect(nextPhaseChange(d, "general")).toBeNull()
+  })
+
+  it("still ends on closed_at and on the lot with sell_until_sold_out", () => {
+    const d = { ...drop, sell_until_sold_out: true }
+    expect(resolveDropPhase({ ...d, closed_at: "2026-11-12T00:00:00Z" }, at("2026-11-13T00:00:00Z"))).toBe("ended")
+    expect(resolveDropPhase(d, at("2026-11-30T00:00:00Z"), 100)).toBe("ended")
+  })
+
   it("runs until the final date when there is no lot", () => {
     const d = { ...drop, general_lot: null }
     expect(resolveDropPhase(d, at("2026-11-09T00:00:00Z"), 5000)).toBe("general")
