@@ -3,13 +3,15 @@ import { Modules } from "@medusajs/framework/utils"
 import { BASE_COLUMNS, BASE_TAB, buildBase, TabInfo } from "./aggregate"
 import { collectDrops, collectSaleLines } from "./collect"
 import { parseServiceAccount, SheetsClient } from "./google"
-import { argumentSeparator, baseValues, DAILY_HEADER_ROW, dailyColumns, localizeFormulas, ORDER_LIST_COLUMNS, orderListHeaderRow, renderTab } from "./render"
+import { argumentSeparator, baseValues, CONFECCAO_HEADER_ROW, DAILY_HEADER_ROW, DAILY_NET_COL, DAILY_TOTAL_COL, dailyColumns, localizeFormulas, ORDER_LIST_COLUMNS, orderListHeaderRow, renderConfeccao, renderTab, SUMMARY_FIRST_ROW, SUMMARY_ROWS, tabConfeccao } from "./render"
 
 type Sheet = { sheetId: number; title: string; chartIds: number[] }
 
 const color = (r: number, g: number, b: number) => ({ red: r, green: g, blue: b })
 const PRESALE = color(0.55, 0.36, 0.96)
 const GENERAL = color(0.15, 0.55, 0.85)
+const STARTER = color(0.95, 0.6, 0.1)
+const BRACELET = color(0.2, 0.65, 0.4)
 const TOTAL = color(0.1, 0.1, 0.1)
 
 const MONEY = { numberFormat: { type: "CURRENCY", pattern: "R$ #,##0.00" } }
@@ -48,35 +50,45 @@ export function chartRequests(tab: TabInfo, sheetId: number) {
   if (!tab.days.length) return []
   const first = DAILY_HEADER_ROW - 1
   const last = DAILY_HEADER_ROW + tab.days.length
-  return tab.split
-    ? [
-        chartRequest(sheetId, "Acumulado líquido: pré-venda x venda global", "LINE", first, last, [{ col: 7, color: PRESALE }, { col: 8, color: GENERAL }, { col: 9, color: TOTAL }], 11),
-        chartRequest(sheetId, "Venda diária (bruto) por fase", "COLUMN", first, last, [{ col: 2, color: PRESALE }, { col: 5, color: GENERAL }], 20, true),
-      ]
-    : [
-        chartRequest(sheetId, "Acumulado líquido", "LINE", first, last, [{ col: 4, color: TOTAL }], 8),
-        chartRequest(sheetId, "Venda diária (bruto)", "COLUMN", first, last, [{ col: 2, color: GENERAL }], 17),
-      ]
+  return [
+    chartRequest(sheetId, "Acumulado líquido do drop", "LINE", first, last, [{ col: DAILY_TOTAL_COL, color: TOTAL }], 16),
+    chartRequest(sheetId, "Venda diária (bruto) por origem", "COLUMN", first, last, [{ col: 2, color: PRESALE }, { col: 5, color: GENERAL }, { col: 8, color: STARTER }, { col: 11, color: BRACELET }], 25, true),
+  ]
 }
 
+const DAILY_MONEY_COLS = [2, 3, 5, 6, 8, 9, 11, 12, DAILY_NET_COL, DAILY_TOTAL_COL]
+
 function tabFormat(tab: TabInfo, sheetId: number) {
-  const moneyCols = tab.split ? [2, 3, 5, 6, 7, 8, 9] : [2, 3, 4]
-  const summaryRows = tab.split ? 3 : 1
   const dayEnd = DAILY_HEADER_ROW + Math.max(tab.days.length, 1)
   const listHeader = orderListHeaderRow(tab)
+  const summaryEnd = 4 + SUMMARY_ROWS
   return [
     cells(sheetId, 0, 1, 0, 1, { textFormat: { bold: true, fontSize: 14 } }, "textFormat"),
-    cells(sheetId, 3, 4, 0, 7, BOLD, "textFormat"),
-    cells(sheetId, 4 + summaryRows - 1, 4 + summaryRows, 0, 7, BOLD, "textFormat"),
-    cells(sheetId, 4, 4 + summaryRows, 3, 7, MONEY, "numberFormat"),
-    cells(sheetId, DAILY_HEADER_ROW - 1, DAILY_HEADER_ROW, 0, dailyColumns(tab.split).length, BOLD, "textFormat"),
+    cells(sheetId, SUMMARY_FIRST_ROW - 2, SUMMARY_FIRST_ROW - 1, 0, 7, BOLD, "textFormat"),
+    cells(sheetId, summaryEnd - 1, summaryEnd, 0, 7, BOLD, "textFormat"),
+    cells(sheetId, SUMMARY_FIRST_ROW - 1, summaryEnd, 3, 7, MONEY, "numberFormat"),
+    cells(sheetId, DAILY_HEADER_ROW - 1, DAILY_HEADER_ROW, 0, dailyColumns().length, BOLD, "textFormat"),
     cells(sheetId, DAILY_HEADER_ROW, dayEnd, 0, 1, DATE, "numberFormat"),
-    ...moneyCols.map((c) => cells(sheetId, DAILY_HEADER_ROW, dayEnd, c, c + 1, MONEY, "numberFormat")),
+    ...DAILY_MONEY_COLS.map((c) => cells(sheetId, DAILY_HEADER_ROW, dayEnd, c, c + 1, MONEY, "numberFormat")),
     cells(sheetId, listHeader - 2, listHeader - 1, 0, 1, { textFormat: { bold: true, fontSize: 12 } }, "textFormat"),
     cells(sheetId, listHeader - 1, listHeader, 0, ORDER_LIST_COLUMNS.length, BOLD, "textFormat"),
     cells(sheetId, listHeader, listHeader + Math.max(tab.lines, 1), 1, 2, DATETIME, "numberFormat"),
-    cells(sheetId, listHeader, listHeader + Math.max(tab.lines, 1), 6, 7, MONEY, "numberFormat"),
-    { autoResizeDimensions: { dimensions: { sheetId, dimension: "COLUMNS", startIndex: 0, endIndex: 10 } } },
+    cells(sheetId, listHeader, listHeader + Math.max(tab.lines, 1), 7, 8, MONEY, "numberFormat"),
+    { autoResizeDimensions: { dimensions: { sheetId, dimension: "COLUMNS", startIndex: 0, endIndex: dailyColumns().length } } },
+  ]
+}
+
+function confeccaoFormat(tab: TabInfo, sheetId: number) {
+  const width = 4 + tab.sizes.length
+  const end = CONFECCAO_HEADER_ROW + tab.grade.length + 1
+  return [
+    cells(sheetId, 0, 1, 0, 1, { textFormat: { bold: true, fontSize: 14 } }, "textFormat"),
+    cells(sheetId, CONFECCAO_HEADER_ROW - 1, CONFECCAO_HEADER_ROW, 0, width, BOLD, "textFormat"),
+    cells(sheetId, CONFECCAO_HEADER_ROW - 1, CONFECCAO_HEADER_ROW, 0, width, { backgroundColor: color(0.9, 0.9, 0.9) }, "backgroundColor"),
+    cells(sheetId, CONFECCAO_HEADER_ROW, end, 3, width, { horizontalAlignment: "CENTER" }, "horizontalAlignment"),
+    ...(tab.grade.length ? [cells(sheetId, end - 1, end, 0, width, BOLD, "textFormat")] : []),
+    { updateSheetProperties: { properties: { sheetId, gridProperties: { frozenRowCount: CONFECCAO_HEADER_ROW } }, fields: "gridProperties.frozenRowCount" } },
+    { autoResizeDimensions: { dimensions: { sheetId, dimension: "COLUMNS", startIndex: 0, endIndex: width } } },
   ]
 }
 
@@ -113,7 +125,7 @@ export async function syncSalesSheet(scope: MedusaContainer, client: SheetsClien
   const existing = new Map<string, Sheet>(
     (await client.getSheets()).sheets.map((s) => [s.properties.title, { sheetId: s.properties.sheetId, title: s.properties.title, chartIds: (s.charts ?? []).map((c) => c.chartId) }])
   )
-  const wanted = [BASE_TAB, ...tabs.map((t) => t.name)].filter((name) => !existing.has(name))
+  const wanted = [BASE_TAB, ...tabs.flatMap((t) => [t.name, tabConfeccao(t.name)])].filter((name) => !existing.has(name))
   if (wanted.length) {
     const res = await client.batchUpdate(wanted.map((title) => ({ addSheet: { properties: { title } } })))
     res.replies.forEach((rep: any) => existing.set(rep.addSheet.properties.title, { sheetId: rep.addSheet.properties.sheetId, title: rep.addSheet.properties.title, chartIds: [] }))
@@ -133,8 +145,13 @@ export async function syncSalesSheet(scope: MedusaContainer, client: SheetsClien
       ...tabFormat(tab, sheet.sheetId),
       ...chartRequests(tab, sheet.sheetId),
     ])
+
+    const confeccao = existing.get(tabConfeccao(tab.name))!
+    await client.clear(`'${confeccao.title}'`)
+    await client.write(`'${confeccao.title}'!A1`, localizeFormulas(renderConfeccao(tab, updatedAt), sep))
+    await client.batchUpdate(confeccaoFormat(tab, confeccao.sheetId))
   }
-  return { tabs: tabs.map((t) => t.name), rows: rows.length }
+  return { tabs: tabs.flatMap((t) => [t.name, tabConfeccao(t.name)]), rows: rows.length }
 }
 
 /** Uma rodada por vez: a que não consegue o lock cede, porque a em andamento (ou a próxima do job) já cobre o mesmo estado. */

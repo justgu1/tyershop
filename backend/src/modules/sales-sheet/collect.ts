@@ -22,7 +22,7 @@ export async function collectDrops(scope: MedusaContainer): Promise<DropCatalog>
   const query = scope.resolve(ContainerRegistrationKeys.QUERY)
   const { data } = await query.graph({
     entity: "drop",
-    fields: ["id", "handle", "title", "preorder_ends_at", "general_starts_at", "products.id"],
+    fields: ["id", "handle", "title", "preorder_starts_at", "preorder_ends_at", "general_starts_at", "products.id"],
   })
   const dropOfProduct = new Map<string, string>()
   const drops = (data as any[]).map((d) => {
@@ -31,6 +31,7 @@ export async function collectDrops(scope: MedusaContainer): Promise<DropCatalog>
       id: d.id,
       handle: d.handle,
       title: d.title,
+      startsAt: new Date(d.preorder_starts_at),
       salesStart: new Date(d.general_starts_at ?? d.preorder_ends_at),
     }
   })
