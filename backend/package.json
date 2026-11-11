@@ -30,6 +30,7 @@
     "@medusajs/medusa": "2.13.1",
     "body-parser": "^2.2.2",
     "csv-parse": "^6.2.1",
+    "imapflow": "^2.11.0",
     "nodemailer": "^8.0.6",
     "patch-package": "^8.0.1"
   },

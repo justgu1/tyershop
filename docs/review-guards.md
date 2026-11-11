@@ -200,6 +200,17 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   Guard: `refund-email.unit.spec.ts` ("estorno de pedido cancelado não manda segundo e-mail") e `templates.unit.spec.ts`
   ("cancelamento sem estorno não promete devolução").
 
+- **E-mail devolvido pelo servidor do cliente aparece no rastreio, com o motivo.** O `success` do envio só diz que o SMTP aceitou; a
+  confirmação do #1293 foi recusada horas depois por caixa cheia e ninguém soube. A rotina lê as devoluções da caixa de suporte e
+  casa pelo Message-ID.
+  Origem: pedido 1293 em produção, confirmação devolvida pelo Gmail (`452 4.2.2`).
+  Guard: `bounce.unit.spec.ts` ("caixa cheia do Gmail aponta o Message-ID do nosso e-mail, o destinatário e o motivo") e
+  `bounce.unit.spec.ts` ("aviso de atraso não conta como devolução").
+- **Resposta de cliente chega ao e-mail do responsável; cópia nossa, devolução e resposta automática nunca são encaminhadas.**
+  Respostas a e-mails antigos caíam só em `suporte@` e ficavam sem resposta (o #1238 esperou desde 09/11).
+  Origem: resposta do cliente do pedido 1238, sem aviso ao responsável.
+  Guard: `inbox-rules.unit.spec.ts` ("só resposta de cliente é encaminhada, nunca cópia nossa, devolução ou resposta automática").
+
 ## Pendentes de guard
 
 - **Reservas do e-mail de confirmação expiram, para um envio interrompido ser refeito.** Falta teste de integração com banco.
@@ -230,3 +241,6 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   Cliente logado sem CPF salvo via o cartão-resumo no lugar do form: "Continuar" falhava a validação num campo invisível e
   parecia não fazer nada; havia dois "Continuar". Falta teste de frontend (não há runner configurado).
   Origem: checkout mobile travado no passo "Seus dados", `validateRequiredFields`.
+- **A rotina `sync-support-inbox` só roda contra a caixa real.** Falta um servidor IMAP de teste para cobrir mover, encaminhar e
+  repetir sem duplicar. Hoje conferido por ensaio somente leitura na caixa de produção.
+  Origem: PR da rotina da caixa de suporte.
