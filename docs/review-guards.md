@@ -173,6 +173,13 @@ Achado sem guard ainda vai em "Pendentes de guard", no fim: fica visível, mas n
   Guard: `aggregate.unit.spec.ts` ("cada aba lista pedido, peça e variação por fórmula sobre a base, sem chaves de array") e
   `aggregate.unit.spec.ts` ("a base guarda a variação (cor e tamanho) de cada item").
 
+- **Cancelamento e estorno de pedido avisam o cliente, uma vez só.** O cancelamento manda o próprio e-mail com o valor devolvido;
+  o e-mail de estorno vale só para pedido que segue ativo, para quem foi cancelado não receber dois avisos. Os clientes
+  estornados pelas falhas de conclusão só souberam pelo Mercado Pago.
+  Origem: pedidos 1216, 1238, 1246 e 1261 em produção, sem nenhum aviso da loja.
+  Guard: `refund-email.unit.spec.ts` ("estorno de pedido cancelado não manda segundo e-mail") e `templates.unit.spec.ts`
+  ("cancelamento sem estorno não promete devolução").
+
 ## Pendentes de guard
 
 - **Reservas do e-mail de confirmação expiram, para um envio interrompido ser refeito.** Falta teste de integração com banco.

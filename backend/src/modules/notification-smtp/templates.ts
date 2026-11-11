@@ -96,6 +96,24 @@ const footerText = (reason: string, plain = false) =>
     ...(plain ? [] : [SOCIAL.map((s) => `${s.label}: ${s.url}`).join(" | ")]),
   ].join("\n")
 
+/** Cancelamento e estorno dizem o mesmo sobre o dinheiro, então o texto vem de um lugar só. */
+function refundMail(d: TemplateData, c: { subject: string; title: string; lead: string; leadText: string }): RenderedEmail {
+  const reason = `Você recebeu este e-mail porque fez um pedido na Tyer com ${esc(d.email)}.`
+  const amount = Number(d.refunded_total) > 0 ? brl(d.refunded_total, d.currency_code) : null
+  const via = d.method ? ` (${d.method})` : ""
+  const money = amount ? `O valor de <strong>${amount}</strong> foi devolvido pelo mesmo meio de pagamento${esc(via)}. O prazo para aparecer na sua conta depende do seu banco.` : ""
+  const moneyText = amount ? `O valor de ${amount} foi devolvido pelo mesmo meio de pagamento${via}. O prazo para aparecer na sua conta depende do seu banco.` : ""
+  const html = shell({
+    preheader: amount ? `${amount} devolvidos do pedido #${d.display_id}.` : `O pedido #${d.display_id} foi atualizado.`,
+    title: d.name ? `${d.name}, ${c.title.toLowerCase()}` : c.title,
+    paragraphs: [c.lead, money, "Se algo não estiver certo, é só responder este e-mail que a gente resolve."].filter(Boolean),
+    cta: { label: "Ver meu pedido", url: d.orders_url },
+    reason,
+  })
+  const text = [c.leadText, moneyText, "Se algo não estiver certo, é só responder este e-mail que a gente resolve.", `Ver pedido: ${d.orders_url}`, footerText(reason)].filter(Boolean).join("\n")
+  return { subject: c.subject, html, text }
+}
+
 const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
   /** Redefinição de senha da conta do cliente. */
   password_reset: (d) => {
@@ -299,6 +317,12 @@ const TEMPLATES: Record<string, (d: TemplateData) => RenderedEmail> = {
     const text = [`O pedido #${d.display_id} foi entregue.`, "Se algo não estiver certo, fale com a gente em até 7 dias do recebimento.", `Ver pedido: ${d.orders_url}`, footerText(reason)].join("\n")
     return { subject, html, text }
   },
+
+  /** Pedido cancelado; cita o valor devolvido quando já houve estorno. */
+  order_canceled: (d) => refundMail(d, { subject: `Pedido #${d.display_id} cancelado`, title: "Pedido cancelado", lead: `O pedido <strong>#${esc(d.display_id)}</strong> foi cancelado.`, leadText: `O pedido #${d.display_id} foi cancelado.` }),
+
+  /** Estorno de um pedido que segue ativo (cancelamento já tem o próprio e-mail). */
+  order_refunded: (d) => refundMail(d, { subject: `Estorno do pedido #${d.display_id}`, title: "Estorno realizado", lead: `Fizemos um estorno no pedido <strong>#${esc(d.display_id)}</strong>.`, leadText: `Fizemos um estorno no pedido #${d.display_id}.` }),
 
   /** Nota fiscal emitida; o PDF vai em anexo e também fica para baixar em Meus pedidos. */
   order_invoice: (d) => {
