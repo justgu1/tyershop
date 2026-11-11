@@ -104,6 +104,31 @@ describe("e-mails de pedido", () => {
   })
 })
 
+describe("e-mails de cancelamento e estorno", () => {
+  const base = { email: "ana@tyer.test", name: "Ana", display_id: 1238, orders_url: "https://tyer.test/account/orders", currency_code: "brl", method: "Pix" }
+
+  it("cancelamento com estorno cita o valor devolvido e a forma de pagamento", () => {
+    const mail = renderTemplate("order_canceled", { ...base, refunded_total: 39.84 })
+    expect(mail.subject).toBe("Pedido #1238 cancelado")
+    expect(mail.html).toContain("R$")
+    expect(mail.html).toContain("39,84")
+    expect(mail.html).toContain("(Pix)")
+    expect(mail.text).toContain("foi devolvido pelo mesmo meio de pagamento")
+  })
+
+  it("cancelamento sem estorno não promete devolução", () => {
+    const mail = renderTemplate("order_canceled", { ...base, refunded_total: 0 })
+    expect(mail.html).not.toContain("devolvido")
+    expect(mail.text).not.toContain("devolvido")
+  })
+
+  it("estorno com o pedido ativo tem assunto e título próprios", () => {
+    const mail = renderTemplate("order_refunded", { ...base, refunded_total: 10 })
+    expect(mail.subject).toBe("Estorno do pedido #1238")
+    expect(mail.html).toContain("Ana, estorno realizado")
+  })
+})
+
 describe("cancelar inscrição nos e-mails de lista", () => {
   const url = "https://tyer.test/sair-da-lista?e=ana%40tyer.test&t=abc"
   it("boas-vindas e ingresso trazem o link e o texto sem HTML", () => {

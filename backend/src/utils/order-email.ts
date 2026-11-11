@@ -2,6 +2,7 @@ import { MedusaContainer } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { productionDaysOfProducts } from "../modules/melhor-envio/quote"
 import { methodLabel } from "./payment-method"
+import { sumRefunds } from "./refund-email"
 
 const siteUrl = () => (process.env.SITE_URL || "http://localhost:4321").replace(/\/$/, "")
 export const ordersUrl = () => `${siteUrl()}/account/orders`
@@ -10,7 +11,7 @@ export const ordersUrl = () => `${siteUrl()}/account/orders`
 export async function loadOrder(scope: MedusaContainer, orderId: string) {
   try {
     return (await scope.resolve(Modules.ORDER).retrieveOrder(orderId, {
-      select: ["id", "display_id", "email", "currency_code", "total", "shipping_total", "customer_id", "metadata", "created_at"],
+      select: ["id", "display_id", "email", "status", "currency_code", "total", "shipping_total", "customer_id", "metadata", "created_at"],
       relations: ["items", "shipping_address", "shipping_methods"],
     })) as any
   } catch {
@@ -57,6 +58,34 @@ export async function paymentInfo(scope: MedusaContainer, orderId: string) {
   const d = (payment?.data ?? {}) as { method?: string; mp_status?: string; mp_payment_id?: number | string }
   if (!payment) return null
   return { method: methodLabel(d.method, "Mercado Pago"), status: STATUS_LABEL[d.mp_status ?? ""] ?? null, id: d.mp_payment_id ? String(d.mp_payment_id) : null }
+}
+
+/** Pedido a que um pagamento pertence (null se o pagamento ainda não virou pedido). */
+export async function orderOfPayment(scope: MedusaContainer, paymentId: string) {
+  try {
+    const payment = await scope.resolve(Modules.PAYMENT).retrievePayment(paymentId, { select: ["id", "payment_collection_id"] })
+    const { data } = await scope
+      .resolve(ContainerRegistrationKeys.QUERY)
+      .graph({ entity: "order_payment_collection", fields: ["order_id"], filters: { payment_collection_id: payment.payment_collection_id } })
+    const orderId = (data[0] as { order_id?: string } | undefined)?.order_id
+    return orderId ? loadOrder(scope, orderId) : null
+  } catch {
+    return null
+  }
+}
+
+/** Dados do e-mail de cancelamento e de estorno: o total já devolvido e a forma de pagamento. */
+export async function refundEmailData(scope: MedusaContainer, order: any) {
+  const { data } = await scope
+    .resolve(ContainerRegistrationKeys.QUERY)
+    .graph({ entity: "order", fields: ["payment_collections.payments.refunds.amount"], filters: { id: order.id } })
+  const payments = ((data[0] as any)?.payment_collections ?? []).flatMap((pc: any) => pc.payments ?? [])
+  return {
+    ...baseOrderData(order),
+    currency_code: order.currency_code,
+    refunded_total: sumRefunds(payments.flatMap((p: any) => p.refunds ?? [])),
+    method: (await paymentInfo(scope, order.id))?.method ?? null,
+  }
 }
 
 export async function confirmationData(scope: MedusaContainer, order: any) {
