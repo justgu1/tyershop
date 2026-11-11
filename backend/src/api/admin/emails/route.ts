@@ -2,8 +2,9 @@ import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules } from "@medusajs/framework/utils"
 import { EMAIL_VIEW_MODULE } from "../../../modules/email-view"
 import EmailViewModuleService from "../../../modules/email-view/service"
+import { BounceReason, REASON_LABEL } from "../../../modules/email-view/bounce"
 
-/** E-mails enviados, com a situação de cada um: enviado, visto (quando, quantas vezes, de onde) ou ainda não visto. */
+/** E-mails enviados, com a situação de cada um: devolvido (e por quê), visto (quando e de onde) ou ainda não visto. */
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
   const { q, template } = req.query as { q?: string; template?: string }
   const filters: Record<string, unknown> = { channel: "email" }
@@ -20,6 +21,8 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
   const views = req.scope.resolve<EmailViewModuleService>(EMAIL_VIEW_MODULE)
   const seen = list.length ? await views.listEmailViews({ notification_id: list.map((n) => n.id) }) : []
   const byNotification = new Map(seen.map((v) => [v.notification_id, v]))
+  const bounces = list.length ? await views.listEmailBounces({ notification_id: list.map((n) => n.id) }) : []
+  const bounceOf = new Map(bounces.map((b) => [b.notification_id, b]))
 
   res.json({
     count,
@@ -31,6 +34,16 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
         template: n.template,
         status: n.status,
         message_id: n.external_id ?? null,
+        bounced: bounceOf.has(n.id)
+          ? {
+              at: bounceOf.get(n.id)!.bounced_at,
+              reason: bounceOf.get(n.id)!.reason,
+              label: REASON_LABEL[bounceOf.get(n.id)!.reason as BounceReason] ?? bounceOf.get(n.id)!.reason,
+              recipient: bounceOf.get(n.id)!.recipient,
+              status_code: bounceOf.get(n.id)!.status_code,
+              diagnostic: bounceOf.get(n.id)!.diagnostic,
+            }
+          : null,
         sent_at: n.created_at,
         viewed: v
           ? {
